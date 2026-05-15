@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildLaunchReadinessReport,
+  directAdminBootstrapTriggerPlan,
   requiredVercelEnvKeys,
   migrationPlanFromStatus,
   parseOpsArgs,
@@ -69,5 +70,12 @@ describe("supabase ops helpers", () => {
       "PROMPTS_RETENTION_SECRET",
       "PROMPTS_DEV_ACCESS_HELP",
     ]);
+  });
+
+  it("documents the trigger bypass needed for direct admin bootstrap", () => {
+    expect(directAdminBootstrapTriggerPlan).toEqual({
+      table: "public.profiles",
+      trigger: "profiles_prevent_admin_escalation",
+    });
   });
 });

@@ -227,13 +227,21 @@ async function makeAdmin(sql, email) {
 
   const user = users[0];
   const username = usernameFromEmail(user.email);
-  await sql`
-    insert into public.profiles (user_id, username, display_name, is_admin)
-    values (${user.id}, ${username}, ${user.email}, true)
-    on conflict (user_id) do update
-    set is_admin = true,
-        updated_at = now()
-  `;
+  await sql.begin(async (tx) => {
+    await tx`alter table public.profiles disable trigger profiles_prevent_admin_escalation`;
+
+    try {
+      await tx`
+        insert into public.profiles (user_id, username, display_name, is_admin)
+        values (${user.id}, ${username}, ${user.email}, true)
+        on conflict (user_id) do update
+        set is_admin = true,
+            updated_at = now()
+      `;
+    } finally {
+      await tx`alter table public.profiles enable trigger profiles_prevent_admin_escalation`;
+    }
+  });
 
   console.log(`Admin enabled for ${email}.`);
 }

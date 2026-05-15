@@ -43,6 +43,11 @@ export const requiredLocalOpsEnvKeys = [
   "SUPABASE_DB_URL",
 ] as const;
 
+export const directAdminBootstrapTriggerPlan = {
+  table: "public.profiles",
+  trigger: "profiles_prevent_admin_escalation",
+} as const;
+
 export function migrationPlanFromStatus(status: SupabaseOpsStatus) {
   const plan: string[] = [];
 
