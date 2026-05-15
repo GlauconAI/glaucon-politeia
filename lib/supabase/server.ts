@@ -4,13 +4,12 @@ import { cookies } from "next/headers";
 import { formatMissingEnvMessage, getPublicEnv } from "@/lib/env";
 
 export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
   const env = getPublicEnv();
 
   if (!env.configured) {
     throw new Error(formatMissingEnvMessage(env.missing));
   }
-
-  const cookieStore = await cookies();
 
   return createServerClient(env.supabaseUrl, env.supabasePublishableKey, {
     cookies: {

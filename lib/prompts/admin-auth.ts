@@ -1,7 +1,12 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getServerEnv } from "@/lib/env";
 
 export async function getCurrentPromptAdmin() {
+  if (!getServerEnv().configured) {
+    return null;
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
 
