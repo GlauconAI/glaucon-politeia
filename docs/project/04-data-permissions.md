@@ -52,8 +52,9 @@ Policies:
 Policies:
 
 - Anyone can read tags.
-- P0 should seed tags; UI creation can be deferred.
-- If inserts are allowed, restrict them to authenticated users or admins depending on launch posture.
+- P0 seeds tags through `supabase/seed.sql`.
+- Tag creation UI is deferred.
+- Tag insert, update, and delete are admin-only in the P0 schema.
 
 ### `post_tags`
 
@@ -110,6 +111,17 @@ Policies:
 - Users can read, insert, and delete only their own bookmarks.
 - Admins may read all if needed.
 - Public pages should not select raw bookmark rows; expose counts through safe aggregate queries, views, or RPC.
+
+### `post_engagement_counts`
+
+Public aggregate view over published posts only:
+
+- `post_id`
+- `like_count`
+- `bookmark_count`
+- `comment_count`
+
+This view exists so public pages can show engagement counts without granting public select access to raw bookmark rows.
 
 ## Prompt Tables
 
