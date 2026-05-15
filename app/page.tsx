@@ -1,7 +1,20 @@
 import { getPublicEnv } from "@/lib/env";
+import { PostCard } from "@/components/posts/PostCard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
   const env = getPublicEnv();
+  const supabase = env.configured ? await createSupabaseServerClient() : null;
+  const { data: posts } = supabase
+    ? await supabase
+        .from("posts")
+        .select(
+          "slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name)),post_engagement_counts(like_count,bookmark_count,comment_count)",
+        )
+        .eq("status", "published")
+        .order("published_at", { ascending: false })
+        .limit(10)
+    : { data: [] };
 
   return (
     <section className="home-stack">
@@ -37,6 +50,19 @@ export default function Home() {
           </p>
         )}
       </div>
+
+      <section className="feed-section">
+        <h2>最新文章</h2>
+        {posts?.length ? (
+          <div className="post-list">
+            {posts.map((post) => (
+              <PostCard key={post.slug} post={post} />
+            ))}
+          </div>
+        ) : (
+          <p className="empty-text">暂无文章，可以从写作发布第一篇。</p>
+        )}
+      </section>
     </section>
   );
 }

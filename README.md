@@ -1,6 +1,6 @@
 # Glaucon Politeia
 
-This repository is currently in the profiles stage for rebuilding a personal website previously specified as `Vibe Academy`.
+This repository is currently in the content publishing stage for rebuilding a personal website previously specified as `Vibe Academy`.
 
 The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application will be a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, and authorization are part of the first product loop. Optional modules such as a local TODO tool, Prompt capture/admin, and a 3D navigation lab are planned as later milestones.
 
@@ -13,6 +13,7 @@ The intended product is a robust, extensible personal publishing site for AI cod
 - P0 Supabase schema, RLS policies, seed tags, and deterministic slug/excerpt/username helpers are being developed on the M1 branch.
 - The M2 branch adds the dev.to-style app shell, persisted theme control, auth page, OAuth callback, and logout flow.
 - The M3 branch adds profile auto-creation, `/profile/me`, public profile pages, owner editing, and avatar upload support.
+- The M4 branch adds the post feed, editor, post detail, tag pages, search, and Markdown rendering.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.
 - The active project documentation has been split into focused documents under `docs/project/`, `docs/milestones/`, and `docs/adr/`.
 - The implementation path is to build the product in milestone-sized vertical slices from this thin foundation.
