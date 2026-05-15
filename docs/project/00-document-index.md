@@ -38,6 +38,9 @@ These source documents are preserved as historical input. New implementation wor
 9. `08-legacy-analysis.md`
    - Detailed analysis of the Trae-era materials, extracted risks, subsystem boundaries, and rebuild decisions.
 
+10. `09-current-status.md`
+    - Current project introduction, production status, implemented milestones, commands, and remaining follow-up work.
+
 ## Implementation Principles
 
 - Start from a thin Next.js + Supabase foundation instead of migrating template code.
