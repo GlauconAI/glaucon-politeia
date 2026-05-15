@@ -13,7 +13,11 @@
     "supabase:status": "node scripts/supabase-ops.mjs status",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "vercel:build": "npx vercel@latest build",
+    "vercel:deploy": "npx vercel@latest deploy --prebuilt",
+    "vercel:env:pull": "npx vercel@latest env pull .env.local",
+    "vercel:link": "npx vercel@latest link"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -43,10 +47,9 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.6",
     "jsdom": "^29.1.1",
-    "postgres": "^3.4.9",
+    "postgres": "^3.4.7",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "postgres": "^3.4.7",
     "vitest": "^4.1.6"
   },
   "overrides": {

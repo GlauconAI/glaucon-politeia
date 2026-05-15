@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildLaunchReadinessReport,
+  requiredVercelEnvKeys,
   migrationPlanFromStatus,
   parseOpsArgs,
   usernameFromEmailForOps,
@@ -58,5 +59,15 @@ describe("supabase ops helpers", () => {
     expect(report.checks.find((check) => check.id === "migrations")?.state).toBe(
       "fail",
     );
+  });
+
+  it("documents the required Vercel production environment keys", () => {
+    expect(requiredVercelEnvKeys).toEqual([
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_SECRET_KEY",
+      "PROMPTS_RETENTION_SECRET",
+      "PROMPTS_DEV_ACCESS_HELP",
+    ]);
   });
 });

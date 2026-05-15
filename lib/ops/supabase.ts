@@ -30,6 +30,19 @@ export const opsMigrations = {
   promptAdminRpc: "supabase/migrations/20260515000400_prompt_admin_rpc.sql",
 } as const;
 
+export const requiredVercelEnvKeys = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "PROMPTS_RETENTION_SECRET",
+  "PROMPTS_DEV_ACCESS_HELP",
+] as const;
+
+export const requiredLocalOpsEnvKeys = [
+  ...requiredVercelEnvKeys,
+  "SUPABASE_DB_URL",
+] as const;
+
 export function migrationPlanFromStatus(status: SupabaseOpsStatus) {
   const plan: string[] = [];
 
@@ -88,14 +101,7 @@ export function usernameFromEmailForOps(email: string) {
 
 export function buildLaunchReadinessReport(input: LaunchReadinessInput) {
   const checks: LaunchReadinessCheck[] = [];
-  const requiredEnv = [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-    "SUPABASE_SECRET_KEY",
-    "PROMPTS_RETENTION_SECRET",
-    "SUPABASE_DB_URL",
-  ];
-  const missingEnv = requiredEnv.filter((key) => !input.env[key]?.trim());
+  const missingEnv = requiredLocalOpsEnvKeys.filter((key) => !input.env[key]?.trim());
   const missingMigrations = migrationPlanFromStatus(input.status);
 
   checks.push({

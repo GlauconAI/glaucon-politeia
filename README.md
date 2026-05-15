@@ -1,6 +1,6 @@
 # Glaucon Politeia
 
-This repository is currently in the 3D Lab stage for rebuilding a personal website previously specified as `Vibe Academy`.
+This repository is currently in the Vercel launch-prep stage for rebuilding a personal website previously specified as `Vibe Academy`.
 
 The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application is a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, authorization, prompt workflows, and an isolated 3D navigation lab are represented in milestone branches.
 
@@ -20,6 +20,7 @@ The intended product is a robust, extensible personal publishing site for AI cod
 - The M8 branch adds prompt ingestion, sensitive-content flags, idempotency, and a browser retry queue.
 - The M9 branch adds admin prompt review, filtering, CSV export, hourly stats, batch actions, and retention archival.
 - The M10 branch adds an isolated React Three Fiber navigation world at `/lab/world`.
+- The launch-prep branch adds direct Supabase ops, readiness checks, and Vercel deployment scripts/docs.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.
 - The active project documentation has been split into focused documents under `docs/project/`, `docs/milestones/`, and `docs/adr/`.
 - The implementation path is to build the product in milestone-sized vertical slices from this thin foundation.
@@ -75,6 +76,14 @@ The intended product is a robust, extensible personal publishing site for AI cod
 
 - `docs/adr/0001-project-starting-point.md`
   - Decision record for using a thin Next.js + Supabase foundation instead of a static blog template or large SaaS starter.
+
+### Operations
+
+- `docs/ops/supabase-direct-ops.md`
+  - Local Supabase database checks, missing migration application, and admin promotion commands.
+
+- `docs/ops/vercel-deployment.md`
+  - Vercel environment variables, CLI workflow, Auth callback configuration, and launch gate.
 
 ## Recommended First Release
 
