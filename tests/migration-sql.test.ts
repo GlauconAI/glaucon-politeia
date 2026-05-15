@@ -52,6 +52,14 @@ describe("p0 core schema migration", () => {
     }
   });
 
+  it("creates profiles before functions that query profiles", () => {
+    const sql = readMigration();
+
+    expect(sql.indexOf("create table public.profiles")).toBeLessThan(
+      sql.indexOf("create or replace function public.is_current_user_admin"),
+    );
+  });
+
   it("keeps bookmark rows private while exposing aggregate post stats", () => {
     const sql = readMigration();
 

@@ -10,6 +10,17 @@ begin
 end;
 $$;
 
+create table public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  username text unique not null check (username ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  display_name text not null,
+  bio text not null default '',
+  avatar_url text not null default '',
+  is_admin boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create or replace function public.is_current_user_admin()
 returns boolean
 language sql
@@ -24,17 +35,6 @@ as $$
       and is_admin = true
   );
 $$;
-
-create table public.profiles (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  username text unique not null check (username ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
-  display_name text not null,
-  bio text not null default '',
-  avatar_url text not null default '',
-  is_admin boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
 
 create table public.posts (
   id uuid primary key default gen_random_uuid(),
