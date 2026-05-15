@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
+    "supabase:readiness": "node scripts/supabase-ops.mjs readiness",
     "supabase:status": "node scripts/supabase-ops.mjs status",
     "test": "vitest run",
     "test:watch": "vitest",

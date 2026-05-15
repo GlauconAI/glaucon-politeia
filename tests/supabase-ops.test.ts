@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLaunchReadinessReport,
   migrationPlanFromStatus,
   parseOpsArgs,
   usernameFromEmailForOps,
@@ -31,6 +32,31 @@ describe("supabase ops helpers", () => {
   it("normalizes fallback usernames from email", () => {
     expect(usernameFromEmailForOps("First.Last+admin@example.com")).toBe(
       "first-last-admin",
+    );
+  });
+
+  it("marks launch readiness as failed when admin and migrations are missing", () => {
+    const report = buildLaunchReadinessReport({
+      env: {
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable",
+        SUPABASE_SECRET_KEY: "secret",
+        PROMPTS_RETENTION_SECRET: "retention",
+        SUPABASE_DB_URL: "postgres://example",
+      },
+      status: {
+        avatarsBucket: true,
+        promptsTable: false,
+        promptHourlyStats: true,
+        archiveOldPrompts: true,
+      },
+      adminCount: 0,
+    });
+
+    expect(report.ready).toBe(false);
+    expect(report.checks.map((check) => check.id)).toContain("admin-user");
+    expect(report.checks.find((check) => check.id === "migrations")?.state).toBe(
+      "fail",
     );
   });
 });

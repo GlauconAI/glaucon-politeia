@@ -41,6 +41,12 @@ try {
     printStatus(await readStatus(sql));
   }
 
+  if (command.command === "readiness") {
+    const status = await readStatus(sql);
+    const adminCount = await readAdminCount(sql);
+    printReadiness(buildLaunchReadinessReport({ env, status, adminCount }));
+  }
+
   if (command.command === "make-admin") {
     await makeAdmin(sql, command.email);
   }
@@ -76,6 +82,7 @@ function parseArgs(args) {
 
   if (name === "status") return { command: "status" };
   if (name === "apply-missing") return { command: "apply-missing" };
+  if (name === "readiness") return { command: "readiness" };
 
   if (name === "make-admin") {
     const email = readFlag(args, "--email")?.trim().toLowerCase();
@@ -101,6 +108,52 @@ function migrationPlanFromStatus(status) {
     plan.push(migrations.promptAdminRpc);
   }
   return plan;
+}
+
+function buildLaunchReadinessReport(input) {
+  const requiredEnv = [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_SECRET_KEY",
+    "PROMPTS_RETENTION_SECRET",
+    "SUPABASE_DB_URL",
+  ];
+  const missingEnv = requiredEnv.filter((key) => !input.env[key]?.trim());
+  const missingMigrations = migrationPlanFromStatus(input.status);
+  const checks = [
+    {
+      id: "env",
+      label: "Required local environment",
+      state: missingEnv.length === 0 ? "pass" : "fail",
+      detail:
+        missingEnv.length === 0
+          ? "All required local variables are present."
+          : `Missing: ${missingEnv.join(", ")}`,
+    },
+    {
+      id: "migrations",
+      label: "Supabase migrations",
+      state: missingMigrations.length === 0 ? "pass" : "fail",
+      detail:
+        missingMigrations.length === 0
+          ? "Remote database has all required launch objects."
+          : `Missing migration coverage: ${missingMigrations.join(", ")}`,
+    },
+    {
+      id: "admin-user",
+      label: "Admin user",
+      state: input.adminCount > 0 ? "pass" : "warn",
+      detail:
+        input.adminCount > 0
+          ? `${input.adminCount} admin profile(s) found.`
+          : "No admin profile found. Run npm run supabase:make-admin -- --email owner@example.com after first login.",
+    },
+  ];
+
+  return {
+    ready: checks.every((check) => check.state === "pass"),
+    checks,
+  };
 }
 
 async function readStatus(sql) {
@@ -131,6 +184,16 @@ async function readStatus(sql) {
   };
 }
 
+async function readAdminCount(sql) {
+  const rows = await sql`
+    select count(*)::int as count
+    from public.profiles
+    where is_admin = true
+  `;
+
+  return rows[0]?.count ?? 0;
+}
+
 function printStatus(status) {
   console.log({
     profilesTable: status.profilesTable,
@@ -140,6 +203,14 @@ function printStatus(status) {
     archiveOldPrompts: status.archiveOldPrompts,
     missingMigrations: migrationPlanFromStatus(status),
   });
+}
+
+function printReadiness(report) {
+  console.log(`Launch readiness: ${report.ready ? "ready" : "needs attention"}`);
+
+  for (const check of report.checks) {
+    console.log(`[${check.state}] ${check.label}: ${check.detail}`);
+  }
 }
 
 async function makeAdmin(sql, email) {

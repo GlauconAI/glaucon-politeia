@@ -16,6 +16,12 @@ Apply currently known missing migrations:
 npm run supabase:apply-missing
 ```
 
+Check launch readiness:
+
+```bash
+npm run supabase:readiness
+```
+
 Promote a signed-in user to site admin:
 
 ```bash
