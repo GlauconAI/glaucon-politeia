@@ -1,0 +1,114 @@
+# Requirements
+
+## Foundation
+
+- Use Next.js App Router, TypeScript, React, Tailwind CSS, and Supabase.
+- Use Supabase SSR-compatible auth helpers for server and browser clients.
+- Support environment variables for Supabase URL, anon key, service role key, Prompt retention secret, and optional development admin help.
+- Provide `.env.example` during implementation.
+- Configure Vitest and Testing Library early.
+
+## Layout And Navigation
+
+- Fixed top header across the site.
+- Desktop layout uses left navigation, main content, and right information panel.
+- Mobile layout hides side panels and keeps the main content readable.
+- Header includes brand, subtitle, search, write action, theme toggle, and user menu.
+- Left navigation includes home, 3D lab, TODO, primary tags, profile, and Prompt admin.
+- Right panel includes welcome content and popular tags.
+
+## Theme
+
+- Support light and dark modes.
+- Persist theme preference locally.
+- Avoid initial theme flash.
+- Apply theme styling to layout, cards, forms, buttons, Markdown, tables, and admin UI.
+
+## Authentication
+
+- `/auth` supports email/password login, email/password registration, GitHub OAuth, and Google OAuth.
+- `/auth/callback` exchanges OAuth code for a session.
+- `redirectTo` must be preserved through login and callback flows.
+- Missing Supabase configuration must produce a clear developer-facing error.
+- User logout refreshes authenticated state.
+
+## Profiles
+
+- Automatically create a profile on first login or first `/profile/me` access.
+- Generate unique usernames from email prefixes with collision handling.
+- Public profile pages show avatar, display name, username, bio, and posts.
+- Owners can edit display name, bio, and avatar.
+- Avatar upload uses Supabase Storage bucket `avatars`.
+- Non-owners must only see published posts.
+- Owners can see their own drafts and published posts.
+- Owners can view their own bookmarks.
+
+## Posts
+
+- Home page lists published posts, 10 per page, newest first.
+- Article cards show title, author, relative publish time, excerpt, tags, like count, and bookmark count.
+- `/editor` supports title, up to three existing tags, Markdown content, save draft, and publish.
+- Slugs are generated from titles, limited to 64 characters, and collision-safe.
+- Excerpts are generated from Markdown content with code and Markdown syntax removed.
+- Drafts have `published_at = null`; published posts set `published_at`.
+- `/posts/[slug]` renders article details, Markdown, reactions, bookmarks, and comments.
+- Markdown supports GFM, code highlighting, and dark mode.
+
+## Tags And Search
+
+- `/tags/[tag]` shows tag metadata and published posts for the tag.
+- Missing tags return 404.
+- `/search?q=...` searches published post title and content.
+- Search returns up to 30 results.
+- Search input must be escaped or parameterized so Supabase `.or()` strings cannot be broken by special characters.
+
+## Comments
+
+- Comments support top-level comments and nested replies.
+- Comments render Markdown with GFM and code highlighting.
+- Unauthenticated users are redirected to login when posting.
+- Authors can delete their own comments.
+- Delete operations must filter by both comment id and author id.
+
+## Reactions And Bookmarks
+
+- Unauthenticated like/bookmark actions redirect to login with `redirectTo`.
+- Authenticated actions toggle rows in `post_reactions` and `bookmarks`.
+- UI should update optimistically and then revalidate.
+- Bookmark row visibility must be private to the owner or admin; public pages should use aggregate counts.
+
+## TODO Tool
+
+- `/todos` is a self-contained local-storage tool inside the site.
+- Supports create, edit, notes, priority, complete, delete, filters, sorting, JSON export, and CSV export.
+- Uses localStorage key `vibe-academy.todos.v1`.
+- Does not require authentication or Supabase.
+
+## Prompt Capture
+
+- Global provider captures submitted prompt-like text from forms, textareas, and contenteditable fields.
+- Must not capture `/auth`, password forms, or password autocomplete fields.
+- Captured content length must be 3 to 20000 characters after trim.
+- Uses client session id, SHA-256 idempotency key, retries, and local failure queue.
+- Server accepts anonymous and authenticated inserts.
+- Sensitive content detection flags likely secrets.
+
+## Prompt Admin
+
+- `/admin/prompts` is available only to logged-in users with `profiles.is_admin = true`.
+- Non-admins get 404 in production.
+- Admins can filter, paginate, highlight, export CSV, view 24-hour stats, mark, unmark, soft delete, and trigger retention archival.
+
+## 3D Lab
+
+- `/lab/world` is a separate interactive navigation experiment.
+- Uses Three.js through React Three Fiber and Drei.
+- Supports scroll, hover, click, keyboard activation, active card focus, fallback loading UI, and mobile performance guardrails.
+
+## Non-Functional Requirements
+
+- RLS policies must protect every Supabase table before UI features depend on them.
+- Core helpers must be unit-tested before route integration.
+- Avoid inherited SaaS template complexity.
+- Avoid route files that mix data access, validation, mutation logic, and presentation beyond a small page boundary.
+- Public pages should be resilient to empty data, missing configuration, and network failures.
