@@ -1,10 +1,59 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { parsePromptAdminFilters } from "@/lib/prompts/admin";
+import { getCurrentPromptAdmin } from "@/lib/prompts/admin-auth";
 import {
   detectSensitivePromptContent,
   validatePromptPayload,
 } from "@/lib/prompts/validation";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export async function GET(request: NextRequest) {
+  const currentAdmin = await getCurrentPromptAdmin();
+
+  if (!currentAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const filters = parsePromptAdminFilters(request.nextUrl.searchParams);
+  const from = (filters.page - 1) * filters.pageSize;
+  const to = from + filters.pageSize - 1;
+  let query = createSupabaseAdminClient()
+    .from("prompts")
+    .select(
+      "id,created_at,user_id,client_session_id,source_url,ip,user_agent,content,flags,marked,marked_reason,deleted_at",
+      { count: "exact" },
+    )
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (filters.q) {
+    query = query.ilike("content", `%${filters.q.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`);
+  }
+
+  if (filters.marked !== undefined) {
+    query = query.eq("marked", filters.marked);
+  }
+
+  if (filters.sensitive !== undefined) {
+    query = query.contains("flags", { has_sensitive: filters.sensitive });
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    prompts: data ?? [],
+    total: count ?? 0,
+    page: filters.page,
+    pageSize: filters.pageSize,
+  });
+}
 
 export async function POST(request: NextRequest) {
   const body = validatePromptPayload(await request.json().catch(() => null));

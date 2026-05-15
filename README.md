@@ -1,8 +1,8 @@
 # Glaucon Politeia
 
-This repository is currently in the Prompt Capture stage for rebuilding a personal website previously specified as `Vibe Academy`.
+This repository is currently in the Prompt Admin stage for rebuilding a personal website previously specified as `Vibe Academy`.
 
-The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application will be a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, and authorization are part of the first product loop. Optional modules such as Prompt Admin and a 3D navigation lab are planned as later milestones.
+The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application will be a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, and authorization are part of the first product loop. The 3D navigation lab is planned as a later isolated milestone.
 
 ## Current State
 
@@ -18,6 +18,7 @@ The intended product is a robust, extensible personal publishing site for AI cod
 - The M6 branch adds launch hardening docs and shared error/not-found surfaces.
 - The M7 branch adds the standalone localStorage TODO tool.
 - The M8 branch adds prompt ingestion, sensitive-content flags, idempotency, and a browser retry queue.
+- The M9 branch adds admin prompt review, filtering, CSV export, hourly stats, batch actions, and retention archival.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.
 - The active project documentation has been split into focused documents under `docs/project/`, `docs/milestones/`, and `docs/adr/`.
 - The implementation path is to build the product in milestone-sized vertical slices from this thin foundation.

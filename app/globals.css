@@ -573,6 +573,69 @@ input {
   padding-top: 10px;
 }
 
+.admin-prompts,
+.admin-table {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-toolbar,
+.admin-bulkbar,
+.stats-strip,
+.prompt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-toolbar input,
+.admin-toolbar select {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.admin-toolbar input {
+  min-width: min(320px, 100%);
+}
+
+.stat-cell,
+.prompt-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.stat-cell {
+  min-width: 76px;
+  padding: 10px;
+}
+
+.stat-cell span,
+.prompt-meta,
+.prompt-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.prompt-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.prompt-row p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 960px) {
   .header-inner {
     grid-template-columns: 1fr auto;
