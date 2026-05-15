@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { PromptCaptureProvider } from "@/components/prompts/PromptCaptureProvider";
 import { getPublicEnv } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { themeInitScript } from "@/lib/theme/init";
@@ -38,7 +39,9 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <AppShell userEmail={await getUserEmail()}>{children}</AppShell>
+        <PromptCaptureProvider>
+          <AppShell userEmail={await getUserEmail()}>{children}</AppShell>
+        </PromptCaptureProvider>
       </body>
     </html>
   );
