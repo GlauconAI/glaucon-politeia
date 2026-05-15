@@ -636,6 +636,47 @@ input {
   overflow-wrap: anywhere;
 }
 
+.lab-world {
+  position: relative;
+  min-height: calc(100vh - 112px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #08111a;
+}
+
+.lab-world-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.lab-world-overlay {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100% - 32px));
+  padding: 32px;
+  color: #f8fafc;
+  pointer-events: none;
+}
+
+.lab-world-overlay h1 {
+  margin: 0;
+  font-size: 52px;
+  letter-spacing: 0;
+}
+
+.lab-world-overlay p {
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.lab-world-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  pointer-events: auto;
+}
+
 @media (max-width: 960px) {
   .header-inner {
     grid-template-columns: 1fr auto;
@@ -675,7 +716,16 @@ input {
   }
 
   .intro-panel h1,
-  .auth-card h1 {
+  .auth-card h1,
+  .lab-world-overlay h1 {
     font-size: 32px;
+  }
+
+  .lab-world {
+    min-height: 72vh;
+  }
+
+  .lab-world-overlay {
+    padding: 20px;
   }
 }
