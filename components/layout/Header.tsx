@@ -1,0 +1,50 @@
+import Link from "next/link";
+
+import { logoutAction } from "@/app/auth/actions";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+
+type HeaderProps = {
+  userEmail: string | null;
+};
+
+export function Header({ userEmail }: HeaderProps) {
+  return (
+    <header className="site-header">
+      <div className="header-inner">
+        <Link href="/" className="brand" aria-label="Vibe Academy home">
+          <span className="brand-title">Vibe Academy</span>
+          <span className="brand-subtitle">Vibe First, Code Later</span>
+        </Link>
+
+        <form className="search-form" action="/search">
+          <input
+            type="search"
+            name="q"
+            placeholder="Search"
+            aria-label="Search posts"
+          />
+        </form>
+
+        <div className="header-actions">
+          <Link href="/editor" className="write-link">
+            写作
+          </Link>
+          <ThemeToggle />
+          {userEmail ? (
+            <div className="user-menu">
+              <span>{userEmail}</span>
+              <Link href="/profile/me">个人资料</Link>
+              <form action={logoutAction}>
+                <button type="submit">退出登录</button>
+              </form>
+            </div>
+          ) : (
+            <Link href="/auth" className="login-link">
+              登录
+            </Link>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
