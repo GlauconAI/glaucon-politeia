@@ -9,5 +9,5 @@ export function createSupabaseBrowserClient() {
     throw new Error(formatMissingEnvMessage(env.missing));
   }
 
-  return createBrowserClient(env.supabaseUrl, env.supabaseAnonKey);
+  return createBrowserClient(env.supabaseUrl, env.supabasePublishableKey);
 }

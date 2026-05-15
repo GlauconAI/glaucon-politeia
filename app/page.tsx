@@ -28,7 +28,8 @@ export default function Home() {
           ) : (
             <p className="mt-2 text-sm text-amber-300">
               Missing public environment variables: {env.missing.join(", ")}.
-              Copy .env.example to .env.local before connecting Supabase.
+              Copy .env.example to .env.local and add your Supabase project URL
+              and publishable key before connecting Supabase.
             </p>
           )}
         </div>

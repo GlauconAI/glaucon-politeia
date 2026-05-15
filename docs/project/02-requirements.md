@@ -4,7 +4,7 @@
 
 - Use Next.js App Router, TypeScript, React, Tailwind CSS, and Supabase.
 - Use Supabase SSR-compatible auth helpers for server and browser clients.
-- Support environment variables for Supabase URL, anon key, service role key, Prompt retention secret, and optional development admin help.
+- Support environment variables for Supabase URL, publishable key, secret key, Prompt retention secret, and optional development admin help.
 - Provide `.env.example` during implementation.
 - Configure Vitest and Testing Library early.
 

@@ -9,7 +9,7 @@ export function createSupabaseAdminClient() {
     throw new Error(formatMissingEnvMessage(env.missing));
   }
 
-  return createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
+  return createClient(env.supabaseUrl, env.supabaseSecretKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

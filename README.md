@@ -8,6 +8,7 @@ The intended product is a robust, extensible personal publishing site for AI cod
 
 - A minimal Next.js App Router baseline has been scaffolded.
 - Supabase browser, server, and admin client helpers are present.
+- Supabase configuration uses the current publishable and secret API key names.
 - Vitest, Testing Library, ESLint, TypeScript, and Tailwind are configured.
 - P0 Supabase schema, RLS policies, seed tags, and deterministic slug/excerpt/username helpers are being developed on the M1 branch.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.

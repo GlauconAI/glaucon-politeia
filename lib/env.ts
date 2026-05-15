@@ -4,13 +4,13 @@ type PublicEnv =
   | {
       configured: true;
       supabaseUrl: string;
-      supabaseAnonKey: string;
+      supabasePublishableKey: string;
       missing: [];
     }
   | {
       configured: false;
       supabaseUrl?: undefined;
-      supabaseAnonKey?: undefined;
+      supabasePublishableKey?: undefined;
       missing: string[];
     };
 
@@ -18,24 +18,24 @@ type ServerEnv =
   | {
       configured: true;
       supabaseUrl: string;
-      supabaseAnonKey: string;
-      supabaseServiceRoleKey: string;
+      supabasePublishableKey: string;
+      supabaseSecretKey: string;
       missing: [];
     }
   | {
       configured: false;
       supabaseUrl?: string;
-      supabaseAnonKey?: string;
-      supabaseServiceRoleKey?: undefined;
+      supabasePublishableKey?: string;
+      supabaseSecretKey?: undefined;
       missing: string[];
     };
 
 const publicKeys = [
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
 ] as const;
 
-const serverKeys = [...publicKeys, "SUPABASE_SERVICE_ROLE_KEY"] as const;
+const serverKeys = [...publicKeys, "SUPABASE_SECRET_KEY"] as const;
 
 function readTrimmed(env: EnvSource, key: string) {
   const value = env[key]?.trim();
@@ -56,7 +56,10 @@ export function getPublicEnv(env: EnvSource = process.env): PublicEnv {
   return {
     configured: true,
     supabaseUrl: readTrimmed(env, "NEXT_PUBLIC_SUPABASE_URL")!,
-    supabaseAnonKey: readTrimmed(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY")!,
+    supabasePublishableKey: readTrimmed(
+      env,
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    )!,
     missing: [],
   };
 }
@@ -64,13 +67,16 @@ export function getPublicEnv(env: EnvSource = process.env): PublicEnv {
 export function getServerEnv(env: EnvSource = process.env): ServerEnv {
   const missing = missingKeys(env, serverKeys);
   const supabaseUrl = readTrimmed(env, "NEXT_PUBLIC_SUPABASE_URL");
-  const supabaseAnonKey = readTrimmed(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const supabasePublishableKey = readTrimmed(
+    env,
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  );
 
   if (missing.length > 0) {
     return {
       configured: false,
       supabaseUrl,
-      supabaseAnonKey,
+      supabasePublishableKey,
       missing,
     };
   }
@@ -78,8 +84,8 @@ export function getServerEnv(env: EnvSource = process.env): ServerEnv {
   return {
     configured: true,
     supabaseUrl: supabaseUrl!,
-    supabaseAnonKey: supabaseAnonKey!,
-    supabaseServiceRoleKey: readTrimmed(env, "SUPABASE_SERVICE_ROLE_KEY")!,
+    supabasePublishableKey: supabasePublishableKey!,
+    supabaseSecretKey: readTrimmed(env, "SUPABASE_SECRET_KEY")!,
     missing: [],
   };
 }

@@ -9,20 +9,20 @@ describe("environment helpers", () => {
     expect(env.configured).toBe(false);
     expect(env.missing).toEqual([
       "NEXT_PUBLIC_SUPABASE_URL",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     ]);
   });
 
   it("returns Supabase public configuration when required keys are present", () => {
     const env = getPublicEnv({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
     });
 
     expect(env).toEqual({
       configured: true,
       supabaseUrl: "https://example.supabase.co",
-      supabaseAnonKey: "anon-key",
+      supabasePublishableKey: "sb_publishable_test",
       missing: [],
     });
   });
@@ -30,12 +30,12 @@ describe("environment helpers", () => {
   it("keeps service role configuration server-only", () => {
     const env = getServerEnv({
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
-      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+      SUPABASE_SECRET_KEY: "sb_secret_test",
     });
 
     expect(env.configured).toBe(true);
-    expect(env.supabaseServiceRoleKey).toBe("service-role-key");
+    expect(env.supabaseSecretKey).toBe("sb_secret_test");
     expect(env.missing).toEqual([]);
   });
 });
