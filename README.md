@@ -1,6 +1,6 @@
 # Glaucon Politeia
 
-This repository is currently in P0 hardening for rebuilding a personal website previously specified as `Vibe Academy`.
+This repository is currently in the local TODO tool stage for rebuilding a personal website previously specified as `Vibe Academy`.
 
 The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application will be a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, and authorization are part of the first product loop. Optional modules such as a local TODO tool, Prompt capture/admin, and a 3D navigation lab are planned as later milestones.
 
@@ -16,6 +16,7 @@ The intended product is a robust, extensible personal publishing site for AI cod
 - The M4 branch adds the post feed, editor, post detail, tag pages, search, and Markdown rendering.
 - The M5 branch adds comments, replies, author deletion, likes, and bookmarks.
 - The M6 branch adds launch hardening docs and shared error/not-found surfaces.
+- The M7 branch adds the standalone localStorage TODO tool.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.
 - The active project documentation has been split into focused documents under `docs/project/`, `docs/milestones/`, and `docs/adr/`.
 - The implementation path is to build the product in milestone-sized vertical slices from this thin foundation.
