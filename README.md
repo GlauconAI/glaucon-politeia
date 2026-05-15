@@ -1,15 +1,17 @@
 # Glaucon Politeia
 
-This repository is currently in the planning and project-documentation stage for rebuilding a personal website previously specified as `Vibe Academy`.
+This repository is currently in the project-baseline stage for rebuilding a personal website previously specified as `Vibe Academy`.
 
 The intended product is a robust, extensible personal publishing site for AI coding notes and project retrospectives. The core application will be a dynamic Next.js + Supabase product rather than a static blog: users, profiles, posts, tags, comments, likes, bookmarks, search, and authorization are part of the first product loop. Optional modules such as a local TODO tool, Prompt capture/admin, and a 3D navigation lab are planned as later milestones.
 
 ## Current State
 
-- No application code has been scaffolded yet.
+- A minimal Next.js App Router baseline has been scaffolded.
+- Supabase browser, server, and admin client helpers are present.
+- Vitest, Testing Library, ESLint, TypeScript, and Tailwind are configured.
 - The previous Trae-era implementation notes have been archived under `docs/raw/`.
 - The active project documentation has been split into focused documents under `docs/project/`, `docs/milestones/`, and `docs/adr/`.
-- The recommended implementation path is to start from a thin Next.js App Router + TypeScript + Tailwind + Supabase foundation, then build the product in milestone-sized vertical slices.
+- The implementation path is to build the product in milestone-sized vertical slices from this thin foundation.
 
 ## Documentation Map
 
