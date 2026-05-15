@@ -2,6 +2,14 @@
 
 Use Vercel for preview and production deployments.
 
+## Current Production
+
+Production alias:
+
+```text
+https://glaucon-politeia.vercel.app
+```
+
 ## Required Production Environment Variables
 
 Set these in Vercel Project Settings -> Environment Variables for Production and Preview:
@@ -15,6 +23,8 @@ PROMPTS_DEV_ACCESS_HELP=
 ```
 
 Do not add `SUPABASE_DB_URL` to Vercel. It is for local operator scripts only.
+
+The current production project has the required Production variables configured. Preview variables may require a branch target when using Vercel CLI in non-interactive mode.
 
 ## First Deployment
 
