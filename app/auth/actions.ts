@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
+import { ensureProfile } from "@/lib/profiles/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getFormString(formData: FormData, key: string) {
@@ -20,6 +21,11 @@ export async function loginAction(formData: FormData) {
 
   if (error) {
     redirect(`/auth?mode=login&error=${encodeURIComponent(error.message)}&redirectTo=${encodeURIComponent(redirectTo)}`);
+  }
+
+  const { data } = await supabase.auth.getUser();
+  if (data.user) {
+    await ensureProfile(supabase, data.user);
   }
 
   redirect(redirectTo);

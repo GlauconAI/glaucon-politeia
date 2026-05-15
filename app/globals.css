@@ -290,6 +290,80 @@ input {
   font-weight: 700;
 }
 
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-header,
+.profile-editor,
+.profile-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+}
+
+.profile-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.profile-header h1,
+.profile-section h2,
+.profile-editor h2 {
+  margin: 0 0 8px;
+  color: var(--strong);
+}
+
+.profile-header p,
+.empty-text,
+.content-list p {
+  color: var(--muted);
+}
+
+.avatar {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--strong);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.content-list li {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.content-list a {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
 @media (max-width: 960px) {
   .header-inner {
     grid-template-columns: 1fr auto;
