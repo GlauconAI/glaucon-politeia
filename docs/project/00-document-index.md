@@ -41,6 +41,9 @@ These source documents are preserved as historical input. New implementation wor
 10. `09-current-status.md`
     - Current project introduction, production status, implemented milestones, commands, and remaining follow-up work.
 
+11. `snapshots/2026-05-16-production-snapshot.md`
+    - Point-in-time project snapshot after custom domain, Supabase Auth URL configuration, favicon, and production deployment.
+
 ## Implementation Principles
 
 - Start from a thin Next.js + Supabase foundation instead of migrating template code.

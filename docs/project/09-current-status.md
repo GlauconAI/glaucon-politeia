@@ -1,6 +1,6 @@
 # Current Project Status
 
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 ## Project Summary
 
@@ -35,6 +35,7 @@ Verified production foundations:
 - Vercel production deployment is live and publicly accessible.
 - Custom domain `402v.com` is verified on Vercel.
 - `www.402v.com` redirects permanently to `402v.com`.
+- The production favicon is served from `/icon.svg`.
 - Vercel production environment variables are configured.
 - Supabase migrations are applied.
 - Supabase Auth Site URL and redirect allow list are configured for `402v.com`.
@@ -170,6 +171,28 @@ Verified production foundations:
 - Fixed direct admin bootstrap so it can promote the first admin despite the database anti-escalation trigger.
 - The script temporarily disables and re-enables `profiles_prevent_admin_escalation` inside a transaction.
 
+### M15: Custom Domain
+
+- Added `402v.com` and `www.402v.com` to the Vercel project.
+- Verified both domains with Vercel domain ownership TXT records.
+- Configured `www.402v.com` as a permanent redirect to `https://402v.com/`.
+- Versioned Supabase Auth URL configuration in `supabase/config.toml`.
+- Updated Supabase Auth Site URL and callback allow list for the custom domain.
+
+### M16: Site Favicon
+
+- Added the Knowledge Nodes favicon at `app/icon.svg`.
+- Registered `/icon.svg` in Next.js metadata.
+- Deployed the favicon to production and verified `https://402v.com/icon.svg`.
+
+## Latest Project Snapshot
+
+- Snapshot: `docs/project/snapshots/2026-05-16-production-snapshot.md`
+- Latest production commit: `8492770 feat: add site favicon`
+- Latest production deployment id: `dpl_5D1MpUzVyKby6dvDfsvU2PSW8F49`
+- Production domain: `https://402v.com`
+- Favicon URL: `https://402v.com/icon.svg`
+
 ## Current Commands
 
 Local development:
@@ -228,6 +251,7 @@ Primary working docs:
 - `docs/project/07-quality-test-strategy.md`
 - `docs/project/08-legacy-analysis.md`
 - `docs/project/09-current-status.md`
+- `docs/project/snapshots/2026-05-16-production-snapshot.md`
 
 Milestone planning:
 

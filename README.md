@@ -20,6 +20,12 @@ For the full project introduction, milestone completion record, commands, produc
 docs/project/09-current-status.md
 ```
 
+Latest project snapshot:
+
+```text
+docs/project/snapshots/2026-05-16-production-snapshot.md
+```
+
 ## What Is Implemented
 
 - Next.js App Router, TypeScript, Tailwind, Vitest, Testing Library, and ESLint.
@@ -35,6 +41,8 @@ docs/project/09-current-status.md
 - 3D navigation lab at `/lab/world`.
 - Supabase direct ops and launch readiness checks.
 - Vercel production deployment configuration.
+- Custom domain `402v.com` with `www.402v.com` redirect.
+- Knowledge Nodes favicon served from `/icon.svg`.
 
 ## Core Commands
 
@@ -79,6 +87,9 @@ npm run vercel:deploy
 
 - `docs/project/09-current-status.md`
   - Current project summary, production status, implemented milestones, commands, and follow-up work.
+
+- `docs/project/snapshots/2026-05-16-production-snapshot.md`
+  - Point-in-time project snapshot after custom domain, favicon, and production deployment.
 
 ### Active Project Documents
 
