@@ -12,6 +12,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Glaucon Politeia",
   description: "A personal AI coding archive and publishing platform.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 type RootLayoutProps = {
