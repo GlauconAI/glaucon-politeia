@@ -17,7 +17,7 @@ The product combines:
 Production URL:
 
 ```text
-https://glaucon-politeia.vercel.app
+https://402v.com
 ```
 
 ## Production State
@@ -33,8 +33,11 @@ Launch readiness: ready
 Verified production foundations:
 
 - Vercel production deployment is live and publicly accessible.
+- Custom domain `402v.com` is verified on Vercel.
+- `www.402v.com` redirects permanently to `402v.com`.
 - Vercel production environment variables are configured.
 - Supabase migrations are applied.
+- Supabase Auth Site URL and redirect allow list are configured for `402v.com`.
 - Supabase avatar storage bucket exists.
 - Prompt capture table and admin RPCs exist.
 - At least one admin profile exists.
@@ -204,6 +207,14 @@ npm run vercel:build
 npm run vercel:deploy
 ```
 
+Supabase project config:
+
+```bash
+npx supabase login
+npx supabase link --project-ref fiicazfhjkviqaaaiksp
+npx supabase config push --project-ref fiicazfhjkviqaaaiksp
+```
+
 ## Documentation Map
 
 Primary working docs:
@@ -247,7 +258,6 @@ The current production deployment is usable, but there is still product polish a
 - Complete end-to-end manual QA for authenticated publishing, comments, profile edits, prompt admin, and avatar upload.
 - Add browser E2E tests for publishing, comments, admin access control, and prompt capture.
 - Configure Preview environment variables in Vercel if preview deployments are needed.
-- Add custom domain if desired.
 - Improve empty states and real homepage content.
 - Tighten SEO metadata for posts, tags, and profiles.
 - Decide whether `/lab/world` should remain in the primary navigation or move under an experiments section.

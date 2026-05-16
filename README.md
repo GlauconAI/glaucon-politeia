@@ -5,7 +5,7 @@ Glaucon Politeia is a personal publishing and AI-coding archive rebuilt from the
 Production:
 
 ```text
-https://glaucon-politeia.vercel.app
+https://402v.com
 ```
 
 Current launch state:

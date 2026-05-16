@@ -7,7 +7,20 @@ Use Vercel for preview and production deployments.
 Production alias:
 
 ```text
+https://402v.com
+```
+
+The previous Vercel-generated production URL remains available:
+
+```text
 https://glaucon-politeia.vercel.app
+```
+
+Custom domain routing:
+
+```text
+402v.com      -> Vercel project glaucon-politeia
+www.402v.com  -> 301 redirect to https://402v.com/
 ```
 
 ## Required Production Environment Variables
@@ -54,16 +67,28 @@ npm run vercel:deploy
 
 ## Supabase Auth URLs
 
-In Supabase Auth settings, add:
+Supabase Auth URL configuration is versioned in `supabase/config.toml`.
+
+Current Site URL:
 
 ```text
-https://YOUR_VERCEL_DOMAIN/auth/callback
+https://402v.com
 ```
 
-Keep the local callback too:
+Current redirect allow list:
 
 ```text
+https://402v.com/auth/callback
+https://www.402v.com/auth/callback
+https://glaucon-politeia.vercel.app/auth/callback
 http://localhost:3000/auth/callback
+```
+
+Push Auth URL configuration after `supabase login`:
+
+```bash
+npx supabase link --project-ref fiicazfhjkviqaaaiksp
+npx supabase config push --project-ref fiicazfhjkviqaaaiksp
 ```
 
 ## Launch Gate
