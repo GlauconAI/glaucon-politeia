@@ -10,8 +10,8 @@ import { themeInitScript } from "@/lib/theme/init";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Glaucon Politeia",
-  description: "A personal AI coding archive and publishing platform.",
+  title: "402v",
+  description: "A calm personal publishing system for notes, HTML sites, family pages, and products.",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],

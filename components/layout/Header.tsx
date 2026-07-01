@@ -11,23 +11,23 @@ export function Header({ userEmail }: HeaderProps) {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link href="/" className="brand" aria-label="Vibe Academy home">
-          <span className="brand-title">Vibe Academy</span>
-          <span className="brand-subtitle">Vibe First, Code Later</span>
+        <Link href="/" className="brand" aria-label="402v home">
+          <span className="brand-title">402v</span>
+          <span className="brand-subtitle">Personal publishing system</span>
         </Link>
 
         <form className="search-form" action="/search">
           <input
             type="search"
             name="q"
-            placeholder="Search"
+            placeholder="Search notes, sites, products..."
             aria-label="Search posts"
           />
         </form>
 
         <div className="header-actions">
           <Link href="/editor" className="write-link">
-            写作
+            Publish
           </Link>
           <ThemeToggle />
           {userEmail ? (

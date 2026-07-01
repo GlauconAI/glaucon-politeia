@@ -15,10 +15,14 @@ export function PostCard({ post }: PostCardProps) {
     bookmark_count: number;
     comment_count: number;
   }>(post.post_engagement_counts);
+  const format = post.content_format === "html" ? "HTML Site" : "Note";
+  const visibility = post.visibility === "private" ? "Private" : "Public";
 
   return (
     <article className="post-card">
       <div className="post-meta">
+        <span className="content-pill">{format}</span>
+        <span className="content-pill content-pill-muted">{visibility}</span>
         {author ? (
           <Link href={`/profile/${author.username}`}>{author.display_name}</Link>
         ) : (

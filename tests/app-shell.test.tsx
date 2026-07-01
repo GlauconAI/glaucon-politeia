@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -12,11 +12,17 @@ describe("app shell", () => {
     );
 
     expect(screen.getByRole("banner")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+    const primaryNav = screen.getByRole("navigation", { name: /primary/i });
+    expect(primaryNav).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveTextContent("Content area");
     expect(
       screen.getByRole("complementary", { name: /site information/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /402v home/i })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Learn" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Sites" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Family" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Products" })).toBeInTheDocument();
   });
 
   it("shows login state when no user is present", () => {

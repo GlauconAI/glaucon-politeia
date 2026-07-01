@@ -2,29 +2,30 @@ import Link from "next/link";
 
 const tags = [
   { href: "/tags/vibe-coding", label: "Vibe Coding" },
-  { href: "/tags/trae-solo", label: "Trae Solo" },
-  { href: "/tags/projects", label: "项目" },
-  { href: "/tags/pitfalls", label: "踩坑" },
+  { href: "/search?q=html", label: "HTML Sites" },
+  { href: "/tags/projects", label: "Projects" },
+  { href: "/search?q=family", label: "Family" },
 ];
 
 export function RightRail() {
   return (
     <aside className="right-rail" aria-label="Site information">
       <section className="panel">
-        <h2>欢迎来到 Vibe Academy</h2>
-        <p>这里记录 AI 编程学习笔记、项目复盘与工具实验。</p>
+        <p className="eyebrow">Publishing surface</p>
+        <h2>402v is the public edge of Glaucon&apos;s knowledge system.</h2>
+        <p>Public notes, private pages, HTML artifacts, family references, and product work share one calm shell.</p>
         <div className="panel-actions">
           <Link href="/editor" className="button-primary">
-            开始写作
+            Publish
           </Link>
-          <Link href="/tags/vibe-coding" className="button-secondary">
-            了解 Vibe Coding
+          <Link href="/search" className="button-secondary">
+            Browse
           </Link>
         </div>
       </section>
 
       <section className="panel">
-        <h2>热门标签</h2>
+        <h2>Active Areas</h2>
         <ul className="tag-list">
           {tags.map((tag) => (
             <li key={tag.href}>
@@ -32,6 +33,11 @@ export function RightRail() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel panel-quiet">
+        <h2>Access model</h2>
+        <p><strong>Public</strong> pages are open on the web. <strong>Private</strong> pages stay behind login.</p>
       </section>
     </aside>
   );
