@@ -1,20 +1,25 @@
 import { getPublicEnv } from "@/lib/env";
 import { PostCard } from "@/components/posts/PostCard";
+import { attachPostEngagementCounts } from "@/lib/posts/engagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function Home() {
   const env = getPublicEnv();
   const supabase = env.configured ? await createSupabaseServerClient() : null;
-  const { data: posts } = supabase
+  const { data: postRows } = supabase
     ? await supabase
         .from("posts")
         .select(
-          "slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name)),post_engagement_counts(like_count,bookmark_count,comment_count)",
+          "id,slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name))",
         )
         .eq("status", "published")
         .order("published_at", { ascending: false })
         .limit(10)
     : { data: [] };
+  const posts: any[] =
+    supabase && postRows?.length
+      ? await attachPostEngagementCounts(supabase, postRows as any)
+      : ((postRows ?? []) as any[]);
 
   return (
     <section className="home-stack">

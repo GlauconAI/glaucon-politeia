@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PostCard } from "@/components/posts/PostCard";
+import { attachPostEngagementCounts } from "@/lib/posts/engagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type TagPageProps = {
@@ -23,15 +24,18 @@ export default async function TagPage({ params }: TagPageProps) {
   const { data: rows } = await supabase
     .from("post_tags")
     .select(
-      "posts(slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name)),post_engagement_counts(like_count,bookmark_count,comment_count))",
+      "posts(id,slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name)))",
     )
     .eq("tag_id", tagRecord.id)
     .eq("posts.status", "published");
 
-  const posts =
+  const postRows =
     rows
       ?.map((row) => (Array.isArray(row.posts) ? row.posts[0] : row.posts))
       .filter(Boolean) ?? [];
+  const posts: any[] = postRows.length
+    ? await attachPostEngagementCounts(supabase, postRows as any)
+    : [];
 
   return (
     <section className="feed-section">

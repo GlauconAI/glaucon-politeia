@@ -5,6 +5,7 @@ import { CommentSection } from "@/components/comments/CommentSection";
 import { PostBody } from "@/components/posts/PostBody";
 import { PostInteractions } from "@/components/posts/PostInteractions";
 import { buildCommentTree } from "@/lib/comments/tree";
+import { loadPostEngagementCounts } from "@/lib/posts/engagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type PostPageProps = {
@@ -17,7 +18,7 @@ export default async function PostPage({ params }: PostPageProps) {
   const { data: userData } = await supabase.auth.getUser();
   const { data: post } = await supabase
     .from("posts")
-    .select("id,slug,title,content_md,content_html,content_format,visibility,published_at,profiles(username,display_name),post_tags(tags(slug,name)),post_engagement_counts(like_count,bookmark_count,comment_count)")
+    .select("id,slug,title,content_md,content_html,content_format,visibility,published_at,profiles(username,display_name),post_tags(tags(slug,name))")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -26,10 +27,7 @@ export default async function PostPage({ params }: PostPageProps) {
   }
 
   const author = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
-  const counts = Array.isArray(post.post_engagement_counts)
-    ? post.post_engagement_counts[0]
-    : post.post_engagement_counts;
-  const [{ data: liked }, { data: bookmarked }, { data: comments }] =
+  const [{ data: liked }, { data: bookmarked }, { data: comments }, countMap] =
     await Promise.all([
       userData.user
         ? supabase
@@ -53,7 +51,9 @@ export default async function PostPage({ params }: PostPageProps) {
         .select("id,parent_id,content_md,author_id,created_at,profiles(display_name,username)")
         .eq("post_id", post.id)
         .order("created_at", { ascending: true }),
+      loadPostEngagementCounts(supabase, [post.id]),
     ]);
+  const counts = countMap.get(post.id);
   const commentTree = buildCommentTree((comments ?? []) as any);
 
   return (

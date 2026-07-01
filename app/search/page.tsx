@@ -1,4 +1,5 @@
 import { PostCard } from "@/components/posts/PostCard";
+import { attachPostEngagementCounts } from "@/lib/posts/engagement";
 import { normalizeSearchQuery, toSafeIlikePattern } from "@/lib/posts/search";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -10,16 +11,19 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams;
   const query = normalizeSearchQuery(q);
   const supabase = await createSupabaseServerClient();
-  const { data: posts } = query
+  const { data: postRows } = query
     ? await supabase
         .from("posts")
         .select(
-          "slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name)),post_engagement_counts(like_count,bookmark_count,comment_count)",
+          "id,slug,title,excerpt,published_at,profiles(username,display_name),post_tags(tags(slug,name))",
         )
         .eq("status", "published")
         .or(`title.ilike.${toSafeIlikePattern(query)},content_md.ilike.${toSafeIlikePattern(query)}`)
         .limit(30)
     : { data: [] };
+  const posts: any[] = postRows?.length
+    ? await attachPostEngagementCounts(supabase, postRows as any)
+    : ((postRows ?? []) as any[]);
 
   return (
     <section className="feed-section">
