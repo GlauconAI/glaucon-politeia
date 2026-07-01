@@ -6,23 +6,34 @@ Glaucon Politeia, with the initial product identity inherited from the previous 
 
 ## Product Goal
 
-Build a personal website that works as a durable AI coding learning archive and lightweight community-style publishing platform. The site should support public reading, authenticated writing, profiles, comments, likes, bookmarks, tags, search, and later independent experimental modules such as Prompt capture, a local TODO tool, and a 3D navigation lab.
+Build a personal website that works as a durable AI coding learning archive, lightweight community-style publishing platform, and `402v Publishing System` for HTML artifacts. The site should support public reading, authenticated writing, profiles, comments, likes, bookmarks, tags, search, public/private HTML publishing, and later independent experimental modules such as Prompt capture, a local TODO tool, and a 3D navigation lab.
 
 ## Primary Audience
 
 - The site owner, as the main author and administrator.
 - Visitors interested in AI coding workflows, Trae usage notes, project retrospectives, and pitfall logs.
 - Future authenticated users who may comment, bookmark, and interact with published content.
+- The owner and trusted agents publishing generated HTML reports or hand-authored HTML pages to `402v.com`.
 
 ## Product Shape
 
-The core product is a dynamic content application, not a static blog. It should use database-backed posts, profiles, tags, comments, reactions, and bookmarks. The visual structure can keep the previous dev.to-inspired three-column reading experience, but the engineering model should be built for authenticated runtime behavior.
+The core product is a dynamic content application, not a static blog. It should use database-backed posts, profiles, tags, comments, reactions, bookmarks, and HTML artifacts. The visual structure can keep the previous dev.to-inspired three-column reading experience, but the engineering model should be built for authenticated runtime behavior.
+
+The publishing system packages three assets into one direction:
+
+- The existing `402v.com` / Glaucon Politeia site.
+- The local `html-artifact-publisher` generator that turns reports into portable HTML site packages.
+- A new publish path that inserts an existing HTML page into Supabase and exposes it through `402v.com/posts/<slug>` as either public or login-required private content.
 
 ## Release Priorities
 
 ### P0: Core Publishing Loop
 
 The first shippable product must let users sign up, maintain profiles, publish posts, read posts, search, browse tags, comment, like, and bookmark.
+
+### P0.1: HTML Artifact Publishing
+
+Extend the core publishing loop so a local HTML file can be published to `402v.com` with `public` or `private` visibility. Markdown posts remain supported; HTML posts render in a sandboxed viewer.
 
 ### P1: Personal Utility And UX Polish
 
@@ -43,10 +54,14 @@ Add the Bruno Simon-inspired 3D navigation experiment as a separate experience a
 - Article edit/delete UI, unless intentionally pulled into a later milestone.
 - Public creation of new tags from the editor.
 - Prompt capture, prompt admin, and 3D lab in the first release.
+- Arbitrary unsandboxed HTML execution in the main application document.
 
 ## Success Criteria
 
 - A visitor can discover and read published posts from home, tags, search, and detail pages.
 - A signed-in user can publish a Markdown post, comment, like, and bookmark.
+- The owner can publish a local HTML artifact to `402v.com`.
+- Anonymous visitors can read public posts and public HTML artifacts.
+- Logged-in users can read private published posts and private HTML artifacts.
 - Private user state is protected by Supabase RLS and verified by tests.
 - The application can be extended with independent modules without rewriting the core layout, auth, or data access patterns.

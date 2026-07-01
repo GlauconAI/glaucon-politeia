@@ -1,4 +1,8 @@
-import { createExcerpt, createUniqueSlug } from "@/lib/posts/text";
+import {
+  normalizePostContentInput,
+  normalizePostVisibility,
+} from "@/lib/posts/content";
+import { createUniqueSlug } from "@/lib/posts/text";
 
 type SupabaseLike = any;
 
@@ -8,15 +12,19 @@ export async function createPost(
     authorId: string;
     title: string;
     content: string;
+    contentFormat?: string;
+    contentHtml?: string;
     tagIds: string[];
     publish: boolean;
+    visibility?: string;
   },
 ) {
   const title = input.title.trim();
-  const content = input.content.trim();
+  const content = normalizePostContentInput(input);
+  const visibility = normalizePostVisibility(input.visibility);
 
-  if (!title || !content) {
-    throw new Error("Title and content are required");
+  if (!title) {
+    throw new Error("Title is required");
   }
 
   const slug = createUniqueSlug(title, {
@@ -30,8 +38,11 @@ export async function createPost(
       author_id: input.authorId,
       slug,
       title,
-      excerpt: createExcerpt(content),
-      content_md: content,
+      excerpt: content.excerpt,
+      content_md: content.contentMd,
+      content_html: content.contentHtml,
+      content_format: content.contentFormat,
+      visibility,
       status,
       published_at: input.publish ? new Date().toISOString() : null,
     })

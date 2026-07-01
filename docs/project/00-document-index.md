@@ -44,6 +44,9 @@ These source documents are preserved as historical input. New implementation wor
 11. `snapshots/2026-05-16-production-snapshot.md`
     - Point-in-time project snapshot after custom domain, Supabase Auth URL configuration, favicon, and production deployment.
 
+12. `../superpowers/plans/2026-07-01-402v-html-publishing.md`
+    - Implementation plan for packaging current site maintenance, the existing HTML artifact generator, and public/private HTML publishing into the 402v Publishing System project.
+
 ## Implementation Principles
 
 - Start from a thin Next.js + Supabase foundation instead of migrating template code.

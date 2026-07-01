@@ -26,8 +26,11 @@ export async function savePostAction(formData: FormData) {
     authorId: data.user.id,
     title: getFormString(formData, "title"),
     content: getFormString(formData, "content"),
+    contentFormat: getFormString(formData, "contentFormat"),
+    contentHtml: getFormString(formData, "content"),
     tagIds,
     publish: intent === "publish",
+    visibility: getFormString(formData, "visibility"),
   });
 
   redirect(`/posts/${post.slug}`);

@@ -1,0 +1,50 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const migrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260701000100_post_visibility_and_html.sql",
+);
+
+function readMigration() {
+  return readFileSync(migrationPath, "utf8").toLowerCase();
+}
+
+describe("post visibility and html migration", () => {
+  it("adds post visibility and content format columns", () => {
+    const sql = readMigration();
+
+    expect(sql).toContain("add column if not exists visibility text");
+    expect(sql).toContain("check (visibility in ('public', 'private'))");
+    expect(sql).toContain("add column if not exists content_format text");
+    expect(sql).toContain("check (content_format in ('markdown', 'html'))");
+    expect(sql).toContain("add column if not exists content_html text");
+    expect(sql).toContain("posts_html_content_required");
+  });
+
+  it("routes read access through a private-aware can_read_post function", () => {
+    const sql = readMigration();
+
+    expect(sql).toContain("create or replace function public.can_read_post");
+    expect(sql).toContain("post_row.visibility = 'public'");
+    expect(sql).toContain("post_row.visibility = 'private'");
+    expect(sql).toContain("auth.uid() is not null");
+  });
+
+  it("updates dependent read policies to use readable posts", () => {
+    const sql = readMigration();
+
+    for (const policy of [
+      "posts_select_readable",
+      "post_tags_select_readable_posts",
+      "comments_select_readable_posts",
+      "post_reactions_select_readable_posts",
+    ]) {
+      expect(sql).toContain(policy);
+    }
+
+    expect(sql).toContain("public.can_read_post(posts)");
+    expect(sql).toContain("public.can_read_post(p)");
+  });
+});

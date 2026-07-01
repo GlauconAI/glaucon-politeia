@@ -17,6 +17,7 @@ describe("supabase ops helpers", () => {
         promptsTable: true,
         promptHourlyStats: false,
         archiveOldPrompts: false,
+        postVisibilityHtml: true,
       }),
     ).toEqual([
       "supabase/migrations/20260515000200_avatar_storage.sql",
@@ -51,6 +52,7 @@ describe("supabase ops helpers", () => {
         promptsTable: false,
         promptHourlyStats: true,
         archiveOldPrompts: true,
+        postVisibilityHtml: false,
       },
       adminCount: 0,
     });

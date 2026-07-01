@@ -460,6 +460,26 @@ input {
   align-items: center;
 }
 
+.segmented-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.segmented-fields label {
+  flex-direction: row;
+  align-items: center;
+}
+
+.html-artifact-frame {
+  width: 100%;
+  min-height: 70vh;
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .markdown-body {
   margin-top: 24px;
   line-height: 1.75;

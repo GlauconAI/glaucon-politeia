@@ -48,11 +48,24 @@
 - Home page lists published posts, 10 per page, newest first.
 - Article cards show title, author, relative publish time, excerpt, tags, like count, and bookmark count.
 - `/editor` supports title, up to three existing tags, Markdown content, save draft, and publish.
+- `/editor` supports public/private visibility and Markdown/HTML content format selection.
 - Slugs are generated from titles, limited to 64 characters, and collision-safe.
 - Excerpts are generated from Markdown content with code and Markdown syntax removed.
+- Excerpts for HTML posts are generated from text extracted from HTML content.
 - Drafts have `published_at = null`; published posts set `published_at`.
 - `/posts/[slug]` renders article details, Markdown, reactions, bookmarks, and comments.
+- `/posts/[slug]` renders HTML posts in a sandboxed iframe.
+- Published posts support `public` visibility for anonymous readers and `private` visibility for logged-in readers.
 - Markdown supports GFM, code highlighting, and dark mode.
+
+## HTML Artifact Publishing
+
+- A local CLI command can publish an existing HTML file into the `posts` table.
+- The command accepts `--input`, `--title`, optional `--slug`, `--author-id`, `--visibility public|private`, `--dry-run`, and `--publish`.
+- Dry-run mode prints the insert payload without writing to Supabase.
+- Publish mode uses trusted local Supabase service-role configuration and must fail clearly when required env vars are missing.
+- HTML content is stored separately from Markdown content and rendered only through the sandboxed HTML viewer.
+- The upstream `html-artifact-publisher` remains a local generator; Glaucon Politeia is the online publishing target.
 
 ## Tags And Search
 
@@ -108,6 +121,7 @@
 ## Non-Functional Requirements
 
 - RLS policies must protect every Supabase table before UI features depend on them.
+- Published private content must be protected by database RLS, not only by UI filtering.
 - Core helpers must be unit-tested before route integration.
 - Avoid inherited SaaS template complexity.
 - Avoid route files that mix data access, validation, mutation logic, and presentation beyond a small page boundary.

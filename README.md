@@ -14,6 +14,75 @@ Current launch state:
 Launch readiness: ready
 ```
 
+## 402v Publishing System
+
+`402v Publishing System` is the next project package for maintaining
+`https://402v.com` as a personal publishing surface for AI-coding knowledge,
+HTML artifacts, project reports, and private notes. It packages the existing
+Glaucon Politeia site, the completed local HTML artifact generator, and the
+next public/private HTML publishing workflow into one product direction.
+
+The goal is simple: when there is an existing HTML page or a generated HTML
+artifact, the owner should be able to say "publish" and place it on `402v.com`
+as either:
+
+- `public`: readable by anonymous visitors without login.
+- `private`: readable only after login.
+
+The current production site already provides the base product:
+
+- Next.js App Router application.
+- Vercel production hosting for `https://402v.com`.
+- Supabase Auth, database, Row Level Security, and local operator scripts.
+- Authenticated editor flow at `/editor`.
+- Post detail pages at `/posts/[slug]`.
+- Public content feed, tags, search, profiles, comments, likes, and bookmarks.
+
+The existing companion generator is `html-artifact-publisher` v1. It currently
+lives outside this repository as a local development asset:
+
+```text
+/Users/glaucon/.config/superpowers/worktrees/plato/html-artifact-publisher-v1/skills-dev/html-artifact-publisher/
+```
+
+That tool can already turn Markdown reports into a local HTML site package with
+`index.html`, `site.json`, `manifest.json`, `sources.json`, `latest.json`,
+`README.md`, and a zip package. It is an upstream artifact generator, not the
+online publishing target. This repository is the online publishing target.
+
+The intended pipeline is:
+
+```text
+Markdown/report/source material
+  -> html-artifact-publisher or an existing hand-authored HTML file
+  -> local publish command
+  -> Supabase posts table
+  -> 402v.com post route
+  -> public or login-required access control
+```
+
+The next implementation will extend the current post model instead of creating
+a separate CMS. The expected application changes are:
+
+- Add post visibility: `public` or `private`.
+- Add post content format: `markdown` or `html`.
+- Keep existing Markdown posts working without migration breakage.
+- Render HTML artifacts in a safe sandboxed viewer.
+- Keep anonymous access limited to public published content.
+- Allow authenticated users to read private published content.
+- Add editor controls for public/private and Markdown/HTML content.
+- Add a local CLI command for publishing an HTML file into `402v.com`.
+- Keep Vercel/Supabase operations under the existing launch gates.
+
+The implementation plan is saved at:
+
+```text
+docs/superpowers/plans/2026-07-01-402v-html-publishing.md
+```
+
+Deployment remains Vercel-based. Database and authorization changes must be
+represented as Supabase migrations and verified before deployment.
+
 For the full project introduction, milestone completion record, commands, production state, and follow-up work, read:
 
 ```text
@@ -43,6 +112,7 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
 - Vercel production deployment configuration.
 - Custom domain `402v.com` with `www.402v.com` redirect.
 - Knowledge Nodes favicon served from `/icon.svg`.
+- Planned 402v Publishing System direction for public/private HTML artifact publishing.
 
 ## Core Commands
 
@@ -130,6 +200,9 @@ npm run vercel:deploy
 
 - `docs/superpowers/plans/`
   - Implementation plans created during milestone execution.
+
+- `docs/superpowers/plans/2026-07-01-402v-html-publishing.md`
+  - Implementation plan for public/private HTML artifact publishing on `402v.com`.
 
 ### Architecture Decisions
 

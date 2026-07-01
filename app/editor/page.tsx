@@ -24,8 +24,34 @@ export default async function EditorPage() {
             ))}
           </div>
         </fieldset>
+        <fieldset>
+          <legend>可见性</legend>
+          <div className="segmented-fields">
+            <label>
+              <input type="radio" name="visibility" value="public" defaultChecked />
+              Public
+            </label>
+            <label>
+              <input type="radio" name="visibility" value="private" />
+              Private
+            </label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>内容格式</legend>
+          <div className="segmented-fields">
+            <label>
+              <input type="radio" name="contentFormat" value="markdown" defaultChecked />
+              Markdown
+            </label>
+            <label>
+              <input type="radio" name="contentFormat" value="html" />
+              HTML
+            </label>
+          </div>
+        </fieldset>
         <label>
-          Markdown 正文
+          正文（Markdown 或 HTML）
           <textarea name="content" required rows={16} />
         </label>
         <div className="editor-actions">

@@ -7,6 +7,8 @@ const migrations = {
   avatarStorage: "supabase/migrations/20260515000200_avatar_storage.sql",
   prompts: "supabase/migrations/20260515000300_prompts.sql",
   promptAdminRpc: "supabase/migrations/20260515000400_prompt_admin_rpc.sql",
+  postVisibilityHtml:
+    "supabase/migrations/20260701000100_post_visibility_and_html.sql",
 };
 
 const command = parseArgs(process.argv.slice(2));
@@ -107,6 +109,7 @@ function migrationPlanFromStatus(status) {
   if (!status.promptHourlyStats || !status.archiveOldPrompts) {
     plan.push(migrations.promptAdminRpc);
   }
+  if (!status.postVisibilityHtml) plan.push(migrations.postVisibilityHtml);
   return plan;
 }
 
@@ -171,7 +174,14 @@ async function readStatus(sql) {
         select 1 from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'archive_old_prompts'
-      ) as archive_old_prompts
+      ) as archive_old_prompts,
+      exists(
+        select 1
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'posts'
+          and column_name = 'content_format'
+      ) as post_visibility_html
   `;
   const row = rows[0];
 
@@ -181,6 +191,7 @@ async function readStatus(sql) {
     avatarsBucket: row.avatars_bucket,
     promptHourlyStats: row.prompt_hourly_stats,
     archiveOldPrompts: row.archive_old_prompts,
+    postVisibilityHtml: row.post_visibility_html,
   };
 }
 
@@ -201,6 +212,7 @@ function printStatus(status) {
     avatarsBucket: status.avatarsBucket,
     promptHourlyStats: status.promptHourlyStats,
     archiveOldPrompts: status.archiveOldPrompts,
+    postVisibilityHtml: status.postVisibilityHtml,
     missingMigrations: migrationPlanFromStatus(status),
   });
 }

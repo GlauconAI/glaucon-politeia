@@ -51,7 +51,6 @@ lib/
   profiles/
   prompts/
   todos/
-  markdown/
   theme/
 supabase/
   migrations/
@@ -74,7 +73,7 @@ Exact paths can adapt to the starter, but these boundaries should remain clear.
 
 Domain modules own validation and data shaping:
 
-- `lib/posts`: slug generation, excerpt generation, post queries, post mutations.
+- `lib/posts`: slug generation, excerpt generation, HTML text extraction, post content normalization, post queries, post mutations.
 - `lib/profiles`: profile lookup, auto-create, username generation.
 - `lib/comments`: comment tree shaping and mutation helpers.
 - `lib/prompts`: validation, sensitive detection, idempotency, queue model, admin filters.
@@ -98,6 +97,8 @@ Validation and business rules belong in `lib/*`, where they can be tested withou
 ## Rendering Strategy
 
 - Public feed, post detail, tag, search, and profile pages should prefer server rendering for data loading.
+- Markdown posts render with the existing React Markdown view.
+- HTML artifact posts render through a sandboxed iframe component using `srcDoc`, isolated from the main application document.
 - Mutating interactions can use server actions or route handlers where appropriate.
 - Client components should be limited to forms, optimistic interactions, theme control, Prompt capture, TODO local-storage state, and 3D canvas.
 - Use cache invalidation deliberately after mutations; avoid full `window.location.reload()` except as a temporary fallback.
@@ -109,10 +110,13 @@ Validation and business rules belong in `lib/*`, where they can be tested withou
 - Admin-only behavior should be isolated behind explicit authorization helpers.
 - Privacy-sensitive aggregate data should use views or RPCs where direct table selection would expose private rows.
 - New content features should first extend the data model and tests, then UI.
+- Local publishing automation should be scriptable and explicit. Trusted publish commands may use service-role credentials, but browser code must never receive those credentials.
 
 ## Key Architectural Decisions
 
 - Dynamic Supabase-backed content instead of local MDX.
+- Extend `posts` for Markdown and HTML artifacts instead of introducing a second CMS.
+- Treat public/private visibility as a post-level database property enforced by RLS.
 - Profile auto-creation as a server-side invariant, not only a UI behavior.
 - Bookmark details private; public UI uses counts.
 - Prompt capture delayed until after the content product is stable.

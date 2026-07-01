@@ -30,16 +30,21 @@ Policies:
 - `title text not null`
 - `excerpt text not null default ''`
 - `content_md text not null`
+- `content_format text not null default 'markdown' check in ('markdown', 'html')`
+- `content_html text not null default ''`
+- `visibility text not null default 'public' check in ('public', 'private')`
 - `status text check in ('draft', 'published')`
 - `published_at timestamptz`
 - timestamps
 
 Policies:
 
-- Anyone can read published posts.
+- Anyone can read published posts with `visibility = 'public'`.
+- Authenticated users can read published posts with `visibility = 'private'`.
 - Authors can read their own drafts and published posts.
 - Authenticated users can create only their own posts.
 - Authors can update and delete their own posts.
+- A readable post means: public published, authenticated private published, own draft/published, or admin-readable.
 
 ### `tags`
 
@@ -66,7 +71,8 @@ Policies:
 
 Policies:
 
-- Anyone can read tags attached to readable posts.
+- Anyone can read tags attached to public readable posts.
+- Authenticated users can read tags attached to private readable posts.
 - Only the post author can create or delete tag links for that post.
 
 ### `comments`
@@ -80,7 +86,8 @@ Policies:
 
 Policies:
 
-- Anyone can read comments for published posts.
+- Anyone can read comments for public published posts.
+- Authenticated users can read comments for private published posts.
 - Authenticated users can create comments as themselves.
 - Comment authors can update and delete their own comments.
 
