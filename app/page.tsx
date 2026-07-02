@@ -8,53 +8,57 @@ const collections = [
     href: "/tags/vibe-coding",
     name: "Learn",
     detail: "AI coding notes, reading trails, and research fragments.",
-    meta: "learning",
+    meta: "~/learn",
+    command: "open learn",
     style: "collection-card-large",
   },
   {
     href: "/search?q=html",
     name: "Sites",
     detail: "Published HTML artifacts, reports, itineraries, and tiny standalone pages.",
-    meta: "html",
+    meta: "~/sites",
+    command: "list artifacts",
     style: "collection-card-tall",
   },
   {
     href: "/search?q=fragments",
     name: "Fragments",
     detail: "Essays, observations, working thoughts, and unfinished notes.",
-    meta: "writing",
+    meta: "~/fragments",
+    command: "grep thoughts",
     style: "",
   },
   {
     href: "/search?q=family",
     name: "Family",
     detail: "Trip plans, home references, and private family archives.",
-    meta: "home",
+    meta: "~/family",
+    command: "mount family",
     style: "",
   },
   {
     href: "/tags/projects",
     name: "Products",
     detail: "Ideas, experiments, product notes, and company-facing work.",
-    meta: "building",
+    meta: "~/products",
+    command: "open products",
     style: "collection-card-wide",
   },
   {
     href: "/search",
     name: "Archive",
     detail: "Everything placed here, searchable and ready to resurface.",
-    meta: "index",
+    meta: "~/archive",
+    command: "find *",
     style: "",
   },
 ];
 
-const surfaces = [
-  "public notes",
-  "private references",
-  "html sites",
-  "family pages",
-  "product sketches",
-  "research trails",
+const commands = [
+  { href: "/search", keys: "Cmd K", label: "Search 402v", detail: "Find notes, artifacts, tags, and people." },
+  { href: "/search?q=html", keys: "Cmd H", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
+  { href: "/tags/vibe-coding", keys: "Cmd L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
+  { href: "/editor", keys: "Cmd P", label: "Publish new output", detail: "Create a note or place an HTML site." },
 ];
 
 function archiveCardClass(style: string) {
@@ -108,24 +112,42 @@ export default async function Home() {
 
   return (
     <section className="home-stack">
-      <div className="archive-hero">
-        <div className="archive-hero-copy">
-          <p className="eyebrow">Personal knowledge universe</p>
-          <h1>402v</h1>
+      <div className="shell-hero">
+        <div className="shell-hero-copy">
+          <p className="eyebrow">Personal publishing command center</p>
+          <h1>
+            <span>402v</span> ~/publishing-system
+          </h1>
           <p>
-            Notes, sites, fragments, and family archives. A personal collection
-            surface for what is being learned, built, remembered, and published.
+            &gt; open notes, sites, fragments, and family archives
           </p>
-          <div className="surface-strip" aria-label="Archive surfaces">
-            {surfaces.map((surface) => (
-              <span key={surface}>{surface}</span>
-            ))}
+          <div className="shell-status-line" aria-label="Shell status">
+            <span>status: online</span>
+            <span>mode: public/private</span>
+            <span>runtime: publishing</span>
           </div>
         </div>
-        <div className="archive-note" aria-label="Archive note">
-          <span>now placed</span>
-          <strong>HTML artifacts live beside notes.</strong>
-          <p>Public and private pages share the same archive surface.</p>
+        <div className="command-panel" aria-label="402v command palette">
+          <form className="command-search" action="/search">
+            <span>&gt;</span>
+            <input
+              aria-label="Search 402v"
+              name="q"
+              placeholder="Search 402v"
+              type="search"
+            />
+          </form>
+          <div className="command-list">
+            {commands.map((command) => (
+              <a key={command.label} href={command.href} className="command-row">
+                <span className="command-keys">{command.keys}</span>
+                <span>
+                  <strong>{command.label}</strong>
+                  <small>{command.detail}</small>
+                </span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -142,8 +164,8 @@ export default async function Home() {
 
       <section className="collections-section">
         <div className="section-heading">
-          <p className="eyebrow">Boards</p>
-          <h2>Collections</h2>
+          <p className="eyebrow">Mounted paths</p>
+          <h2>Mounted collections</h2>
         </div>
         <div className="collection-board">
           {collections.map((collection) => (
@@ -153,8 +175,9 @@ export default async function Home() {
               className={archiveCardClass(collection.style)}
             >
               <span>{collection.meta}</span>
-              <strong>{collection.name}</strong>
+              <strong>{collection.command}</strong>
               <p>{collection.detail}</p>
+              <small>{collection.name}</small>
             </a>
           ))}
         </div>
@@ -163,11 +186,11 @@ export default async function Home() {
       <section className="feed-section archive-feed">
         <div className="section-heading section-heading-row">
           <div>
-            <p className="eyebrow">Recent additions</p>
-            <h2>Recently placed</h2>
+            <p className="eyebrow">Published stream</p>
+            <h2>Recent outputs</h2>
           </div>
           <a href="/search" className="text-link">
-            Full archive
+            run full archive
           </a>
         </div>
         {posts?.length ? (

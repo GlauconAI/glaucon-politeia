@@ -60,14 +60,15 @@ export default async function PostPage({ params }: PostPageProps) {
   return (
     <article className="post-detail publication-page">
       <header className="publication-header">
-        <p className="eyebrow">
-          <Link href="/">402v</Link> / <Link href="/search">Archive</Link> / {post.slug}
+        <p className="eyebrow shell-path">
+          <Link href="/">402v</Link> <span>/posts/{post.slug}</span>
         </p>
         <h1>{post.title}</h1>
         <div className="post-meta publication-meta">
+          <span className="content-pill">status: published</span>
           <span className="content-pill">{contentFormat === "html" ? "HTML Site" : "Note"}</span>
           <span className="content-pill content-pill-muted">
-            {post.visibility === "private" ? "Private" : "Public"}
+            visibility: {post.visibility === "private" ? "private" : "public"}
           </span>
           {author ? (
             <Link href={`/profile/${author.username}`}>{author.display_name}</Link>

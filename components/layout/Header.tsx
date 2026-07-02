@@ -22,7 +22,7 @@ export function Header({ userEmail }: HeaderProps) {
       <div className="header-inner">
         <Link href="/" className="brand" aria-label="402v home">
           <span className="brand-title">402v</span>
-          <span className="brand-subtitle">Notes, sites, fragments, and family archives.</span>
+          <span className="brand-subtitle">~/publishing-system</span>
         </Link>
 
         <nav className="site-nav" aria-label="Primary">
@@ -37,7 +37,7 @@ export function Header({ userEmail }: HeaderProps) {
           <input
             type="search"
             name="q"
-            placeholder="Search the archive"
+            placeholder="Search 402v"
             aria-label="Search posts"
           />
         </form>

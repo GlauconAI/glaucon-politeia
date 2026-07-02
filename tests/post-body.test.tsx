@@ -29,6 +29,7 @@ describe("PostBody", () => {
       />,
     );
 
+    expect(screen.getByText(/artifact preview/i)).toBeInTheDocument();
     const frame = screen.getByTitle("Artifact");
     expect(frame).toHaveAttribute("sandbox", "");
     expect(frame).toHaveAttribute(

@@ -5,11 +5,17 @@ type HtmlArtifactViewProps = {
 
 export function HtmlArtifactView({ html, title }: HtmlArtifactViewProps) {
   return (
-    <iframe
-      className="html-artifact-frame"
-      sandbox=""
-      srcDoc={html}
-      title={title}
-    />
+    <section className="artifact-preview" aria-label="Artifact preview">
+      <div className="artifact-preview-bar">
+        <span>artifact preview</span>
+        <strong>{title}</strong>
+      </div>
+      <iframe
+        className="html-artifact-frame"
+        sandbox=""
+        srcDoc={html}
+        title={title}
+      />
+    </section>
   );
 }

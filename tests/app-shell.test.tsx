@@ -16,6 +16,7 @@ describe("app shell", () => {
     expect(primaryNav).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveTextContent("Content area");
     expect(screen.getByRole("link", { name: /402v home/i })).toBeInTheDocument();
+    expect(screen.getByText("~/publishing-system")).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Learn" })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Sites" })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Fragments" })).toBeInTheDocument();
