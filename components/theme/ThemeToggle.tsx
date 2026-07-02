@@ -35,6 +35,8 @@ function readStoredTheme(): ThemeMode {
 
 export function ThemeToggle() {
   const [mode, setMode] = useState<ThemeMode>(readStoredTheme);
+  const modeLabel =
+    mode === "system" ? "System" : mode === "light" ? "Light" : "Dark";
 
   function cycleTheme() {
     const next = mode === "system" ? "light" : mode === "light" ? "dark" : "system";
@@ -46,13 +48,13 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      className="icon-button"
+      className="theme-button"
       aria-label={`Theme: ${mode}`}
       title={`Theme: ${mode}`}
       onClick={cycleTheme}
       suppressHydrationWarning
     >
-      {mode === "dark" ? "D" : mode === "light" ? "L" : "S"}
+      Theme: {modeLabel}
     </button>
   );
 }

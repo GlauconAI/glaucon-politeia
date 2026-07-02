@@ -36,6 +36,9 @@ describe("app shell", () => {
       "href",
       "/auth",
     );
+    expect(
+      screen.queryByRole("link", { name: /publish/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows user email and profile link when logged in", () => {
@@ -47,5 +50,9 @@ describe("app shell", () => {
 
     expect(screen.getByText("reader@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /个人资料/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /publish/i })).toHaveAttribute(
+      "href",
+      "/editor",
+    );
   });
 });

@@ -58,7 +58,6 @@ const commands = [
   { href: "/search", keys: "Cmd K", label: "Search 402v", detail: "Find notes, artifacts, tags, and people." },
   { href: "/search?q=html", keys: "Cmd H", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
   { href: "/tags/vibe-coding", keys: "Cmd L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
-  { href: "/editor", keys: "Cmd P", label: "Publish new output", detail: "Create a note or place an HTML site." },
 ];
 
 function archiveCardClass(style: string) {

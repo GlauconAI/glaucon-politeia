@@ -139,6 +139,7 @@ input {
 .button-primary,
 .button-secondary,
 .icon-button,
+.theme-button,
 .user-menu button {
   display: inline-flex;
   min-height: 36px;
@@ -162,6 +163,12 @@ input {
 
 .button-secondary {
   background: var(--panel-muted);
+}
+
+.theme-button {
+  min-width: 108px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .icon-button {
@@ -1479,6 +1486,7 @@ body {
 .button-primary,
 .button-secondary,
 .icon-button,
+.theme-button,
 .user-menu button,
 .search-form input {
   border-color: rgba(255, 255, 255, 0.1);
@@ -1490,6 +1498,7 @@ body {
 .write-link:hover,
 .login-link:hover,
 .icon-button:hover,
+.theme-button:hover,
 .user-menu button:hover {
   border-color: rgba(124, 58, 237, 0.55);
   background: rgba(124, 58, 237, 0.16);

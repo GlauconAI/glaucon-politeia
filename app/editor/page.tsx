@@ -1,8 +1,16 @@
+import { redirect } from "next/navigation";
+
 import { savePostAction } from "@/app/editor/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function EditorPage() {
   const supabase = await createSupabaseServerClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) {
+    redirect("/auth?redirectTo=/editor");
+  }
+
   const { data } = await supabase.from("tags").select("id, slug, name").order("slug");
 
   return (

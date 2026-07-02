@@ -15,10 +15,7 @@ export function RightRail() {
         <h2>402v is the public edge of Glaucon&apos;s knowledge system.</h2>
         <p>Public notes, private pages, HTML artifacts, family references, and product work share one calm shell.</p>
         <div className="panel-actions">
-          <Link href="/editor" className="button-primary">
-            Publish
-          </Link>
-          <Link href="/search" className="button-secondary">
+          <Link href="/search" className="button-primary">
             Browse
           </Link>
         </div>

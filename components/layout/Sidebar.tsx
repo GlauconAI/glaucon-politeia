@@ -11,7 +11,6 @@ const navItems = [
 ];
 
 const operatorItems = [
-  { href: "/editor", label: "Editor" },
   { href: "/lab/world", label: "Lab" },
   { href: "/todos", label: "TODO" },
   { href: "/profile/me", label: "个人资料" },

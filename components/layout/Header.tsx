@@ -43,9 +43,11 @@ export function Header({ userEmail }: HeaderProps) {
         </form>
 
         <div className="header-actions">
-          <Link href="/editor" className="write-link">
-            Publish
-          </Link>
+          {userEmail ? (
+            <Link href="/editor" className="write-link">
+              Publish
+            </Link>
+          ) : null}
           <ThemeToggle />
           {userEmail ? (
             <div className="user-menu">

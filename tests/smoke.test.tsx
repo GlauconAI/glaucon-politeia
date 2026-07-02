@@ -14,6 +14,7 @@ describe("home page", () => {
       screen.getByText(/open notes, sites, fragments, and family archives/i),
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/search 402v/i)).toBeInTheDocument();
+    expect(screen.queryByText(/publish new output/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /mounted collections/i })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /recent outputs/i }),
