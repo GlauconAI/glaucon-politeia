@@ -6,6 +6,10 @@ const migrationPath = join(
   process.cwd(),
   "supabase/migrations/20260701000100_post_visibility_and_html.sql",
 );
+const privateDefaultMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260702000100_posts_default_private.sql",
+);
 
 function readMigration() {
   return readFileSync(migrationPath, "utf8").toLowerCase();
@@ -46,5 +50,12 @@ describe("post visibility and html migration", () => {
 
     expect(sql).toContain("public.can_read_post(posts)");
     expect(sql).toContain("public.can_read_post(p)");
+  });
+
+  it("keeps future post visibility private by default", () => {
+    const sql = readFileSync(privateDefaultMigrationPath, "utf8").toLowerCase();
+
+    expect(sql).toContain("alter table public.posts");
+    expect(sql).toContain("alter column visibility set default 'private'");
   });
 });

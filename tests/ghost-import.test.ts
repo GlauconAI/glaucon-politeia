@@ -70,8 +70,8 @@ describe("import-ghost script", () => {
 
       expect(result.summary).toMatchObject({
         sourcePosts: 2,
-        published: 1,
-        drafts: 1,
+        published: 2,
+        drafts: 0,
         usedTags: 2,
       });
       expect(result.posts[0]).toMatchObject({
@@ -89,8 +89,9 @@ describe("import-ghost script", () => {
       );
       expect(result.posts[0].content_md).toContain("[Tag](/tags/leetcode)");
       expect(result.posts[1]).toMatchObject({
-        status: "draft",
-        published_at: null,
+        status: "published",
+        visibility: "public",
+        published_at: "2015-12-19T10:13:38.000Z",
       });
       expect(result.tags.map((tag: { slug: string }) => tag.slug)).toEqual([
         "algorithm",

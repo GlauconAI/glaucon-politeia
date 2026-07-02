@@ -125,7 +125,7 @@ function buildImportPlan(source, authorId) {
       usedTagSlugs.add(slug);
     }
 
-    const status = post.status === "draft" ? "draft" : "published";
+    const status = "published";
     const markdown = rewriteGhostLinks((post.markdown || "").trim(), postSlugMap);
     const html = (post.html || "").trim();
 
@@ -141,7 +141,7 @@ function buildImportPlan(source, authorId) {
       visibility: "public",
       status,
       published_at:
-        status === "published" ? timestampToIso(post.published_at) : null,
+        timestampToIso(post.published_at) || timestampToIso(post.created_at),
       created_at: timestampToIso(post.created_at),
       updated_at: timestampToIso(post.updated_at) || timestampToIso(post.created_at),
       image: post.image || "",

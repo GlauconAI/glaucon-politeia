@@ -11,7 +11,7 @@ type ContentInput = {
 
 export function normalizePostVisibility(value: unknown): PostVisibility {
   if (value === undefined || value === null || value === "") {
-    return "public";
+    return "private";
   }
 
   if (value === "public" || value === "private") {

@@ -60,7 +60,7 @@ function parseArgs(values) {
   const title = readFlag(values, "--title");
   const slug = readFlag(values, "--slug") || slugify(title || basename(input || ""));
   const authorId = readFlag(values, "--author-id");
-  const visibility = readFlag(values, "--visibility") || "public";
+  const visibility = readFlag(values, "--visibility") || "private";
   const dryRun = values.includes("--dry-run");
   const publish = values.includes("--publish");
 

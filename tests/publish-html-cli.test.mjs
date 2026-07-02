@@ -45,4 +45,35 @@ describe("publish html cli", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("defaults new HTML artifacts to private visibility", () => {
+    const dir = mkdtempSync(join(tmpdir(), "publish-html-"));
+    const input = join(dir, "artifact.html");
+    writeFileSync(input, "<html><body><h1>Artifact</h1></body></html>");
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "scripts/publish-html.mjs",
+          "--input",
+          input,
+          "--title",
+          "Artifact",
+          "--slug",
+          "artifact",
+          "--author-id",
+          "00000000-0000-0000-0000-000000000001",
+          "--dry-run",
+        ],
+        { cwd: process.cwd(), encoding: "utf8" },
+      );
+
+      expect(result.status).toBe(0);
+      const payload = JSON.parse(result.stdout);
+      expect(payload.visibility).toBe("private");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

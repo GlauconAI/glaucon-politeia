@@ -39,7 +39,7 @@ describe("EditorPage", () => {
       name: /publish settings/i,
     });
     expect(
-      within(settingsRegion).getByRole("radio", { name: /public/i }),
+      within(settingsRegion).getByRole("radio", { name: /private/i }),
     ).toBeChecked();
     expect(
       within(settingsRegion).getByRole("radio", { name: /markdown/i }),

@@ -76,14 +76,14 @@ export default async function EditorPage() {
               <legend>Visibility</legend>
               <div className="segmented-fields publish-segments">
                 <label>
-                  <input type="radio" name="visibility" value="public" defaultChecked />
+                  <input type="radio" name="visibility" value="public" />
                   <span>
                     <strong>Public</strong>
                     <small>Readable on the web</small>
                   </span>
                 </label>
                 <label>
-                  <input type="radio" name="visibility" value="private" />
+                  <input type="radio" name="visibility" value="private" defaultChecked />
                   <span>
                     <strong>Private</strong>
                     <small>Login required</small>

@@ -7,8 +7,8 @@ import {
 } from "@/lib/posts/content";
 
 describe("post content helpers", () => {
-  it("normalizes visibility with public as the default", () => {
-    expect(normalizePostVisibility(undefined)).toBe("public");
+  it("normalizes visibility with private as the default", () => {
+    expect(normalizePostVisibility(undefined)).toBe("private");
     expect(normalizePostVisibility("private")).toBe("private");
     expect(() => normalizePostVisibility("team")).toThrow(
       "Visibility must be public or private",
