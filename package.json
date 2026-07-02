@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "import:ghost": "node scripts/import-ghost.mjs",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
