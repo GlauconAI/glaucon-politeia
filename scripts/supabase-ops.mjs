@@ -9,6 +9,8 @@ const migrations = {
   promptAdminRpc: "supabase/migrations/20260515000400_prompt_admin_rpc.sql",
   postVisibilityHtml:
     "supabase/migrations/20260701000100_post_visibility_and_html.sql",
+  adminOnlyPostMutations:
+    "supabase/migrations/20260702000200_admin_only_post_mutations.sql",
 };
 
 const command = parseArgs(process.argv.slice(2));
@@ -110,6 +112,9 @@ function migrationPlanFromStatus(status) {
     plan.push(migrations.promptAdminRpc);
   }
   if (!status.postVisibilityHtml) plan.push(migrations.postVisibilityHtml);
+  if (!status.adminOnlyPostMutations) {
+    plan.push(migrations.adminOnlyPostMutations);
+  }
   return plan;
 }
 
@@ -181,7 +186,14 @@ async function readStatus(sql) {
         where table_schema = 'public'
           and table_name = 'posts'
           and column_name = 'content_format'
-      ) as post_visibility_html
+      ) as post_visibility_html,
+      exists(
+        select 1
+        from pg_policies
+        where schemaname = 'public'
+          and tablename = 'posts'
+          and policyname = 'posts_insert_admin_only'
+      ) as admin_only_post_mutations
   `;
   const row = rows[0];
 
@@ -192,6 +204,7 @@ async function readStatus(sql) {
     promptHourlyStats: row.prompt_hourly_stats,
     archiveOldPrompts: row.archive_old_prompts,
     postVisibilityHtml: row.post_visibility_html,
+    adminOnlyPostMutations: row.admin_only_post_mutations,
   };
 }
 
@@ -213,6 +226,7 @@ function printStatus(status) {
     promptHourlyStats: status.promptHourlyStats,
     archiveOldPrompts: status.archiveOldPrompts,
     postVisibilityHtml: status.postVisibilityHtml,
+    adminOnlyPostMutations: status.adminOnlyPostMutations,
     missingMigrations: migrationPlanFromStatus(status),
   });
 }

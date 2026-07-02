@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createPost } from "@/lib/posts/service";
+import { getCurrentUserAccess } from "@/lib/auth/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getFormString(formData: FormData, key: string) {
@@ -12,10 +13,14 @@ function getFormString(formData: FormData, key: string) {
 
 export async function savePostAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
+  const access = await getCurrentUserAccess(supabase);
 
-  if (!data.user) {
+  if (!access.user) {
     redirect("/auth?redirectTo=/editor");
+  }
+
+  if (!access.canPublish) {
+    redirect("/");
   }
 
   const tagIds = formData
@@ -23,7 +28,7 @@ export async function savePostAction(formData: FormData) {
     .filter((value): value is string => typeof value === "string");
   const intent = getFormString(formData, "intent");
   const post = await createPost(supabase, {
-    authorId: data.user.id,
+    authorId: access.user.id,
     title: getFormString(formData, "title"),
     content: getFormString(formData, "content"),
     contentFormat: getFormString(formData, "contentFormat"),

@@ -8,6 +8,7 @@ const redirectMock = vi.hoisted(() => vi.fn((path: string) => {
 }));
 
 let currentUser: { id: string } | null = { id: "user-1" };
+let currentProfile: { is_admin: boolean } | null = { is_admin: true };
 
 vi.mock("next/navigation", () => ({
   redirect: redirectMock,
@@ -20,6 +21,9 @@ vi.mock("@/lib/supabase/server", () => ({
     },
     from: () => ({
       select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: currentProfile }),
+        }),
         order: async () => ({
           data: [
             { id: "tag-1", slug: "family", name: "Family" },
@@ -34,6 +38,7 @@ vi.mock("@/lib/supabase/server", () => ({
 describe("EditorPage", () => {
   beforeEach(() => {
     currentUser = { id: "user-1" };
+    currentProfile = { is_admin: true };
     redirectMock.mockClear();
   });
 
@@ -42,6 +47,13 @@ describe("EditorPage", () => {
 
     await expect(EditorPage()).rejects.toThrow("redirect:/auth?redirectTo=/editor");
     expect(redirectMock).toHaveBeenCalledWith("/auth?redirectTo=/editor");
+  });
+
+  it("redirects logged-in non-admin users away from the publish form", async () => {
+    currentProfile = { is_admin: false };
+
+    await expect(EditorPage()).rejects.toThrow("redirect:/");
+    expect(redirectMock).toHaveBeenCalledWith("/");
   });
 
   it("renders a structured publishing command form", async () => {

@@ -43,7 +43,7 @@ describe("app shell", () => {
 
   it("shows user email and profile link when logged in", () => {
     render(
-      <AppShell userEmail="reader@example.com">
+      <AppShell userEmail="reader@example.com" canPublish>
         <p>Content area</p>
       </AppShell>,
     );
@@ -54,5 +54,18 @@ describe("app shell", () => {
       "href",
       "/editor",
     );
+  });
+
+  it("does not show publishing access to logged-in non-admin users", () => {
+    render(
+      <AppShell userEmail="reader@example.com" canPublish={false}>
+        <p>Content area</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByText("reader@example.com")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /publish/i }),
+    ).not.toBeInTheDocument();
   });
 });

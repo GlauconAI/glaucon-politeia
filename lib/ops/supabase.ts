@@ -4,6 +4,7 @@ export type SupabaseOpsStatus = {
   promptHourlyStats: boolean;
   archiveOldPrompts: boolean;
   postVisibilityHtml?: boolean;
+  adminOnlyPostMutations?: boolean;
 };
 
 export type SupabaseOpsCommand =
@@ -31,6 +32,8 @@ export const opsMigrations = {
   promptAdminRpc: "supabase/migrations/20260515000400_prompt_admin_rpc.sql",
   postVisibilityHtml:
     "supabase/migrations/20260701000100_post_visibility_and_html.sql",
+  adminOnlyPostMutations:
+    "supabase/migrations/20260702000200_admin_only_post_mutations.sql",
 } as const;
 
 export const requiredVercelEnvKeys = [
@@ -68,6 +71,10 @@ export function migrationPlanFromStatus(status: SupabaseOpsStatus) {
 
   if (!status.postVisibilityHtml) {
     plan.push(opsMigrations.postVisibilityHtml);
+  }
+
+  if (!status.adminOnlyPostMutations) {
+    plan.push(opsMigrations.adminOnlyPostMutations);
   }
 
   return plan;

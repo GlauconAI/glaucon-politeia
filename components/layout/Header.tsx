@@ -4,6 +4,7 @@ import { logoutAction } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 type HeaderProps = {
+  canPublish?: boolean;
   userEmail: string | null;
 };
 
@@ -16,7 +17,7 @@ const collectionLinks = [
   { href: "/search", label: "Archive" },
 ];
 
-export function Header({ userEmail }: HeaderProps) {
+export function Header({ canPublish = false, userEmail }: HeaderProps) {
   return (
     <header className="site-header">
       <div className="header-inner">
@@ -43,7 +44,7 @@ export function Header({ userEmail }: HeaderProps) {
         </form>
 
         <div className="header-actions">
-          {userEmail ? (
+          {canPublish ? (
             <Link href="/editor" className="write-link">
               Publish
             </Link>

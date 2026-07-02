@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { PromptCaptureProvider } from "@/components/prompts/PromptCaptureProvider";
+import { getCurrentUserAccess } from "@/lib/auth/access";
 import { getPublicEnv } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { themeInitScript } from "@/lib/theme/init";
@@ -23,19 +24,20 @@ type RootLayoutProps = {
 };
 
 export default async function RootLayout({ children }: RootLayoutProps) {
-  async function getUserEmail() {
+  async function getUserAccess() {
     if (!getPublicEnv().configured) {
-      return null;
+      return { canPublish: false, email: null };
     }
 
     try {
       const supabase = await createSupabaseServerClient();
-      const { data } = await supabase.auth.getUser();
-      return data.user?.email ?? null;
+      const access = await getCurrentUserAccess(supabase);
+      return { canPublish: access.canPublish, email: access.email };
     } catch {
-      return null;
+      return { canPublish: false, email: null };
     }
   }
+  const userAccess = await getUserAccess();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -44,7 +46,12 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       </head>
       <body>
         <PromptCaptureProvider>
-          <AppShell userEmail={await getUserEmail()}>{children}</AppShell>
+          <AppShell
+            canPublish={userAccess.canPublish}
+            userEmail={userAccess.email}
+          >
+            {children}
+          </AppShell>
         </PromptCaptureProvider>
       </body>
     </html>

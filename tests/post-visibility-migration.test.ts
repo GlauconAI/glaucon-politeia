@@ -10,6 +10,10 @@ const privateDefaultMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260702000100_posts_default_private.sql",
 );
+const adminPublishMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260702000200_admin_only_post_mutations.sql",
+);
 
 function readMigration() {
   return readFileSync(migrationPath, "utf8").toLowerCase();
@@ -66,5 +70,25 @@ describe("post visibility and html migration", () => {
     ).toLowerCase();
 
     expect(config).toContain("enable_signup = false");
+  });
+
+  it("restricts post and post tag mutations to admin users", () => {
+    const sql = readFileSync(adminPublishMigrationPath, "utf8").toLowerCase();
+
+    for (const policy of [
+      "posts_insert_admin_only",
+      "posts_update_admin_only",
+      "posts_delete_admin_only",
+      "post_tags_insert_admin_only",
+      "post_tags_delete_admin_only",
+    ]) {
+      expect(sql).toContain(policy);
+    }
+
+    expect(sql).not.toContain("create policy posts_insert_own");
+    expect(sql).not.toContain(
+      "create policy post_tags_insert_post_author_or_admin",
+    );
+    expect(sql).toContain("public.is_current_user_admin()");
   });
 });
