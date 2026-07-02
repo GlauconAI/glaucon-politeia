@@ -55,32 +55,38 @@ export default async function PostPage({ params }: PostPageProps) {
     ]);
   const counts = countMap.get(post.id);
   const commentTree = buildCommentTree((comments ?? []) as any);
+  const contentFormat = post.content_format === "html" ? "html" : "markdown";
 
   return (
-    <article className="post-detail">
-      <p className="eyebrow">
-        <Link href="/">首页</Link> / {post.slug}
-      </p>
-      <h1>{post.title}</h1>
-      <div className="post-meta">
-        {author ? (
-          <Link href={`/profile/${author.username}`}>{author.display_name}</Link>
-        ) : (
-          <span>匿名</span>
-        )}
-        {post.published_at ? <span>{new Date(post.published_at).toLocaleDateString()}</span> : null}
-        {post.visibility === "private" ? <span>Private</span> : null}
-      </div>
-      <div className="tag-row">
-        {post.post_tags?.map((item) => {
-          const tag = Array.isArray(item.tags) ? item.tags[0] : item.tags;
-          return tag ? (
-            <Link key={tag.slug} href={`/tags/${tag.slug}`}>
-              #{tag.name}
-            </Link>
-          ) : null;
-        })}
-      </div>
+    <article className="post-detail publication-page">
+      <header className="publication-header">
+        <p className="eyebrow">
+          <Link href="/">402v</Link> / <Link href="/search">Archive</Link> / {post.slug}
+        </p>
+        <h1>{post.title}</h1>
+        <div className="post-meta publication-meta">
+          <span className="content-pill">{contentFormat === "html" ? "HTML Site" : "Note"}</span>
+          <span className="content-pill content-pill-muted">
+            {post.visibility === "private" ? "Private" : "Public"}
+          </span>
+          {author ? (
+            <Link href={`/profile/${author.username}`}>{author.display_name}</Link>
+          ) : (
+            <span>匿名</span>
+          )}
+          {post.published_at ? <span>{new Date(post.published_at).toLocaleDateString()}</span> : null}
+        </div>
+        <div className="tag-row">
+          {post.post_tags?.map((item) => {
+            const tag = Array.isArray(item.tags) ? item.tags[0] : item.tags;
+            return tag ? (
+              <Link key={tag.slug} href={`/tags/${tag.slug}`}>
+                #{tag.name}
+              </Link>
+            ) : null;
+          })}
+        </div>
+      </header>
       <PostInteractions
         postId={post.id}
         slug={post.slug}
@@ -90,7 +96,7 @@ export default async function PostPage({ params }: PostPageProps) {
         bookmarkCount={counts?.bookmark_count ?? 0}
       />
       <PostBody
-        contentFormat={post.content_format === "html" ? "html" : "markdown"}
+        contentFormat={contentFormat}
         contentMd={post.content_md ?? ""}
         contentHtml={post.content_html ?? ""}
         title={post.title}

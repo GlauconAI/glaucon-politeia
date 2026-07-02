@@ -15,14 +15,13 @@ describe("app shell", () => {
     const primaryNav = screen.getByRole("navigation", { name: /primary/i });
     expect(primaryNav).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveTextContent("Content area");
-    expect(
-      screen.getByRole("complementary", { name: /site information/i }),
-    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /402v home/i })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Learn" })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Sites" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Fragments" })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Family" })).toBeInTheDocument();
     expect(within(primaryNav).getByRole("link", { name: "Products" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Archive" })).toBeInTheDocument();
   });
 
   it("shows login state when no user is present", () => {
@@ -46,6 +45,6 @@ describe("app shell", () => {
     );
 
     expect(screen.getByText("reader@example.com")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /个人资料/i })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /个人资料/i })).toBeInTheDocument();
   });
 });

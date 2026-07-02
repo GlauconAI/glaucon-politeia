@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 type PostCardProps = {
+  className?: string;
+  collection?: string;
   post: any;
 };
 
@@ -8,7 +10,7 @@ function first<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ className = "archive-card", collection, post }: PostCardProps) {
   const author = first<{ username: string; display_name: string }>(post.profiles);
   const counts = first<{
     like_count: number;
@@ -19,10 +21,11 @@ export function PostCard({ post }: PostCardProps) {
   const visibility = post.visibility === "private" ? "Private" : "Public";
 
   return (
-    <article className="post-card">
+    <article className={["post-card", className].filter(Boolean).join(" ")}>
       <div className="post-meta">
         <span className="content-pill">{format}</span>
         <span className="content-pill content-pill-muted">{visibility}</span>
+        {collection ? <span className="content-pill content-pill-muted">{collection}</span> : null}
         {author ? (
           <Link href={`/profile/${author.username}`}>{author.display_name}</Link>
         ) : (

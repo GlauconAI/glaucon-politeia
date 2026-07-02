@@ -11,7 +11,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "402v",
-  description: "A calm personal publishing system for notes, HTML sites, family pages, and products.",
+  description: "Notes, sites, fragments, and family archives.",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],

@@ -3,44 +3,90 @@ import { PostCard } from "@/components/posts/PostCard";
 import { attachPostEngagementCounts } from "@/lib/posts/engagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const spaces = [
+const collections = [
   {
     href: "/tags/vibe-coding",
     name: "Learn",
-    detail: "AI coding notes, research trails, and study logs.",
-    meta: "Notes",
-  },
-  {
-    href: "/search?q=essay",
-    name: "Notes",
-    detail: "Essays, fragments, personal observations, and working thoughts.",
-    meta: "Writing",
+    detail: "AI coding notes, reading trails, and research fragments.",
+    meta: "learning",
+    style: "collection-card-large",
   },
   {
     href: "/search?q=html",
     name: "Sites",
-    detail: "Published HTML artifacts, reports, itineraries, and mini-sites.",
-    meta: "HTML",
+    detail: "Published HTML artifacts, reports, itineraries, and tiny standalone pages.",
+    meta: "html",
+    style: "collection-card-tall",
+  },
+  {
+    href: "/search?q=fragments",
+    name: "Fragments",
+    detail: "Essays, observations, working thoughts, and unfinished notes.",
+    meta: "writing",
+    style: "",
   },
   {
     href: "/search?q=family",
     name: "Family",
-    detail: "Family references, plans, trips, and private household pages.",
-    meta: "Home",
+    detail: "Trip plans, home references, and private family archives.",
+    meta: "home",
+    style: "",
   },
   {
     href: "/tags/projects",
     name: "Products",
-    detail: "Product experiments, company work, and long-running builds.",
-    meta: "Builds",
+    detail: "Ideas, experiments, product notes, and company-facing work.",
+    meta: "building",
+    style: "collection-card-wide",
   },
   {
     href: "/search",
     name: "Archive",
-    detail: "Everything published, searchable, and ready to resurface.",
-    meta: "Index",
+    detail: "Everything placed here, searchable and ready to resurface.",
+    meta: "index",
+    style: "",
   },
 ];
+
+const surfaces = [
+  "public notes",
+  "private references",
+  "html sites",
+  "family pages",
+  "product sketches",
+  "research trails",
+];
+
+function archiveCardClass(style: string) {
+  return ["collection-card", style].filter(Boolean).join(" ");
+}
+
+function postBoardClass(index: number) {
+  const style = index % 5 === 0 ? "post-card-wide" : index % 3 === 0 ? "post-card-tall" : "";
+  return ["archive-card", style].filter(Boolean).join(" ");
+}
+
+function inferCollection(post: any) {
+  if (post.content_format === "html") {
+    return "Sites";
+  }
+  const tagNames = post.post_tags
+    ?.map((item: any) => {
+      const tag = Array.isArray(item.tags) ? item.tags[0] : item.tags;
+      return tag?.name?.toLowerCase() ?? tag?.slug?.toLowerCase() ?? "";
+    })
+    .filter(Boolean);
+
+  if (tagNames?.some((tag: string) => tag.includes("project"))) {
+    return "Products";
+  }
+
+  if (tagNames?.some((tag: string) => tag.includes("vibe"))) {
+    return "Learn";
+  }
+
+  return "Fragments";
+}
 
 export default async function Home() {
   const env = getPublicEnv();
@@ -62,28 +108,24 @@ export default async function Home() {
 
   return (
     <section className="home-stack">
-      <div className="intro-panel intro-panel-os">
-        <div className="intro-copy">
-          <p className="eyebrow">Calm personal OS for publishing</p>
+      <div className="archive-hero">
+        <div className="archive-hero-copy">
+          <p className="eyebrow">Personal knowledge universe</p>
           <h1>402v</h1>
           <p>
-            A quiet web surface for learning notes, essays, HTML sites, family
-            references, and future products. Public when it should travel;
-            private when it should stay close.
+            Notes, sites, fragments, and family archives. A personal collection
+            surface for what is being learned, built, remembered, and published.
           </p>
-          <div className="intro-actions">
-            <a href="/search?q=html" className="button-primary">
-              Browse Sites
-            </a>
-            <a href="/editor" className="button-secondary">
-              Publish
-            </a>
+          <div className="surface-strip" aria-label="Archive surfaces">
+            {surfaces.map((surface) => (
+              <span key={surface}>{surface}</span>
+            ))}
           </div>
         </div>
-        <div className="system-card" aria-label="Publishing system status">
-          <span>public / private</span>
-          <strong>HTML artifacts are live</strong>
-          <p>Markdown notes and sandboxed HTML pages now share one publishing flow.</p>
+        <div className="archive-note" aria-label="Archive note">
+          <span>now placed</span>
+          <strong>HTML artifacts live beside notes.</strong>
+          <p>Public and private pages share the same archive surface.</p>
         </div>
       </div>
 
@@ -98,36 +140,45 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <section className="spaces-section">
+      <section className="collections-section">
         <div className="section-heading">
-          <p className="eyebrow">Information architecture</p>
-          <h2>Spaces</h2>
+          <p className="eyebrow">Boards</p>
+          <h2>Collections</h2>
         </div>
-        <div className="space-grid">
-          {spaces.map((space) => (
-            <a key={space.name} href={space.href} className="space-card">
-              <span>{space.meta}</span>
-              <strong>{space.name}</strong>
-              <p>{space.detail}</p>
+        <div className="collection-board">
+          {collections.map((collection) => (
+            <a
+              key={collection.name}
+              href={collection.href}
+              className={archiveCardClass(collection.style)}
+            >
+              <span>{collection.meta}</span>
+              <strong>{collection.name}</strong>
+              <p>{collection.detail}</p>
             </a>
           ))}
         </div>
       </section>
 
-      <section className="feed-section">
+      <section className="feed-section archive-feed">
         <div className="section-heading section-heading-row">
           <div>
-            <p className="eyebrow">Recent output</p>
-            <h2>Latest publishing</h2>
+            <p className="eyebrow">Recent additions</p>
+            <h2>Recently placed</h2>
           </div>
           <a href="/search" className="text-link">
-            View archive
+            Full archive
           </a>
         </div>
         {posts?.length ? (
-          <div className="post-list">
-            {posts.map((post) => (
-              <PostCard key={post.slug} post={post} />
+          <div className="archive-post-board">
+            {posts.map((post, index) => (
+              <PostCard
+                key={post.slug}
+                collection={inferCollection(post)}
+                className={postBoardClass(index)}
+                post={post}
+              />
             ))}
           </div>
         ) : (

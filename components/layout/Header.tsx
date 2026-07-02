@@ -7,20 +7,37 @@ type HeaderProps = {
   userEmail: string | null;
 };
 
+const collectionLinks = [
+  { href: "/tags/vibe-coding", label: "Learn" },
+  { href: "/search?q=html", label: "Sites" },
+  { href: "/search?q=fragments", label: "Fragments" },
+  { href: "/search?q=family", label: "Family" },
+  { href: "/tags/projects", label: "Products" },
+  { href: "/search", label: "Archive" },
+];
+
 export function Header({ userEmail }: HeaderProps) {
   return (
     <header className="site-header">
       <div className="header-inner">
         <Link href="/" className="brand" aria-label="402v home">
           <span className="brand-title">402v</span>
-          <span className="brand-subtitle">Personal publishing system</span>
+          <span className="brand-subtitle">Notes, sites, fragments, and family archives.</span>
         </Link>
+
+        <nav className="site-nav" aria-label="Primary">
+          {collectionLinks.map((item) => (
+            <Link key={item.href} href={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
         <form className="search-form" action="/search">
           <input
             type="search"
             name="q"
-            placeholder="Search notes, sites, products..."
+            placeholder="Search the archive"
             aria-label="Search posts"
           />
         </form>
