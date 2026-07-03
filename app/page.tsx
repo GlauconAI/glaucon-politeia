@@ -12,6 +12,7 @@ const collectionStyles = new Map([
 
 const commands = [
   { href: "/search", keys: "Cmd K", label: "Search 402v", detail: "Find notes, artifacts, tags, and people." },
+  { href: "/", keys: "G H", label: "Go Home", detail: "Return to the command center from anywhere." },
   { href: "/sites", keys: "G S", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
   { href: "/learn", keys: "G L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
 ];

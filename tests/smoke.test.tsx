@@ -15,6 +15,8 @@ describe("home page", () => {
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/search 402v/i)).toBeInTheDocument();
     expect(screen.getByText("Cmd K")).toBeInTheDocument();
+    expect(screen.getByText("G H")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /go home/i })).toHaveAttribute("href", "/");
     expect(screen.getByText("G S")).toBeInTheDocument();
     expect(screen.getByText("G L")).toBeInTheDocument();
     expect(screen.queryByText("Cmd H")).not.toBeInTheDocument();

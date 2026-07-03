@@ -61,6 +61,13 @@ export function CommandShortcuts() {
       }
 
       if (pendingSequence.current === "g") {
+        if (key === "h") {
+          event.preventDefault();
+          clearSequence();
+          router.push("/");
+          return;
+        }
+
         if (key === "s") {
           event.preventDefault();
           clearSequence();
