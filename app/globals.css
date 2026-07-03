@@ -1829,6 +1829,19 @@ body {
   white-space: nowrap;
 }
 
+.artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.artifact-actions .button-secondary {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
 .publish-page {
   border: 0;
   background: transparent;
@@ -2088,6 +2101,83 @@ body {
   width: 100%;
 }
 
+.publish-maintenance-panel {
+  margin-top: 18px;
+}
+
+.search-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+
+.search-filter-row a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  padding: 7px 11px;
+  text-decoration: none;
+}
+
+.search-filter-row a.active {
+  border-color: rgba(67, 211, 139, 0.55);
+  color: var(--success);
+}
+
+.editor-post-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.editor-post-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.028);
+  padding: 12px;
+}
+
+.editor-post-row h3 {
+  margin: 0 0 8px;
+  color: var(--strong);
+  font-size: 17px;
+}
+
+.editor-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.editor-row-actions .button-primary,
+.editor-row-actions .button-secondary {
+  min-height: 38px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+
+.danger-zone {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(251, 113, 133, 0.22);
+  padding-top: 16px;
+}
+
+.danger-button {
+  border-color: rgba(251, 113, 133, 0.45);
+  color: #fecdd3;
+}
+
 .html-artifact-frame {
   display: block;
   min-height: 76vh;
@@ -2199,6 +2289,21 @@ body {
   .publish-segments,
   .publish-actions {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .artifact-preview-bar,
+  .editor-post-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .artifact-preview-bar {
+    display: grid;
+    align-items: start;
+  }
+
+  .artifact-actions,
+  .editor-row-actions {
+    justify-content: flex-start;
   }
 
   .field-stack textarea {

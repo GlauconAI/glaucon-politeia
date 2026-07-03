@@ -1,3 +1,5 @@
+import { HtmlArtifactActions } from "@/components/posts/HtmlArtifactActions";
+
 type HtmlArtifactViewProps = {
   html: string;
   title: string;
@@ -9,6 +11,7 @@ export function HtmlArtifactView({ html, title }: HtmlArtifactViewProps) {
       <div className="artifact-preview-bar">
         <span>artifact preview</span>
         <strong>{title}</strong>
+        <HtmlArtifactActions html={html} title={title} />
       </div>
       <iframe
         className="html-artifact-frame"

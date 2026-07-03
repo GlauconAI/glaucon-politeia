@@ -17,12 +17,12 @@ describe("app shell", () => {
     expect(screen.getByRole("main")).toHaveTextContent("Content area");
     expect(screen.getByRole("link", { name: /402v home/i })).toBeInTheDocument();
     expect(screen.getByText("~/publishing-system")).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Learn" })).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Sites" })).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Fragments" })).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Family" })).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Products" })).toBeInTheDocument();
-    expect(within(primaryNav).getByRole("link", { name: "Archive" })).toBeInTheDocument();
+    expect(within(primaryNav).getByRole("link", { name: "Learn" })).toHaveAttribute("href", "/learn");
+    expect(within(primaryNav).getByRole("link", { name: "Sites" })).toHaveAttribute("href", "/sites");
+    expect(within(primaryNav).getByRole("link", { name: "Fragments" })).toHaveAttribute("href", "/fragments");
+    expect(within(primaryNav).getByRole("link", { name: "Family" })).toHaveAttribute("href", "/family");
+    expect(within(primaryNav).getByRole("link", { name: "Products" })).toHaveAttribute("href", "/products");
+    expect(within(primaryNav).getByRole("link", { name: "Archive" })).toHaveAttribute("href", "/archive");
   });
 
   it("shows login state when no user is present", () => {

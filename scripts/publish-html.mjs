@@ -25,7 +25,7 @@ const payload = {
 };
 
 if (args.dryRun) {
-  console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify({ ...payload, tag_slugs: args.tagSlugs }, null, 2));
   process.exit(0);
 }
 
@@ -53,6 +53,35 @@ if (error) {
   fail(error.message);
 }
 
+if (args.tagSlugs.length > 0) {
+  const { data: tags, error: tagLookupError } = await supabase
+    .from("tags")
+    .select("id, slug")
+    .in("slug", args.tagSlugs);
+
+  if (tagLookupError) {
+    fail(tagLookupError.message);
+  }
+
+  const foundSlugs = new Set((tags ?? []).map((tag) => tag.slug));
+  const missingSlugs = args.tagSlugs.filter((slug) => !foundSlugs.has(slug));
+
+  if (missingSlugs.length > 0) {
+    fail(`Unknown tags: ${missingSlugs.join(", ")}`);
+  }
+
+  const { error: postTagError } = await supabase.from("post_tags").insert(
+    (tags ?? []).map((tag) => ({
+      post_id: data.id,
+      tag_id: tag.id,
+    })),
+  );
+
+  if (postTagError) {
+    fail(postTagError.message);
+  }
+}
+
 console.log(JSON.stringify({ id: data.id, slug: data.slug }, null, 2));
 
 function parseArgs(values) {
@@ -61,6 +90,10 @@ function parseArgs(values) {
   const slug = readFlag(values, "--slug") || slugify(title || basename(input || ""));
   const authorId = readFlag(values, "--author-id");
   const visibility = readFlag(values, "--visibility") || "private";
+  const tagSlugs = readFlags(values, "--tag")
+    .map((value) => slugify(value))
+    .filter(Boolean)
+    .slice(0, 3);
   const dryRun = values.includes("--dry-run");
   const publish = values.includes("--publish");
 
@@ -86,6 +119,7 @@ function parseArgs(values) {
     slug,
     authorId: authorId.trim(),
     visibility,
+    tagSlugs,
     dryRun,
     publish,
   };
@@ -94,6 +128,12 @@ function parseArgs(values) {
 function readFlag(values, flag) {
   const index = values.indexOf(flag);
   return index === -1 ? undefined : values[index + 1];
+}
+
+function readFlags(values, flag) {
+  return values.flatMap((value, index) =>
+    value === flag && typeof values[index + 1] === "string" ? [values[index + 1]] : [],
+  );
 }
 
 function slugify(value) {

@@ -30,6 +30,9 @@ describe("PostBody", () => {
     );
 
     expect(screen.getByText(/artifact preview/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open artifact/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /download html/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy artifact link/i })).toBeInTheDocument();
     const frame = screen.getByTitle("Artifact");
     expect(frame).toHaveAttribute("sandbox", "");
     expect(frame).toHaveAttribute(

@@ -12,7 +12,7 @@ Build a personal website that works as a durable AI coding learning archive, lig
 
 - The site owner, as the main author and administrator.
 - Visitors interested in AI coding workflows, Trae usage notes, project retrospectives, and pitfall logs.
-- Future authenticated users who may comment, bookmark, and interact with published content.
+- Future authenticated trusted users who may comment, bookmark, and interact with published content.
 - The owner and trusted agents publishing generated HTML reports or hand-authored HTML pages to `402v.com`.
 
 ## Product Shape
@@ -29,7 +29,7 @@ The publishing system packages three assets into one direction:
 
 ### P0: Core Publishing Loop
 
-The first shippable product must let users sign up, maintain profiles, publish posts, read posts, search, browse tags, comment, like, and bookmark.
+The first shippable product must let trusted users log in, maintain profiles, publish posts, read posts, search, browse tags, comment, like, and bookmark. Public self-registration is not part of the production owner-publishing model.
 
 ### P0.1: HTML Artifact Publishing
 
@@ -50,8 +50,8 @@ Add the Bruno Simon-inspired 3D navigation experiment as a separate experience a
 ## Explicit Non-Goals For P0
 
 - Billing, subscriptions, teams, organizations, invitations, or SaaS dashboards.
-- Full CMS admin for all content.
-- Article edit/delete UI, unless intentionally pulled into a later milestone.
+- Multi-author public CMS workflows.
+- Public self-registration and public OAuth signup.
 - Public creation of new tags from the editor.
 - Prompt capture, prompt admin, and 3D lab in the first release.
 - Arbitrary unsandboxed HTML execution in the main application document.
@@ -61,6 +61,7 @@ Add the Bruno Simon-inspired 3D navigation experiment as a separate experience a
 - A visitor can discover and read published posts from home, tags, search, and detail pages.
 - A signed-in user can publish a Markdown post, comment, like, and bookmark.
 - The owner can publish a local HTML artifact to `402v.com`.
+- The owner can edit, republish, draft, or delete existing Markdown and HTML posts from the publishing backend.
 - Anonymous visitors can read public posts and public HTML artifacts.
 - Logged-in users can read private published posts and private HTML artifacts.
 - Private user state is protected by Supabase RLS and verified by tests.

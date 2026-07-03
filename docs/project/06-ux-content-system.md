@@ -16,10 +16,10 @@ The layout should be dense enough for repeated reading and content management, w
 
 Required elements:
 
-- Brand entry: `Vibe Academy` initially, unless renamed during branding.
-- Subtitle: `Vibe First, Code Later - My AI Coding Journey`.
+- Brand entry: `402v`.
+- Subtitle: personal publishing system.
 - Search box that navigates to `/search?q=...`.
-- Write button linking to `/editor`.
+- Publish button linking to `/editor`, visible only to owner/admin users.
 - Theme toggle.
 - User menu.
 
@@ -27,6 +27,19 @@ User menu:
 
 - Logged out: login link to `/auth`.
 - Logged in: show email or display name, profile link, and logout action.
+
+## Collections
+
+The public shell exposes real collection pages:
+
+- `/learn`
+- `/sites`
+- `/fragments`
+- `/family`
+- `/products`
+- `/archive`
+
+Collections must use post metadata such as content format, tags, status, and visibility. They should not be implemented as keyword-only search aliases.
 
 ## Left Navigation
 
@@ -77,16 +90,19 @@ The editor should be simple and reliable in P0:
 
 - Title field.
 - Existing tag selection, max 3.
-- Markdown body.
+- Markdown or HTML body.
+- Public/private visibility.
+- Markdown/HTML content format.
 - Save draft.
 - Publish.
+- Existing post maintenance list.
+- Existing post edit, republish, draft, and delete flows.
 - Clear validation state.
 - Redirect unauthenticated submitters to `/auth?redirectTo=/editor`.
+- Redirect non-admin users away from the editor.
 
 Deferred:
 
-- Editing existing posts.
-- Deleting posts.
 - Creating tags from the editor.
 
 ## Article Detail
@@ -132,6 +148,7 @@ Search page states:
 - No query: ask for a keyword.
 - No results: show no-result message and home link.
 - Results: post card list.
+- Filters: All, HTML Sites, and Notes.
 
 Tag page states:
 

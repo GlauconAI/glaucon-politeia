@@ -1,48 +1,73 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 
-import { savePostAction } from "@/app/editor/actions";
+import { deletePostAction, updatePostAction } from "@/app/editor/actions";
 import { getCurrentUserAccess } from "@/lib/auth/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function EditorPage() {
+type EditorPostPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+function first<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function EditorPostPage({ params }: EditorPostPageProps) {
+  const { slug } = await params;
   const supabase = await createSupabaseServerClient();
   const access = await getCurrentUserAccess(supabase);
 
   if (!access.user) {
-    redirect("/auth?redirectTo=/editor");
+    redirect(`/auth?redirectTo=/editor/${slug}`);
   }
 
   if (!access.canPublish) {
     redirect("/");
   }
 
-  const [{ data: tags }, { data: posts }] = await Promise.all([
-    supabase.from("tags").select("id, slug, name").order("slug"),
+  const [{ data: post }, { data: tags }] = await Promise.all([
     supabase
       .from("posts")
-      .select("id, slug, title, status, visibility, content_format, updated_at")
-      .order("updated_at", { ascending: false }),
+      .select(
+        "id, slug, title, content_md, content_html, content_format, visibility, status, post_tags(tag_id,tags(id,slug,name))",
+      )
+      .eq("slug", slug)
+      .maybeSingle(),
+    supabase.from("tags").select("id, slug, name").order("slug"),
   ]);
+
+  if (!post) {
+    notFound();
+  }
+
+  const contentFormat = post.content_format === "html" ? "html" : "markdown";
+  const content = contentFormat === "html" ? (post.content_html ?? "") : (post.content_md ?? "");
+  const selectedTagIds = new Set(
+    post.post_tags?.map((item: any) => item.tag_id ?? first(item.tags)?.id).filter(Boolean) ?? [],
+  );
 
   return (
     <section className="editor-page publish-page">
       <header className="editor-hero">
         <div>
-          <p className="eyebrow shell-path">402v /editor</p>
+          <p className="eyebrow shell-path">
+            <Link href="/editor">402v /editor</Link> <span>/{post.slug}</span>
+          </p>
           <h1>
-            <span>Publish</span> command
+            <span>Edit</span> output
           </h1>
-          <p>&gt; write a Markdown note or place an HTML artifact</p>
+          <p>&gt; update, republish, draft, or remove an existing output</p>
         </div>
-        <div className="shell-status-line" aria-label="Publish status">
-          <span>mode: compose</span>
-          <span>visibility: public/private</span>
-          <span>format: markdown/html</span>
+        <div className="shell-status-line" aria-label="Post status">
+          <span>status: {post.status}</span>
+          <span>visibility: {post.visibility}</span>
+          <span>format: {contentFormat}</span>
         </div>
       </header>
 
-      <form action={savePostAction} className="editor-form publish-form">
+      <form action={updatePostAction} className="editor-form publish-form">
+        <input type="hidden" name="postId" value={post.id} />
         <div className="publish-layout">
           <div
             className="publish-panel publish-content-panel"
@@ -61,15 +86,25 @@ export default async function EditorPage() {
                 name="title"
                 required
                 autoComplete="off"
-                placeholder="Name this output"
+                defaultValue={post.title}
+              />
+            </label>
+
+            <label className="field-stack" htmlFor="post-slug">
+              <span>Slug</span>
+              <input
+                id="post-slug"
+                name="slug"
+                required
+                autoComplete="off"
+                defaultValue={post.slug}
               />
             </label>
 
             <label className="field-stack field-stack-grow" htmlFor="post-content">
               <span>Body</span>
               <small>
-                Paste Markdown or a complete HTML document. Choose the matching
-                format before publishing.
+                Replace the HTML artifact or Markdown note, then save as a draft or publish.
               </small>
               <textarea
                 id="post-content"
@@ -77,7 +112,7 @@ export default async function EditorPage() {
                 required
                 rows={20}
                 spellCheck
-                placeholder="# Note title&#10;&#10;Start writing..."
+                defaultValue={content}
               />
             </label>
           </div>
@@ -96,14 +131,24 @@ export default async function EditorPage() {
               <legend>Visibility</legend>
               <div className="segmented-fields publish-segments">
                 <label>
-                  <input type="radio" name="visibility" value="public" />
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="public"
+                    defaultChecked={post.visibility === "public"}
+                  />
                   <span>
                     <strong>Public</strong>
                     <small>Readable on the web</small>
                   </span>
                 </label>
                 <label>
-                  <input type="radio" name="visibility" value="private" defaultChecked />
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="private"
+                    defaultChecked={post.visibility !== "public"}
+                  />
                   <span>
                     <strong>Private</strong>
                     <small>Login required</small>
@@ -116,14 +161,24 @@ export default async function EditorPage() {
               <legend>Format</legend>
               <div className="segmented-fields publish-segments">
                 <label>
-                  <input type="radio" name="contentFormat" value="markdown" defaultChecked />
+                  <input
+                    type="radio"
+                    name="contentFormat"
+                    value="markdown"
+                    defaultChecked={contentFormat === "markdown"}
+                  />
                   <span>
                     <strong>Markdown</strong>
                     <small>Notes and essays</small>
                   </span>
                 </label>
                 <label>
-                  <input type="radio" name="contentFormat" value="html" />
+                  <input
+                    type="radio"
+                    name="contentFormat"
+                    value="html"
+                    defaultChecked={contentFormat === "html"}
+                  />
                   <span>
                     <strong>HTML</strong>
                     <small>Sandboxed artifact</small>
@@ -139,7 +194,12 @@ export default async function EditorPage() {
                 {tags?.length ? (
                   tags.map((tag) => (
                     <label key={tag.id}>
-                      <input type="checkbox" name="tagIds" value={tag.id} />
+                      <input
+                        type="checkbox"
+                        name="tagIds"
+                        value={tag.id}
+                        defaultChecked={selectedTagIds.has(tag.id)}
+                      />
                       <span>{tag.name}</span>
                     </label>
                   ))
@@ -157,45 +217,24 @@ export default async function EditorPage() {
                 Publish
               </button>
             </div>
+
+            <div className="danger-zone">
+              <p className="eyebrow">Danger zone</p>
+              <button
+                form="delete-post-form"
+                type="submit"
+                className="button-secondary danger-button"
+              >
+                Delete post
+              </button>
+            </div>
           </div>
         </div>
       </form>
 
-      <section className="publish-panel publish-maintenance-panel">
-        <div className="publish-panel-heading">
-          <p className="eyebrow">Maintenance</p>
-          <h2>Manage posts</h2>
-        </div>
-        {posts?.length ? (
-          <div className="editor-post-list">
-            {posts.map((post) => (
-              <article className="editor-post-row" key={post.id}>
-                <div>
-                  <h3>{post.title}</h3>
-                  <div className="post-meta">
-                    <span>{post.content_format === "html" ? "HTML" : "Markdown"}</span>
-                    <span>{post.status}</span>
-                    <span>{post.visibility}</span>
-                    {post.updated_at ? (
-                      <span>{new Date(post.updated_at).toLocaleDateString()}</span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="editor-row-actions">
-                  <Link href={`/posts/${post.slug}`} className="button-secondary">
-                    View
-                  </Link>
-                  <Link href={`/editor/${post.slug}`} className="button-primary">
-                    Edit {post.title}
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-text">No posts yet.</p>
-        )}
-      </section>
+      <form id="delete-post-form" action={deletePostAction}>
+        <input type="hidden" name="postId" value={post.id} />
+      </form>
     </section>
   );
 }

@@ -1,63 +1,19 @@
 import { getPublicEnv } from "@/lib/env";
 import { PostCard } from "@/components/posts/PostCard";
+import { collectionRoutes } from "@/lib/posts/collections";
 import { attachPostEngagementCounts } from "@/lib/posts/engagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const collections = [
-  {
-    href: "/tags/vibe-coding",
-    name: "Learn",
-    detail: "AI coding notes, reading trails, and research fragments.",
-    meta: "~/learn",
-    command: "open learn",
-    style: "collection-card-large",
-  },
-  {
-    href: "/search?q=html",
-    name: "Sites",
-    detail: "Published HTML artifacts, reports, itineraries, and tiny standalone pages.",
-    meta: "~/sites",
-    command: "list artifacts",
-    style: "collection-card-tall",
-  },
-  {
-    href: "/search?q=fragments",
-    name: "Fragments",
-    detail: "Essays, observations, working thoughts, and unfinished notes.",
-    meta: "~/fragments",
-    command: "grep thoughts",
-    style: "",
-  },
-  {
-    href: "/search?q=family",
-    name: "Family",
-    detail: "Trip plans, home references, and private family archives.",
-    meta: "~/family",
-    command: "mount family",
-    style: "",
-  },
-  {
-    href: "/tags/projects",
-    name: "Products",
-    detail: "Ideas, experiments, product notes, and company-facing work.",
-    meta: "~/products",
-    command: "open products",
-    style: "collection-card-wide",
-  },
-  {
-    href: "/search",
-    name: "Archive",
-    detail: "Everything placed here, searchable and ready to resurface.",
-    meta: "~/archive",
-    command: "find *",
-    style: "",
-  },
-];
+const collectionStyles = new Map([
+  ["Learn", "collection-card-large"],
+  ["Sites", "collection-card-tall"],
+  ["Products", "collection-card-wide"],
+]);
 
 const commands = [
   { href: "/search", keys: "Cmd K", label: "Search 402v", detail: "Find notes, artifacts, tags, and people." },
-  { href: "/search?q=html", keys: "Cmd H", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
-  { href: "/tags/vibe-coding", keys: "Cmd L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
+  { href: "/sites", keys: "Cmd H", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
+  { href: "/learn", keys: "Cmd L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
 ];
 
 function archiveCardClass(style: string) {
@@ -167,16 +123,16 @@ export default async function Home() {
           <h2>Mounted collections</h2>
         </div>
         <div className="collection-board">
-          {collections.map((collection) => (
+          {collectionRoutes.map((collection) => (
             <a
-              key={collection.name}
+              key={collection.label}
               href={collection.href}
-              className={archiveCardClass(collection.style)}
+              className={archiveCardClass(collectionStyles.get(collection.label) ?? "")}
             >
               <span>{collection.meta}</span>
               <strong>{collection.command}</strong>
-              <p>{collection.detail}</p>
-              <small>{collection.name}</small>
+              <p>{collection.description}</p>
+              <small>{collection.label}</small>
             </a>
           ))}
         </div>

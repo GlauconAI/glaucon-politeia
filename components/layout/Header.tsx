@@ -2,20 +2,14 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/auth/actions";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { collectionRoutes } from "@/lib/posts/collections";
 
 type HeaderProps = {
   canPublish?: boolean;
   userEmail: string | null;
 };
 
-const collectionLinks = [
-  { href: "/tags/vibe-coding", label: "Learn" },
-  { href: "/search?q=html", label: "Sites" },
-  { href: "/search?q=fragments", label: "Fragments" },
-  { href: "/search?q=family", label: "Family" },
-  { href: "/tags/projects", label: "Products" },
-  { href: "/search", label: "Archive" },
-];
+const collectionLinks = collectionRoutes.map(({ href, label }) => ({ href, label }));
 
 export function Header({ canPublish = false, userEmail }: HeaderProps) {
   return (

@@ -26,9 +26,10 @@
 
 ## Authentication
 
-- `/auth` supports email/password login, email/password registration, GitHub OAuth, and Google OAuth.
-- `/auth/callback` exchanges OAuth code for a session.
-- `redirectTo` must be preserved through login and callback flows.
+- `/auth` supports email/password login for existing trusted users.
+- Public registration and public OAuth entrypoints are disabled for the production owner-publishing model.
+- `/auth/callback` remains available for already-configured provider callbacks, but the public auth UI must not advertise OAuth signup.
+- `redirectTo` must be preserved through login flows.
 - Missing Supabase configuration must produce a clear developer-facing error.
 - User logout refreshes authenticated state.
 
@@ -49,6 +50,9 @@
 - Article cards show title, author, relative publish time, excerpt, tags, like count, and bookmark count.
 - `/editor` supports title, up to three existing tags, Markdown content, save draft, and publish.
 - `/editor` supports public/private visibility and Markdown/HTML content format selection.
+- `/editor` is owner/admin-only and must not be reachable by anonymous or non-admin users.
+- `/editor` lists existing posts for maintenance.
+- `/editor/[slug]` supports editing title, slug, content, tags, visibility, format, draft/publish state, and deletion.
 - Slugs are generated from titles, limited to 64 characters, and collision-safe.
 - Excerpts are generated from Markdown content with code and Markdown syntax removed.
 - Excerpts for HTML posts are generated from text extracted from HTML content.
@@ -69,9 +73,11 @@
 
 ## Tags And Search
 
+- Top-level collection pages `/learn`, `/sites`, `/fragments`, `/family`, `/products`, and `/archive` show curated content groups instead of keyword-search aliases.
 - `/tags/[tag]` shows tag metadata and published posts for the tag.
 - Missing tags return 404.
-- `/search?q=...` searches published post title and content.
+- `/search?q=...` searches published post title, Markdown content, and HTML content.
+- Search supports content-format filters for HTML sites and Markdown notes.
 - Search returns up to 30 results.
 - Search input must be escaped or parameterized so Supabase `.or()` strings cannot be broken by special characters.
 

@@ -19,16 +19,29 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       getUser: async () => ({ data: { user: currentUser } }),
     },
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
           maybeSingle: async () => ({ data: currentProfile }),
         }),
         order: async () => ({
-          data: [
-            { id: "tag-1", slug: "family", name: "Family" },
-            { id: "tag-2", slug: "projects", name: "Projects" },
-          ],
+          data:
+            table === "posts"
+              ? [
+                  {
+                    id: "post-1",
+                    slug: "trip-page",
+                    title: "Trip Page",
+                    status: "published",
+                    visibility: "public",
+                    content_format: "html",
+                    updated_at: "2026-07-02T00:00:00.000Z",
+                  },
+                ]
+              : [
+                  { id: "tag-1", slug: "family", name: "Family" },
+                  { id: "tag-2", slug: "projects", name: "Projects" },
+                ],
         }),
       }),
     }),
@@ -90,5 +103,20 @@ describe("EditorPage", () => {
     expect(
       within(settingsRegion).getByRole("button", { name: /publish/i }),
     ).toBeInTheDocument();
+  });
+
+  it("renders a maintenance list for existing posts", async () => {
+    render(await EditorPage());
+
+    expect(
+      screen.getByRole("heading", { name: /manage posts/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /edit trip page/i })).toHaveAttribute(
+      "href",
+      "/editor/trip-page",
+    );
+    const postRow = screen.getByRole("article");
+    expect(within(postRow).getByText("HTML")).toBeInTheDocument();
+    expect(within(postRow).getByText("published")).toBeInTheDocument();
   });
 });

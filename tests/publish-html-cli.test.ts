@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 describe("publish html cli", () => {
@@ -25,6 +26,10 @@ describe("publish html cli", () => {
           "00000000-0000-0000-0000-000000000001",
           "--visibility",
           "private",
+          "--tag",
+          "family",
+          "--tag",
+          "sites",
           "--dry-run",
         ],
         { cwd: process.cwd(), encoding: "utf8" },
@@ -39,6 +44,7 @@ describe("publish html cli", () => {
         content_format: "html",
         visibility: "private",
         status: "draft",
+        tag_slugs: ["family", "sites"],
       });
       expect(payload.content_html).toContain("<h1>Artifact</h1>");
     } finally {
@@ -72,6 +78,7 @@ describe("publish html cli", () => {
       expect(result.status).toBe(0);
       const payload = JSON.parse(result.stdout);
       expect(payload.visibility).toBe("private");
+      expect(payload.tag_slugs).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
