@@ -12,8 +12,8 @@ const collectionStyles = new Map([
 
 const commands = [
   { href: "/search", keys: "Cmd K", label: "Search 402v", detail: "Find notes, artifacts, tags, and people." },
-  { href: "/sites", keys: "Cmd H", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
-  { href: "/learn", keys: "Cmd L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
+  { href: "/sites", keys: "G S", label: "Open latest HTML artifact", detail: "Browse published standalone pages." },
+  { href: "/learn", keys: "G L", label: "Jump to Learn", detail: "AI, coding, reading trails, and research notes." },
 ];
 
 function archiveCardClass(style: string) {

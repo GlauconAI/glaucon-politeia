@@ -14,6 +14,11 @@ describe("home page", () => {
       screen.getByText(/open notes, sites, fragments, and family archives/i),
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/search 402v/i)).toBeInTheDocument();
+    expect(screen.getByText("Cmd K")).toBeInTheDocument();
+    expect(screen.getByText("G S")).toBeInTheDocument();
+    expect(screen.getByText("G L")).toBeInTheDocument();
+    expect(screen.queryByText("Cmd H")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cmd L")).not.toBeInTheDocument();
     expect(screen.queryByText(/publish new output/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /mounted collections/i })).toBeInTheDocument();
     expect(

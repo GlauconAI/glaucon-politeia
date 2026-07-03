@@ -1,9 +1,21 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/layout/AppShell";
 
+const routerPushMock = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: routerPushMock,
+  }),
+}));
+
 describe("app shell", () => {
+  beforeEach(() => {
+    routerPushMock.mockClear();
+  });
+
   it("renders global navigation landmarks", () => {
     render(
       <AppShell userEmail={null}>
@@ -67,5 +79,38 @@ describe("app shell", () => {
     expect(
       screen.queryByRole("link", { name: /publish/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("supports non-conflicting global command shortcuts", () => {
+    render(
+      <AppShell userEmail={null}>
+        <p>Content area</p>
+      </AppShell>,
+    );
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    expect(screen.getByRole("searchbox", { name: /search posts/i })).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "s" });
+    expect(routerPushMock).toHaveBeenCalledWith("/sites");
+
+    routerPushMock.mockClear();
+    fireEvent.keyDown(window, { key: "g" });
+    fireEvent.keyDown(window, { key: "l" });
+    expect(routerPushMock).toHaveBeenCalledWith("/learn");
+  });
+
+  it("does not claim browser-reserved Command+H or Command+L", () => {
+    render(
+      <AppShell userEmail={null}>
+        <p>Content area</p>
+      </AppShell>,
+    );
+
+    fireEvent.keyDown(window, { key: "h", metaKey: true });
+    fireEvent.keyDown(window, { key: "l", metaKey: true });
+
+    expect(routerPushMock).not.toHaveBeenCalled();
   });
 });

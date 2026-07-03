@@ -30,6 +30,7 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
 
         <form className="search-form" action="/search">
           <input
+            data-command-search
             type="search"
             name="q"
             placeholder="Search 402v"
