@@ -2129,6 +2129,37 @@ body {
   color: var(--success);
 }
 
+.archive-pagination-summary,
+.archive-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 18px;
+}
+
+.archive-pagination-summary span,
+.archive-pagination a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  padding: 7px 11px;
+  text-decoration: none;
+}
+
+.archive-pagination-summary span {
+  color: var(--muted);
+}
+
+.archive-pagination a[aria-current="page"] {
+  border-color: rgba(67, 211, 139, 0.55);
+  color: var(--success);
+}
+
 .editor-post-list {
   display: grid;
   gap: 10px;
