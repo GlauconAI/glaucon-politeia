@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const siteUrl = "https://402v.com";
 
-const staticPaths = ["", ...collectionRoutes.map((route) => route.href), "/search"];
+const staticPaths = ["", ...collectionRoutes.map((route) => route.href), "/earth-revolution", "/search"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

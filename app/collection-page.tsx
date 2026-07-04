@@ -50,15 +50,22 @@ export async function CollectionPage({
   const currentPage = Math.max(1, Math.floor(page));
   const from = (currentPage - 1) * archivePageSize;
   const to = from + archivePageSize - 1;
+  const postTagsSelect = query.tagSlugs.length
+    ? "post_tags!inner(tags!inner(slug,name))"
+    : "post_tags(tags(slug,name))";
   let request = supabase
     .from("posts")
     .select(
-      "id,slug,title,excerpt,published_at,visibility,content_format,profiles(username,display_name),post_tags(tags(slug,name))",
+      `id,slug,title,excerpt,published_at,visibility,content_format,profiles(username,display_name),${postTagsSelect}`,
       isArchive ? { count: "exact" } : undefined,
     )
     .eq("status", "published")
     .eq("visibility", "public")
     .order("published_at", { ascending: false });
+
+  if (query.tagSlugs.length) {
+    request = request.in("post_tags.tags.slug", query.tagSlugs);
+  }
 
   request = isArchive ? request.range(from, to) : request.limit(60);
 

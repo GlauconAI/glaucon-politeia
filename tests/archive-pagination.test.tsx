@@ -5,19 +5,26 @@ import { CollectionPage } from "@/app/collection-page";
 
 const queryState = vi.hoisted(() => ({
   filters: [] as Array<[string, string]>,
+  inFilters: [] as Array<[string, string[]]>,
   range: null as [number, number] | null,
+  selectColumns: "",
   selectOptions: null as { count?: string } | null,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
     from: () => ({
-      select: (_columns: string, options?: { count?: string }) => {
+      select: (columns: string, options?: { count?: string }) => {
+        queryState.selectColumns = columns;
         queryState.selectOptions = options ?? null;
 
         const query = {
           eq(column: string, value: string) {
             queryState.filters.push([column, value]);
+            return query;
+          },
+          in(column: string, value: string[]) {
+            queryState.inFilters.push([column, value]);
             return query;
           },
           order() {
@@ -45,7 +52,19 @@ vi.mock("@/lib/supabase/server", () => ({
           async limit() {
             return {
               count: null,
-              data: [],
+              data: [
+                {
+                  id: "post-fragment",
+                  slug: "tagged-fragment",
+                  title: "Tagged Fragment",
+                  excerpt: "Loaded through a server-side tag filter.",
+                  published_at: "2015-08-19T00:00:00.000Z",
+                  visibility: "public",
+                  content_format: "markdown",
+                  profiles: { username: "glaucon", display_name: "Glaucon" },
+                  post_tags: [{ tags: { slug: "fragments", name: "Fragments" } }],
+                },
+              ],
             };
           },
         };
@@ -63,7 +82,9 @@ vi.mock("@/lib/posts/engagement", () => ({
 describe("archive pagination", () => {
   it("loads the requested archive page with a bounded range", async () => {
     queryState.filters = [];
+    queryState.inFilters = [];
     queryState.range = null;
+    queryState.selectColumns = "";
     queryState.selectOptions = null;
 
     render(await (CollectionPage as any)({ slug: "archive", page: 2 }));
@@ -81,5 +102,19 @@ describe("archive pagination", () => {
       "href",
       "/archive?page=3",
     );
+  });
+
+  it("filters tagged collections in the database before applying the collection limit", async () => {
+    queryState.filters = [];
+    queryState.inFilters = [];
+    queryState.range = null;
+    queryState.selectColumns = "";
+    queryState.selectOptions = null;
+
+    render(await (CollectionPage as any)({ slug: "fragments" }));
+
+    expect(queryState.selectColumns).toContain("post_tags!inner");
+    expect(queryState.inFilters).toContainEqual(["post_tags.tags.slug", ["fragments"]]);
+    expect(screen.getByText("Tagged Fragment")).toBeInTheDocument();
   });
 });

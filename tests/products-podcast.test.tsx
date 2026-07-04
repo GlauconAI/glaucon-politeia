@@ -35,6 +35,9 @@ vi.mock("@/lib/supabase/server", () => ({
           eq() {
             return query;
           },
+          in() {
+            return query;
+          },
           order() {
             return query;
           },
