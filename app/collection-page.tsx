@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { LaoyaoGuitarFeature } from "@/components/family/LaoyaoGuitarFeature";
 import { PostCard } from "@/components/posts/PostCard";
 import { collectionForPath, collectionQueryForPath } from "@/lib/posts/collections";
 import { attachPostEngagementCounts } from "@/lib/posts/engagement";
@@ -110,6 +111,7 @@ export async function CollectionPage({
         <h1>{headingLabel ?? collection.label}</h1>
         <p>{collection.description}</p>
       </div>
+      {slug === "family" ? <LaoyaoGuitarFeature /> : null}
       {isArchive ? (
         <div className="archive-pagination-summary">
           <span>{count ?? 0} published items</span>

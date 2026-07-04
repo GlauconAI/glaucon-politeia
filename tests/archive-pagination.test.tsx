@@ -142,4 +142,26 @@ describe("archive pagination", () => {
     expect(queryState.inFilters).toContainEqual(["post_tags.tags.slug", ["fragments"]]);
     expect(screen.getByText("Tagged Fragment")).toBeInTheDocument();
   });
+
+  it("features recent Laoyao guitar progress at the top of family", async () => {
+    queryState.filters = [];
+    queryState.inFilters = [];
+    queryState.range = null;
+    queryState.selectColumns = "";
+    queryState.selectOptions = null;
+
+    render(await (CollectionPage as any)({ slug: "family" }));
+
+    expect(screen.getByRole("heading", { name: "老姚吉他" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "第31课｜情非得已" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "第30课｜迟到" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /第31课作业视频/ })).toHaveAttribute(
+      "href",
+      "https://gofile.me/7SLxt/3CGX48f02",
+    );
+    expect(screen.getByRole("link", { name: /第30课作业视频/ })).toHaveAttribute(
+      "href",
+      "https://gofile.me/7SLxt/NDIrujYJk",
+    );
+  });
 });
