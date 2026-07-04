@@ -29,7 +29,15 @@ function pageWindow(currentPage: number, totalPages: number) {
   return Array.from({ length: end - start + 1 }, (_value, index) => start + index);
 }
 
-export async function CollectionPage({ page = 1, slug }: { page?: number; slug: string }) {
+export async function CollectionPage({
+  headingLabel,
+  page = 1,
+  slug,
+}: {
+  headingLabel?: string;
+  page?: number;
+  slug: string;
+}) {
   const collection = collectionForPath(slug);
   const query = collectionQueryForPath(slug);
 
@@ -72,7 +80,7 @@ export async function CollectionPage({ page = 1, slug }: { page?: number; slug: 
     <section className="feed-section collection-page">
       <div className="section-heading">
         <p className="eyebrow">{collection.meta}</p>
-        <h1>{collection.label}</h1>
+        <h1>{headingLabel ?? collection.label}</h1>
         <p>{collection.description}</p>
       </div>
       {isArchive ? (

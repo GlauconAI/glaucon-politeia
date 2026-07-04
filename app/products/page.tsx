@@ -1,5 +1,5 @@
 import { CollectionPage } from "@/app/collection-page";
-import { PodcastFeature } from "@/components/podcast/PodcastFeature";
+import { ProductShowcase } from "@/components/products/ProductShowcase";
 import { loadXiaoyuzhouPodcast } from "@/lib/podcast/xiaoyuzhou";
 
 export default async function ProductsPage() {
@@ -7,8 +7,8 @@ export default async function ProductsPage() {
 
   return (
     <>
-      <PodcastFeature podcast={podcast} />
-      {await CollectionPage({ slug: "products" })}
+      <ProductShowcase podcast={podcast} />
+      {await CollectionPage({ headingLabel: "Product Notes", slug: "products" })}
     </>
   );
 }
