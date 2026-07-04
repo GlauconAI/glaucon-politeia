@@ -50,8 +50,12 @@ export function CommandShortcuts() {
         event.preventDefault();
         clearSequence();
         const searchInput = document.querySelector<HTMLInputElement>("[data-command-search]");
-        searchInput?.focus();
-        searchInput?.select();
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        } else {
+          router.push("/search");
+        }
         return;
       }
 

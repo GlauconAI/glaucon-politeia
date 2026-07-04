@@ -9,6 +9,7 @@ const queryState = vi.hoisted(() => ({
   range: null as [number, number] | null,
   selectColumns: "",
   selectOptions: null as { count?: string } | null,
+  totalCount: 82,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -33,7 +34,7 @@ vi.mock("@/lib/supabase/server", () => ({
           async range(from: number, to: number) {
             queryState.range = [from, to];
             return {
-              count: 82,
+              count: queryState.totalCount,
               data: [
                 {
                   id: "post-25",
@@ -86,6 +87,7 @@ describe("archive pagination", () => {
     queryState.range = null;
     queryState.selectColumns = "";
     queryState.selectOptions = null;
+    queryState.totalCount = 82;
 
     render(await (CollectionPage as any)({ slug: "archive", page: 2 }));
 
@@ -94,13 +96,36 @@ describe("archive pagination", () => {
     expect(queryState.filters).toContainEqual(["visibility", "public"]);
     expect(queryState.range).toEqual([24, 47]);
     expect(screen.getByText("Page Two Post")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Page 1" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "1" })).toHaveAttribute(
       "href",
       "/archive?page=1",
     );
-    expect(screen.getByRole("link", { name: "Page 3" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "3" })).toHaveAttribute(
       "href",
       "/archive?page=3",
+    );
+    expect(screen.getByRole("link", { name: "4" })).toHaveAttribute(
+      "href",
+      "/archive?page=4",
+    );
+    expect(screen.queryByRole("link", { name: /Page 1/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("...")).not.toBeInTheDocument();
+  });
+
+  it("keeps the last archive page reachable behind an ellipsis when there are many pages", async () => {
+    queryState.filters = [];
+    queryState.inFilters = [];
+    queryState.range = null;
+    queryState.selectColumns = "";
+    queryState.selectOptions = null;
+    queryState.totalCount = 250;
+
+    render(await (CollectionPage as any)({ slug: "archive", page: 2 }));
+
+    expect(screen.getByText("...")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "11" })).toHaveAttribute(
+      "href",
+      "/archive?page=11",
     );
   });
 

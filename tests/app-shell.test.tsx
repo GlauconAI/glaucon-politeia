@@ -89,7 +89,9 @@ describe("app shell", () => {
     );
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    expect(screen.getByRole("searchbox", { name: /search posts/i })).toHaveFocus();
+    expect(routerPushMock).toHaveBeenCalledWith("/search");
+
+    routerPushMock.mockClear();
 
     fireEvent.keyDown(window, { key: "g" });
     fireEvent.keyDown(window, { key: "s" });
@@ -112,5 +114,17 @@ describe("app shell", () => {
     fireEvent.keyDown(window, { key: "l", metaKey: true });
 
     expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("does not render the long header search field", () => {
+    render(
+      <AppShell userEmail={null}>
+        <p>Content area</p>
+      </AppShell>,
+    );
+
+    expect(
+      screen.queryByRole("searchbox", { name: /search posts/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -88,6 +88,7 @@ export default async function Home() {
             <span>&gt;</span>
             <input
               aria-label="Search 402v"
+              data-command-search
               name="q"
               placeholder="Search 402v"
               type="search"

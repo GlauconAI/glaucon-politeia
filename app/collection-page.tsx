@@ -22,11 +22,31 @@ function archivePageHref(page: number) {
   return `/archive?page=${page}`;
 }
 
-function pageWindow(currentPage: number, totalPages: number) {
-  const start = Math.max(1, currentPage - 1);
-  const end = Math.min(totalPages, currentPage + 1);
+function archivePageItems(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_value, index) => index + 1);
+  }
 
-  return Array.from({ length: end - start + 1 }, (_value, index) => start + index);
+  const pages = new Set([1, totalPages]);
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  for (let page = start; page <= end; page += 1) {
+    pages.add(page);
+  }
+
+  const sortedPages = [...pages].sort((left, right) => left - right);
+  const items: Array<number | "ellipsis"> = [];
+
+  sortedPages.forEach((pageNumber, index) => {
+    const previous = sortedPages[index - 1];
+    if (previous && pageNumber - previous > 1) {
+      items.push("ellipsis");
+    }
+    items.push(pageNumber);
+  });
+
+  return items;
 }
 
 export async function CollectionPage({
@@ -112,15 +132,21 @@ export async function CollectionPage({
           {currentPage > 1 ? (
             <a href={archivePageHref(currentPage - 1)}>Previous</a>
           ) : null}
-          {pageWindow(currentPage, totalPages).map((pageNumber) => (
-            <a
-              key={pageNumber}
-              aria-current={pageNumber === currentPage ? "page" : undefined}
-              href={archivePageHref(pageNumber)}
-            >
-              Page {pageNumber}
-            </a>
-          ))}
+          {archivePageItems(currentPage, totalPages).map((item, index) =>
+            item === "ellipsis" ? (
+              <span key={`ellipsis-${index}`} aria-hidden="true">
+                ...
+              </span>
+            ) : (
+              <a
+                key={item}
+                aria-current={item === currentPage ? "page" : undefined}
+                href={archivePageHref(item)}
+              >
+                {item}
+              </a>
+            ),
+          )}
           {currentPage < totalPages ? (
             <a href={archivePageHref(currentPage + 1)}>Next</a>
           ) : null}

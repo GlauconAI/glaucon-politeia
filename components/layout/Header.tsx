@@ -28,16 +28,6 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
           ))}
         </nav>
 
-        <form className="search-form" action="/search">
-          <input
-            data-command-search
-            type="search"
-            name="q"
-            placeholder="Search 402v"
-            aria-label="Search posts"
-          />
-        </form>
-
         <div className="header-actions">
           {canPublish ? (
             <Link href="/editor" className="write-link">
