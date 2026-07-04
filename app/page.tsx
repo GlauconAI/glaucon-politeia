@@ -1,5 +1,4 @@
 import { getPublicEnv } from "@/lib/env";
-import { EarthRevolutionFeature } from "@/components/earth/EarthRevolutionFeature";
 import { PostCard } from "@/components/posts/PostCard";
 import { collectionRoutes } from "@/lib/posts/collections";
 import { attachPostEngagementCounts } from "@/lib/posts/engagement";
@@ -118,8 +117,6 @@ export default async function Home() {
           </p>
         </div>
       ) : null}
-
-      <EarthRevolutionFeature />
 
       <section className="collections-section">
         <div className="section-heading">
