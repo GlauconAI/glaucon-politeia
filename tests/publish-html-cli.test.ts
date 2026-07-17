@@ -83,4 +83,36 @@ describe("publish html cli", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("flushes dry-run payloads larger than the stdout pipe buffer", () => {
+    const dir = mkdtempSync(join(tmpdir(), "publish-html-"));
+    const input = join(dir, "large-artifact.html");
+    const html = `<html><body><p>${"large payload ".repeat(16_000)}</p></body></html>`;
+    writeFileSync(input, html);
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "scripts/publish-html.mjs",
+          "--input",
+          input,
+          "--title",
+          "Large Artifact",
+          "--slug",
+          "large-artifact",
+          "--author-id",
+          "00000000-0000-0000-0000-000000000001",
+          "--dry-run",
+        ],
+        { cwd: process.cwd(), encoding: "utf8" },
+      );
+
+      expect(result.status).toBe(0);
+      const payload = JSON.parse(result.stdout);
+      expect(payload.content_html).toBe(html);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

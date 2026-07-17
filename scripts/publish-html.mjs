@@ -25,7 +25,12 @@ const payload = {
 };
 
 if (args.dryRun) {
-  console.log(JSON.stringify({ ...payload, tag_slugs: args.tagSlugs }, null, 2));
+  await new Promise((resolve, reject) => {
+    process.stdout.write(
+      `${JSON.stringify({ ...payload, tag_slugs: args.tagSlugs }, null, 2)}\n`,
+      (error) => (error ? reject(error) : resolve()),
+    );
+  });
   process.exit(0);
 }
 
