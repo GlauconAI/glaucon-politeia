@@ -73,6 +73,40 @@ describe("ObservatoryRegistrySnapshotSchema", () => {
     );
   });
 
+  it("rejects impossible provenance timestamps at the collected_at path", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      source: {
+        ...validSnapshot.source,
+        collected_at: "2026-02-30T22:45:00.000Z",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["source", "collected_at"]);
+    }
+  });
+
+  it("rejects absolute provenance logical references", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      source: {
+        ...validSnapshot.source,
+        logical_reference:
+          "/Users/private/Glaucon Vault/orchestration-system-design.html",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual([
+        "source",
+        "logical_reference",
+      ]);
+    }
+  });
+
   it("rejects unsupported snapshot schema versions", () => {
     const result = ObservatoryRegistrySnapshotSchema.safeParse({
       ...validSnapshot,
@@ -80,6 +114,138 @@ describe("ObservatoryRegistrySnapshotSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("reports every mismatched enumerable summary count at its exact path", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      summary: {
+        ...validSnapshot.summary,
+        project_count: 2,
+        primary_scene_count: 2,
+        execution_flow_count: 2,
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path)).toEqual([
+        ["summary", "project_count"],
+        ["summary", "primary_scene_count"],
+        ["summary", "execution_flow_count"],
+      ]);
+    }
+  });
+
+  it("keeps secondary_scene_count as a nonnegative source-derived summary", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      summary: {
+        ...validSnapshot.summary,
+        secondary_scene_count: 7,
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(
+      ObservatoryRegistrySnapshotSchema.shape.summary.shape
+        .secondary_scene_count.description,
+    ).toMatch(/not cross-validated/i);
+  });
+
+  it("rejects duplicate canonical scene ids at the duplicate id path", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      summary: {
+        ...validSnapshot.summary,
+        primary_scene_count: 2,
+      },
+      scenes: [validSnapshot.scenes[0], validSnapshot.scenes[0]],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["scenes", 1, "id"]);
+    }
+  });
+
+  it("rejects duplicate canonical flow ids at the duplicate id path", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      summary: {
+        ...validSnapshot.summary,
+        execution_flow_count: 2,
+      },
+      execution_flows: [
+        validSnapshot.execution_flows[0],
+        validSnapshot.execution_flows[0],
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual([
+        "execution_flows",
+        1,
+        "id",
+      ]);
+    }
+  });
+
+  it("rejects duplicate derived project keys at the duplicate key path", () => {
+    const project = validSnapshot.project_groups[0].projects[0];
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      summary: {
+        ...validSnapshot.summary,
+        project_count: 2,
+      },
+      project_groups: [
+        {
+          ...validSnapshot.project_groups[0],
+          projects: [project, project],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual([
+        "project_groups",
+        0,
+        "projects",
+        1,
+        "project_key",
+      ]);
+    }
+  });
+
+  it("rejects derived project keys with ambiguous path delimiters", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      project_groups: [
+        {
+          ...validSnapshot.project_groups[0],
+          projects: [
+            {
+              ...validSnapshot.project_groups[0].projects[0],
+              project_key: "socrates/governance/child",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual([
+        "project_groups",
+        0,
+        "projects",
+        0,
+        "project_key",
+      ]);
+    }
   });
 
   it("rejects runtime or private fields outside the root whitelist", () => {

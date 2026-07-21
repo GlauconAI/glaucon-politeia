@@ -171,10 +171,42 @@ const expectedFixturePayload = `{
   ]
 }`;
 
+type MutableFixtureRegistry = {
+  project_groups: Array<{
+    owner: string;
+    projects: Array<{ name: string; [key: string]: unknown }>;
+  }>;
+  scene_groups: Array<{
+    scenes: Array<{ id: string; [key: string]: unknown }>;
+  }>;
+};
+
+function fixtureHtmlWith(
+  mutate: (registry: MutableFixtureRegistry) => void,
+): string {
+  const registry = JSON.parse(expectedFixturePayload) as MutableFixtureRegistry;
+  mutate(registry);
+  return `<script id="orchestration-registry" type="application/json">${JSON.stringify(registry)}</script>`;
+}
+
 const provenance = {
   collected_at: "2026-07-21T22:45:00.000Z",
   digest: "a".repeat(64),
 } as const;
+
+function captureRegistryError(action: () => unknown): OrchestrationRegistryError {
+  try {
+    action();
+  } catch (error) {
+    expect(error).toBeInstanceOf(OrchestrationRegistryError);
+    if (error instanceof OrchestrationRegistryError) {
+      return error;
+    }
+    throw error;
+  }
+
+  throw new Error("Expected an OrchestrationRegistryError.");
+}
 
 describe("extractOrchestrationRegistryPayload", () => {
   it("extracts the exact application/json script payload with the canonical id", () => {
@@ -191,16 +223,53 @@ describe("extractOrchestrationRegistryPayload", () => {
   });
 
   it("reports an explicit error when the canonical script is missing", () => {
-    expect(() =>
+    const error = captureRegistryError(() =>
       extractOrchestrationRegistryPayload(
         '<script type="application/json" id="other">{}</script>',
       ),
-    ).toThrowError(
-      new OrchestrationRegistryError(
-        "REGISTRY_SCRIPT_MISSING",
-        'Missing <script id="orchestration-registry" type="application/json">.',
+    );
+
+    expect(error.code).toBe("REGISTRY_SCRIPT_MISSING");
+    expect(error.message).toBe(
+      'Missing <script id="orchestration-registry" type="application/json">.',
+    );
+  });
+
+  it("rejects duplicate complete canonical registry scripts", () => {
+    const script =
+      '<script id="orchestration-registry" type="application/json">{}</script>';
+    const error = captureRegistryError(() =>
+      extractOrchestrationRegistryPayload(`${script}${script}`),
+    );
+
+    expect(error.code).toBe("REGISTRY_SCRIPT_DUPLICATE");
+    expect(error.message).toMatch(/exactly one.*found 2/i);
+  });
+
+  it("rejects duplicate id or type attributes on a relevant script", () => {
+    const htmlCases = [
+      '<script id="orchestration-registry" id="other" type="application/json">{}</script>',
+      '<script id="orchestration-registry" type="application/json" type="text/plain">{}</script>',
+    ];
+
+    for (const html of htmlCases) {
+      const error = captureRegistryError(() =>
+        extractOrchestrationRegistryPayload(html),
+      );
+      expect(error.code).toBe("REGISTRY_SCRIPT_ATTRIBUTES_DUPLICATE");
+      expect(error.message).toMatch(/duplicate (id|type) attribute/i);
+    }
+  });
+
+  it("reports an unterminated canonical registry script separately", () => {
+    const error = captureRegistryError(() =>
+      extractOrchestrationRegistryPayload(
+        '<script id="orchestration-registry" type="application/json">{}',
       ),
     );
+
+    expect(error.code).toBe("REGISTRY_SCRIPT_UNTERMINATED");
+    expect(error.message).toMatch(/unterminated/i);
   });
 });
 
@@ -239,6 +308,73 @@ describe("parseOrchestrationRegistryHtml", () => {
     expect(snapshot.project_groups[1].projects[0]).not.toHaveProperty("id");
   });
 
+  it("preserves Unicode project names in deterministic derived keys", () => {
+    const html = fixtureHtmlWith((registry) => {
+      registry.project_groups[1].projects[0].name = "长期健康资料";
+    });
+    const snapshot = parseOrchestrationRegistryHtml(html, provenance);
+
+    expect(snapshot.project_groups[1].projects[0].project_key).toBe(
+      "owner-team/长期健康资料",
+    );
+    expect(snapshot.project_groups[1].projects[0].name).toBe("长期健康资料");
+  });
+
+  it("preserves canonical leading whitespace in original project names", () => {
+    const html = fixtureHtmlWith((registry) => {
+      registry.project_groups[1].projects[0].name = " Dream Builder Daycare";
+    });
+    const snapshot = parseOrchestrationRegistryHtml(html, provenance);
+
+    expect(snapshot.project_groups[1].projects[0].project_key).toBe(
+      "owner-team/ Dream Builder Daycare",
+    );
+    expect(snapshot.project_groups[1].projects[0].name).toBe(
+      " Dream Builder Daycare",
+    );
+  });
+
+  it("rejects project keys when owner normalization is empty", () => {
+    const html = fixtureHtmlWith((registry) => {
+      registry.project_groups[1].owner = "---";
+    });
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
+
+    expect(error.code).toBe("REGISTRY_PROJECT_KEY_INVALID");
+    expect(error.message).toMatch(/owner cannot produce a project key/i);
+  });
+
+  it("rejects slash-delimited owner or project-name key inputs", () => {
+    for (const html of [
+      fixtureHtmlWith((registry) => {
+        registry.project_groups[1].owner = "Owner/Team";
+      }),
+      fixtureHtmlWith((registry) => {
+        registry.project_groups[1].projects[0].name = "alpha/child";
+      }),
+    ]) {
+      const error = captureRegistryError(() =>
+        parseOrchestrationRegistryHtml(html, provenance),
+      );
+      expect(error.code).toBe("REGISTRY_PROJECT_KEY_INVALID");
+      expect(error.message).toMatch(/slash/i);
+    }
+  });
+
+  it("rejects collisions between deterministic derived project keys", () => {
+    const html = fixtureHtmlWith((registry) => {
+      registry.project_groups[1].projects[1].name = "alpha";
+    });
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
+
+    expect(error.code).toBe("REGISTRY_PROJECT_KEY_COLLISION");
+    expect(error.message).toContain('"owner-team/alpha"');
+  });
+
   it("excludes absolute roots and unrelated private registry fields", () => {
     const snapshot = parseOrchestrationRegistryHtml(fixtureHtml, provenance);
     const serialized = JSON.stringify(snapshot);
@@ -253,12 +389,13 @@ describe("parseOrchestrationRegistryHtml", () => {
   it("reports malformed registry JSON explicitly", () => {
     const html =
       '<script id="orchestration-registry" type="application/json">{"broken":</script>';
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
 
-    expect(() => parseOrchestrationRegistryHtml(html, provenance)).toThrowError(
-      new OrchestrationRegistryError(
-        "REGISTRY_JSON_MALFORMED",
-        "The orchestration registry script contains malformed JSON.",
-      ),
+    expect(error.code).toBe("REGISTRY_JSON_MALFORMED");
+    expect(error.message).toBe(
+      "The orchestration registry script contains malformed JSON.",
     );
   });
 
@@ -268,22 +405,49 @@ describe("parseOrchestrationRegistryHtml", () => {
       '"schema_version": "3.0.0"',
     );
 
-    expect(() => parseOrchestrationRegistryHtml(html, provenance)).toThrowError(
-      new OrchestrationRegistryError(
-        "REGISTRY_SCHEMA_UNSUPPORTED",
-        'Unsupported orchestration registry schema version "3.0.0"; expected "2.0.0".',
-      ),
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
+
+    expect(error.code).toBe("REGISTRY_SCHEMA_UNSUPPORTED");
+    expect(error.message).toBe(
+      'Unsupported orchestration registry schema version "3.0.0"; expected "2.0.0".',
     );
   });
 
   it("reports invalid canonical registry structure explicitly", () => {
     const html = fixtureHtml.replace('"status": "active",', "");
 
-    expect(() => parseOrchestrationRegistryHtml(html, provenance)).toThrowError(
-      OrchestrationRegistryError,
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
     );
-    expect(() => parseOrchestrationRegistryHtml(html, provenance)).toThrow(
-      /canonical registry structure is invalid/i,
+
+    expect(error.code).toBe("REGISTRY_SCHEMA_INVALID");
+    expect(error.message).toMatch(/canonical registry structure is invalid/i);
+  });
+
+  it("reports invalid provenance with a stable public code and message", () => {
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(fixtureHtml, {
+        ...provenance,
+        collected_at: "2026-02-30T22:45:00.000Z",
+      }),
     );
+
+    expect(error.code).toBe("REGISTRY_PROVENANCE_INVALID");
+    expect(error.message).toMatch(/registry provenance is invalid/i);
+  });
+
+  it("wraps final snapshot validation with a stable public code and message", () => {
+    const html = fixtureHtmlWith((registry) => {
+      registry.scene_groups[1].scenes[0].id = "S01";
+    });
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
+
+    expect(error.code).toBe("REGISTRY_SNAPSHOT_INVALID");
+    expect(error.message).toMatch(/generated registry snapshot is invalid/i);
+    expect(error.message).toContain("scenes.1.id");
   });
 });
