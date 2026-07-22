@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "imports": {
-    "#observatory-schema": "./lib/observatory/schema.ts"
+    "#observatory-schema": "./lib/observatory/schema.ts",
+    "#observatory-registry": "./lib/observatory/registry.ts",
+    "#observatory-collection-schema": "./lib/observatory/collection-schema.ts",
+    "#observatory-collector": "./lib/observatory/collector.ts",
+    "#observatory-publisher": "./lib/observatory/publisher.ts"
   },
   "scripts": {
     "dev": "next dev",
@@ -11,6 +15,8 @@
     "start": "next start",
     "lint": "eslint .",
     "import:ghost": "node scripts/import-ghost.mjs",
+    "observatory:collect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/collect.ts",
+    "observatory:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/publish.ts",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
