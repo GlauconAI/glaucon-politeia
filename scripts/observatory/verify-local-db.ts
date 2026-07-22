@@ -264,6 +264,8 @@ async function main(): Promise<void> {
       role_name: string;
       can_create: boolean;
       can_update: boolean;
+      can_prune: boolean;
+      can_mark_release: boolean;
     }[]
   >`
     select role_name,
@@ -276,7 +278,17 @@ async function main(): Promise<void> {
         role_name,
         'public.update_observatory_work_item(uuid,integer,text,text,text)',
         'execute'
-      ) as can_update
+      ) as can_update,
+      has_function_privilege(
+        role_name,
+        'public.prune_observatory_snapshots(integer)',
+        'execute'
+      ) as can_prune,
+      has_function_privilege(
+        role_name,
+        'public.mark_observatory_snapshot_release(text)',
+        'execute'
+      ) as can_mark_release
     from unnest(array['anon', 'authenticated', 'service_role']) role_name
     order by role_name
   `;
@@ -284,8 +296,13 @@ async function main(): Promise<void> {
     const expected = privilege.role_name === "authenticated";
     assert.equal(privilege.can_create, expected);
     assert.equal(privilege.can_update, expected);
+    assert.equal(privilege.can_prune, privilege.role_name === "service_role");
+    assert.equal(
+      privilege.can_mark_release,
+      privilege.role_name === "service_role",
+    );
   }
-  record("RPC execute grants limited to authenticated");
+  record("RPC execute grants limited to exact authenticated/service roles");
 
   await asRole("service_role", null, async (transaction) => {
     await transaction`
@@ -622,6 +639,59 @@ async function main(): Promise<void> {
     },
     /snapshots are immutable/iu,
   );
+
+  await expectPgError(
+    "authenticated snapshot retention denied",
+    "42501",
+    () =>
+      asRole("authenticated", adminId, async (transaction) => {
+        await transaction`select public.prune_observatory_snapshots(30)`;
+      }),
+  );
+
+  for (let index = 0; index < 32; index += 1) {
+    const retentionDigest = randomBytes(32).toString("hex");
+    await asRole("service_role", null, async (transaction) => {
+      await transaction`
+        insert into public.observatory_snapshots (
+          schema_version,
+          generated_at,
+          source_digest,
+          payload,
+          summary,
+          collector_version
+        ) values (
+          '2.0.0',
+          now() + (${index}::text || ' seconds')::interval,
+          ${retentionDigest},
+          '{"kind":"retention-integration"}'::jsonb,
+          '{"project_count":0}'::jsonb,
+          'integration-test'
+        )
+      `;
+    });
+  }
+
+  await asRole("service_role", null, async (transaction) => {
+    const [marked] = await transaction<{ marked: boolean }[]>`
+      select public.mark_observatory_snapshot_release(${digest}) as marked
+    `;
+    assert.equal(marked?.marked, true);
+    const [pruned] = await transaction<{ deleted: number }[]>`
+      select public.prune_observatory_snapshots(30) as deleted
+    `;
+    assert.equal(pruned?.deleted, 2);
+  });
+  const [retentionState] = await sql<
+    { release_rows: number; rolling_rows: number }[]
+  >`
+    select
+      count(*) filter (where release_evidence)::integer as release_rows,
+      count(*) filter (where not release_evidence)::integer as rolling_rows
+    from public.observatory_snapshots
+  `;
+  assert.deepEqual(retentionState, { release_rows: 1, rolling_rows: 30 });
+  record("retention keeps 30 rolling rows plus release evidence");
 
   await expectPgError(
     "event update blocked by append-only trigger",
