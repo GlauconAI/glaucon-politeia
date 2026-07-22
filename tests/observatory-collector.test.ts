@@ -43,9 +43,12 @@ const agentsOutput = JSON.stringify({
 const statusOutput = JSON.stringify({
   runtimeVersion: "2026.7.21",
   gateway: {
-    running: false,
     reachable: true,
     url: "ws://127.0.0.1:18789?token=private",
+  },
+  gatewayService: {
+    loaded: true,
+    runtime: { status: "running" },
   },
   agents: {
     defaultId: "plato",
@@ -124,7 +127,7 @@ describe("collectObservatorySnapshot", () => {
     ]);
     expect(snapshot.runtime).toEqual({
       runtime_version: "2026.7.21",
-      gateway_running: false,
+      gateway_running: true,
       gateway_reachable: true,
       configured_agent_count: 1,
       task_totals: {
@@ -144,7 +147,7 @@ describe("collectObservatorySnapshot", () => {
       agent_count: 1,
       binding_count: 1,
       configured_agent_count: 1,
-      gateway_running: false,
+      gateway_running: true,
       gateway_reachable: true,
       task_totals: snapshot.runtime.task_totals,
     });
@@ -185,6 +188,7 @@ describe("collectObservatorySnapshot", () => {
             tasks: JSON.parse(statusOutput).tasks,
             agents: JSON.parse(statusOutput).agents,
             gateway: JSON.parse(statusOutput).gateway,
+            gatewayService: JSON.parse(statusOutput).gatewayService,
             runtimeVersion: JSON.parse(statusOutput).runtimeVersion,
           }),
         }),
@@ -197,6 +201,35 @@ describe("collectObservatorySnapshot", () => {
     expect(first.source_digest).toBe(second.source_digest);
     expect(first.registry.source.digest).toBe(first.source_digest);
     expect(JSON.stringify(first)).not.toContain("/canonical/registry.html");
+  });
+
+  it("keeps a stopped Gateway service stopped regardless of reachability", async () => {
+    const baseStatus = JSON.parse(statusOutput);
+    for (const reachable of [true, false]) {
+      const snapshot = await collectObservatorySnapshot(
+        { registryPath: "/canonical/registry.html" },
+        {
+          runCommand: successfulRunner([], {
+            agents: agentsOutput,
+            status: JSON.stringify({
+              ...baseStatus,
+              gateway: { ...baseStatus.gateway, reachable },
+              gatewayService: {
+                loaded: true,
+                runtime: { status: " stopped " },
+              },
+            }),
+          }),
+          readTextFile: async () => registryHtml,
+          now: () => fixedNow,
+        },
+      );
+
+      expect(snapshot.runtime.gateway_running).toBe(false);
+      expect(snapshot.runtime.gateway_reachable).toBe(reachable);
+      expect(snapshot.summary.gateway_running).toBe(false);
+      expect(snapshot.summary.gateway_reachable).toBe(reachable);
+    }
   });
 
   it("emits only safe logical workspace labels from path and token inputs", async () => {

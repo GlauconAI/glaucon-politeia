@@ -241,6 +241,11 @@ function mapRuntime(
   }
   const runtime = firstRecord(status.runtime);
   const gateway = firstRecord(status.gateway, runtime?.gateway);
+  const gatewayService = firstRecord(
+    status.gatewayService,
+    status.gateway_service,
+  );
+  const gatewayServiceRuntime = firstRecord(gatewayService?.runtime);
   const agents = firstRecord(status.agents, runtime?.agents);
   const tasks = firstRecord(status.taskTotals, status.tasks, runtime?.tasks);
   const taskStatuses = firstRecord(tasks?.byStatus, tasks?.by_status);
@@ -256,6 +261,7 @@ function mapRuntime(
       "OpenClaw status JSON does not contain a runtime version.",
     );
   }
+  const gatewayServiceStatus = firstString(gatewayServiceRuntime?.status);
 
   const active =
     safeCount(tasks?.active) ??
@@ -278,7 +284,9 @@ function mapRuntime(
   const output = {
     runtime_version: runtimeVersion,
     gateway_running:
-      firstBoolean(gateway?.running, status.gatewayRunning) ?? false,
+      gatewayServiceStatus === undefined
+        ? (firstBoolean(gateway?.running, status.gatewayRunning) ?? false)
+        : gatewayServiceStatus.trim().toLowerCase() === "running",
     gateway_reachable:
       firstBoolean(gateway?.reachable, status.gatewayReachable) ?? false,
     configured_agent_count:
