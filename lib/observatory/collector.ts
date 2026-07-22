@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION,
@@ -21,6 +21,7 @@ export type ObservatoryCollectorErrorCode =
   | "CLI_JSON_MALFORMED"
   | "CLI_SCHEMA_INVALID"
   | "SNAPSHOT_INVALID"
+  | "FILE_IDENTITY_FAILED"
   | "SOURCE_WRITE_FORBIDDEN"
   | "ATOMIC_WRITE_FAILED";
 
@@ -63,6 +64,16 @@ export interface AtomicFileAdapter {
   remove(path: string): Promise<void>;
 }
 
+export interface FileIdentity {
+  device: number | bigint | string;
+  inode: number | bigint | string;
+}
+
+export interface FileIdentityAdapter {
+  realpathIfExists(path: string): Promise<string | undefined>;
+  statIfExists(path: string): Promise<FileIdentity | undefined>;
+}
+
 interface CollectorDependencies {
   runCommand: CommandRunner;
   readTextFile(path: string): Promise<string>;
@@ -72,6 +83,7 @@ interface CollectorDependencies {
 
 interface CollectAndWriteDependencies extends CollectorDependencies {
   files: AtomicFileAdapter;
+  identities: FileIdentityAdapter;
   createTempPath?(destinationPath: string): string;
 }
 
@@ -108,19 +120,26 @@ function safeCount(value: unknown): number | undefined {
     : undefined;
 }
 
-function logicalWorkspaceLabel(value: unknown, fallback: string): string {
-  if (typeof value !== "string" || value.length === 0) return fallback;
-  const segments = value.split(/[\\/]+/u).filter(Boolean);
-  const isAbsolute = value.startsWith("/") || /^[a-z]:[\\/]/iu.test(value);
-  if (isAbsolute) {
-    const workspaceIndex = segments.findLastIndex((segment) =>
-      /^(?:workspace|workspaces)$/iu.test(segment),
-    );
-    if (workspaceIndex < 0 || workspaceIndex === segments.length - 1) {
-      return fallback;
-    }
+function logicalWorkspaceLabel(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) return "unknown";
+  const safeToken = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/iu;
+  if (!value.includes("/") && !value.includes("\\")) {
+    return safeToken.test(value) ? value : "unknown";
   }
-  return segments.at(-1) ?? fallback;
+
+  const isAbsolute =
+    value.startsWith("/") ||
+    value.startsWith("\\\\") ||
+    /^[a-z]:[\\/]/iu.test(value);
+  if (!isAbsolute) return "unknown";
+  const segments = value.replaceAll("\\", "/").split("/").filter(Boolean);
+  const workspaceIndex = segments.findLastIndex(
+    (segment) => segment === "workspace" || segment === "workspaces",
+  );
+  const label = segments[workspaceIndex + 1];
+  return workspaceIndex >= 0 && label && safeToken.test(label)
+    ? label
+    : "unknown";
 }
 
 function parseCliJson(stdout: string, label: "agents" | "status"): unknown {
@@ -193,7 +212,6 @@ function mapAgents(candidate: unknown): ObservatoryAgent[] {
           agent.workspace_label,
           agent.workspace,
         ),
-        id,
       ),
       binding_count: bindings,
       default:
@@ -260,8 +278,9 @@ function mapRuntime(
   const output = {
     runtime_version: runtimeVersion,
     gateway_running:
-      firstBoolean(gateway?.running, gateway?.reachable, status.gatewayRunning) ??
-      false,
+      firstBoolean(gateway?.running, status.gatewayRunning) ?? false,
+    gateway_reachable:
+      firstBoolean(gateway?.reachable, status.gatewayReachable) ?? false,
     configured_agent_count:
       safeCount(status.configuredAgentCount) ??
       safeCount(status.configured_agent_count) ??
@@ -401,6 +420,7 @@ export async function collectObservatorySnapshot(
       ),
       configured_agent_count: runtime.configured_agent_count,
       gateway_running: runtime.gateway_running,
+      gateway_reachable: runtime.gateway_reachable,
       task_totals: runtime.task_totals,
     },
   });
@@ -473,17 +493,79 @@ export async function writeObservatorySnapshotAtomically(
   }
 }
 
+async function assertDistinctSourceAndDestination(
+  sourcePath: string,
+  destinationPath: string,
+  identities: FileIdentityAdapter,
+): Promise<void> {
+  let sourceCanonical: string;
+  let destinationCanonical: string;
+  let sourceIdentity: FileIdentity | undefined;
+  let destinationIdentity: FileIdentity | undefined;
+  try {
+    const sourceResolved = await identities.realpathIfExists(sourcePath);
+    if (!sourceResolved) {
+      throw new ObservatoryCollectorError(
+        "FILE_IDENTITY_FAILED",
+        "The canonical registry source no longer exists.",
+      );
+    }
+    sourceCanonical = sourceResolved;
+
+    const destinationResolved =
+      await identities.realpathIfExists(destinationPath);
+    if (destinationResolved) {
+      destinationCanonical = destinationResolved;
+    } else {
+      const parentResolved = await identities.realpathIfExists(
+        dirname(destinationPath),
+      );
+      const destinationName = basename(destinationPath);
+      if (!parentResolved || !destinationName) {
+        throw new ObservatoryCollectorError(
+          "FILE_IDENTITY_FAILED",
+          "The local snapshot destination parent cannot be resolved safely.",
+        );
+      }
+      destinationCanonical = join(parentResolved, destinationName);
+    }
+
+    [sourceIdentity, destinationIdentity] = await Promise.all([
+      identities.statIfExists(sourcePath),
+      identities.statIfExists(destinationPath),
+    ]);
+  } catch (error) {
+    if (error instanceof ObservatoryCollectorError) throw error;
+    throw new ObservatoryCollectorError(
+      "FILE_IDENTITY_FAILED",
+      "Unable to verify that the local snapshot destination is distinct from the canonical source.",
+    );
+  }
+
+  const sameCanonicalPath = sourceCanonical === destinationCanonical;
+  const sameFileIdentity =
+    sourceIdentity !== undefined &&
+    destinationIdentity !== undefined &&
+    String(sourceIdentity.device) === String(destinationIdentity.device) &&
+    String(sourceIdentity.inode) === String(destinationIdentity.inode);
+  if (sameCanonicalPath || sameFileIdentity) {
+    throw new ObservatoryCollectorError(
+      "SOURCE_WRITE_FORBIDDEN",
+      "The local snapshot destination resolves to the canonical registry source.",
+    );
+  }
+}
+
 export async function collectAndWriteObservatorySnapshot(
   input: { registryPath: string; destinationPath: string },
   dependencies: CollectAndWriteDependencies,
 ): Promise<ObservatoryCollectionEnvelope> {
-  if (resolve(input.registryPath) === resolve(input.destinationPath)) {
-    throw new ObservatoryCollectorError(
-      "SOURCE_WRITE_FORBIDDEN",
-      "The local snapshot destination cannot overwrite the canonical registry source.",
-    );
-  }
   const snapshot = await collectObservatorySnapshot(input, dependencies);
+  await assertDistinctSourceAndDestination(
+    input.registryPath,
+    input.destinationPath,
+    dependencies.identities,
+  );
   await writeObservatorySnapshotAtomically(
     snapshot,
     input.destinationPath,

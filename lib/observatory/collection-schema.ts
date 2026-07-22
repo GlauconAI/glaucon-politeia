@@ -31,6 +31,7 @@ export const ObservatoryRuntimeTaskTotalsSchema = z.strictObject({
 export const ObservatoryRuntimeSchema = z.strictObject({
   runtime_version: z.string().min(1),
   gateway_running: z.boolean(),
+  gateway_reachable: z.boolean(),
   configured_agent_count: z.number().int().nonnegative(),
   task_totals: ObservatoryRuntimeTaskTotalsSchema,
 });
@@ -45,6 +46,7 @@ export const ObservatoryCollectionSummarySchema = z.strictObject({
   binding_count: z.number().int().nonnegative(),
   configured_agent_count: z.number().int().nonnegative(),
   gateway_running: z.boolean(),
+  gateway_reachable: z.boolean(),
   task_totals: ObservatoryRuntimeTaskTotalsSchema,
 });
 
@@ -71,6 +73,7 @@ export const ObservatoryCollectionEnvelopeSchema = z
       ),
       configured_agent_count: snapshot.runtime.configured_agent_count,
       gateway_running: snapshot.runtime.gateway_running,
+      gateway_reachable: snapshot.runtime.gateway_reachable,
       task_totals: snapshot.runtime.task_totals,
     };
     for (const key of Object.keys(expected) as Array<keyof typeof expected>) {

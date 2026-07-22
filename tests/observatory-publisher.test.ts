@@ -35,7 +35,7 @@ async function validSnapshot() {
               ])
             : JSON.stringify({
                 runtimeVersion: "2026.7.21",
-                gateway: { running: true },
+                gateway: { running: true, reachable: true },
                 configuredAgentCount: 1,
                 taskTotals: {
                   total: 3,

@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  realpath,
+  rename,
+  stat,
+  unlink,
+} from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
 import {
@@ -9,6 +17,7 @@ import {
   type AtomicFileAdapter,
   type CommandInvocation,
   type CommandResult,
+  type FileIdentityAdapter,
 } from "#observatory-collector";
 
 function runCommand(invocation: CommandInvocation): Promise<CommandResult> {
@@ -61,6 +70,35 @@ const files: AtomicFileAdapter = {
   },
 };
 
+function isMissing(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+const identities: FileIdentityAdapter = {
+  realpathIfExists: async (path) => {
+    try {
+      return await realpath(path);
+    } catch (error) {
+      if (isMissing(error)) return undefined;
+      throw error;
+    }
+  },
+  statIfExists: async (path) => {
+    try {
+      const identity = await stat(path);
+      return { device: identity.dev, inode: identity.ino };
+    } catch (error) {
+      if (isMissing(error)) return undefined;
+      throw error;
+    }
+  },
+};
+
 async function main(): Promise<void> {
   const registryArgument = process.argv[2];
   if (!registryArgument) {
@@ -83,6 +121,7 @@ async function main(): Promise<void> {
       readTextFile: async (path) => readFile(path, "utf8"),
       now: () => new Date(),
       files,
+      identities,
       createTempPath: (destination) =>
         join(
           dirname(destination),

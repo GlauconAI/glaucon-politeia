@@ -7,9 +7,11 @@ import {
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
   collectObservatorySnapshot,
+  writeObservatorySnapshotAtomically,
   type AtomicFileAdapter,
   type CommandInvocation,
   type CommandResult,
+  type FileIdentityAdapter,
 } from "@/lib/observatory/collector";
 import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
 
@@ -41,6 +43,7 @@ const agentsOutput = JSON.stringify({
 const statusOutput = JSON.stringify({
   runtimeVersion: "2026.7.21",
   gateway: {
+    running: false,
     reachable: true,
     url: "ws://127.0.0.1:18789?token=private",
   },
@@ -121,7 +124,8 @@ describe("collectObservatorySnapshot", () => {
     ]);
     expect(snapshot.runtime).toEqual({
       runtime_version: "2026.7.21",
-      gateway_running: true,
+      gateway_running: false,
+      gateway_reachable: true,
       configured_agent_count: 1,
       task_totals: {
         total: 9,
@@ -140,7 +144,8 @@ describe("collectObservatorySnapshot", () => {
       agent_count: 1,
       binding_count: 1,
       configured_agent_count: 1,
-      gateway_running: true,
+      gateway_running: false,
+      gateway_reachable: true,
       task_totals: snapshot.runtime.task_totals,
     });
     expect(ObservatoryCollectionEnvelopeSchema.parse(snapshot)).toEqual(
@@ -194,17 +199,30 @@ describe("collectObservatorySnapshot", () => {
     expect(JSON.stringify(first)).not.toContain("/canonical/registry.html");
   });
 
-  it("does not turn an arbitrary absolute path basename into a workspace label", async () => {
+  it("emits only safe logical workspace labels from path and token inputs", async () => {
     const snapshot = await collectObservatorySnapshot(
       { registryPath: "/canonical/registry.html" },
       {
         runCommand: successfulRunner([], {
           agents: JSON.stringify([
             {
-              id: "plato",
-              displayName: "Plato",
-              workspace: "/Users/private-user",
+              id: "nested",
+              workspace:
+                "/Users/private/.openclaw/workspace/plato/private-tail",
             },
+            {
+              id: "windows",
+              workspace:
+                "C:\\Users\\private\\.openclaw\\workspaces\\athena\\private-tail",
+            },
+            {
+              id: "unc",
+              workspace:
+                "\\\\private-server\\share\\workspace\\socrates\\private-tail",
+            },
+            { id: "missing", workspace: "/Users/private-user/private-tail" },
+            { id: "logical", workspaceLabel: "plato-prod" },
+            { id: "invalid", workspaceLabel: "private/path" },
           ]),
           status: statusOutput,
         }),
@@ -213,8 +231,18 @@ describe("collectObservatorySnapshot", () => {
       },
     );
 
-    expect(snapshot.agents[0].workspace_label).toBe("plato");
-    expect(JSON.stringify(snapshot)).not.toContain("private-user");
+    expect(snapshot.agents.map((agent) => agent.workspace_label)).toEqual([
+      "plato",
+      "athena",
+      "socrates",
+      "unknown",
+      "plato-prod",
+      "unknown",
+    ]);
+    const serialized = JSON.stringify(snapshot);
+    expect(serialized).not.toContain("private-tail");
+    expect(serialized).not.toContain("private-user");
+    expect(serialized).not.toContain("private-server");
   });
 
   it("reports command failures without exposing stderr secrets", async () => {
@@ -306,6 +334,139 @@ describe("collectAndWriteObservatorySnapshot", () => {
           rename: async () => undefined,
           remove: async () => undefined,
         },
+        identities: {
+          realpathIfExists: async () => sourcePath,
+          statIfExists: async () => ({ device: 1, inode: 2 }),
+        },
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "SOURCE_WRITE_FORBIDDEN",
+    });
+    expect(opened).toBe(false);
+  });
+
+  it("rejects an existing destination symlink alias before opening a temp file", async () => {
+    const sourcePath = "/canonical/orchestration-system-design.html";
+    const destinationPath = "/safe/output/source-alias.html";
+    let opened = false;
+    let renamed = false;
+    let sourceContent = "canonical-source-content";
+    const identities: FileIdentityAdapter = {
+      realpathIfExists: async (path) =>
+        path === sourcePath || path === destinationPath
+          ? "/real/canonical/source.html"
+          : undefined,
+      statIfExists: async (path) =>
+        path === sourcePath || path === destinationPath
+          ? { device: 7, inode: 11 }
+          : undefined,
+    };
+
+    const action = collectAndWriteObservatorySnapshot(
+      { registryPath: sourcePath, destinationPath },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+        identities,
+        files: {
+          openExclusive: async () => {
+            opened = true;
+            return {
+              write: async () => undefined,
+              close: async () => undefined,
+            };
+          },
+          rename: async () => {
+            renamed = true;
+            sourceContent = "overwritten";
+          },
+          remove: async () => undefined,
+        },
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "SOURCE_WRITE_FORBIDDEN",
+    });
+    expect(opened).toBe(false);
+    expect(renamed).toBe(false);
+    expect(sourceContent).toBe("canonical-source-content");
+  });
+
+  it("resolves a missing destination through its real parent before comparing source identity", async () => {
+    const sourcePath = "/canonical/source.html";
+    const destinationPath = "/symlinked-parent/source.html";
+    let opened = false;
+    const identities: FileIdentityAdapter = {
+      realpathIfExists: async (path) => {
+        if (path === sourcePath) return "/real/canonical/source.html";
+        if (path === destinationPath) return undefined;
+        if (path === "/symlinked-parent") return "/real/canonical";
+        return undefined;
+      },
+      statIfExists: async (path) =>
+        path === sourcePath ? { device: 7, inode: 11 } : undefined,
+    };
+
+    const action = collectAndWriteObservatorySnapshot(
+      { registryPath: sourcePath, destinationPath },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+        identities,
+        files: {
+          openExclusive: async () => {
+            opened = true;
+            throw new Error("must not open");
+          },
+          rename: async () => undefined,
+          remove: async () => undefined,
+        },
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "SOURCE_WRITE_FORBIDDEN",
+    });
+    expect(opened).toBe(false);
+  });
+
+  it("rejects distinct canonical paths that share the same device and inode", async () => {
+    const sourcePath = "/canonical/source.html";
+    const destinationPath = "/safe/output/hard-link.html";
+    let opened = false;
+    const identities: FileIdentityAdapter = {
+      realpathIfExists: async (path) =>
+        path === sourcePath
+          ? "/real/source.html"
+          : path === destinationPath
+            ? "/real/hard-link.html"
+            : undefined,
+      statIfExists: async (path) =>
+        path === sourcePath || path === destinationPath
+          ? { device: 7, inode: 11 }
+          : undefined,
+    };
+
+    const action = collectAndWriteObservatorySnapshot(
+      { registryPath: sourcePath, destinationPath },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+        identities,
+        files: {
+          openExclusive: async () => {
+            opened = true;
+            throw new Error("must not open");
+          },
+          rename: async () => undefined,
+          remove: async () => undefined,
+        },
       },
     );
 
@@ -350,6 +511,10 @@ describe("collectAndWriteObservatorySnapshot", () => {
         readTextFile: async () => registryHtml,
         now: () => fixedNow,
         files: adapter,
+        identities: {
+          realpathIfExists: async (path) => path,
+          statIfExists: async () => undefined,
+        },
         createTempPath: () => temp,
       },
     );
@@ -359,5 +524,38 @@ describe("collectAndWriteObservatorySnapshot", () => {
     expect(files.get(destination)).toBe("last-known-good");
     expect(files.has(temp)).toBe(false);
     expect(removed).toEqual([temp]);
+  });
+
+  it("does not remove or follow a pre-existing untrusted temp symlink", async () => {
+    const snapshot = await collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+    const temp = "/safe/output/.snapshot.untrusted.tmp";
+    const removed: string[] = [];
+
+    await expect(
+      writeObservatorySnapshotAtomically(
+        snapshot,
+        "/safe/output/snapshot.json",
+        {
+          openExclusive: async () => {
+            throw Object.assign(new Error("already exists"), {
+              code: "EEXIST",
+            });
+          },
+          rename: async () => undefined,
+          remove: async (path) => {
+            removed.push(path);
+          },
+        },
+        () => temp,
+      ),
+    ).rejects.toMatchObject({ code: "ATOMIC_WRITE_FAILED" });
+    expect(removed).toEqual([]);
   });
 });
