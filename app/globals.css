@@ -110,8 +110,153 @@
 
 .observatory-source,
 .observatory-catalog,
+.observatory-source-health,
+.observatory-system-inventory,
+.observatory-topology,
+.observatory-v1-notice,
 .observatory-capture-panel {
   padding: 18px;
+}
+
+.observatory-source-health,
+.observatory-system-inventory,
+.observatory-topology,
+.observatory-v1-notice {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+}
+
+.observatory-health-counts,
+.observatory-inventory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.observatory-health-counts span,
+.observatory-system-inventory .observatory-panel-heading > span,
+.observatory-topology .observatory-panel-heading > span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.observatory-source-health-list,
+.observatory-inventory-list,
+.observatory-relationship-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.observatory-source-health-list li,
+.observatory-inventory-list li,
+.observatory-relationship-list li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 12px;
+}
+
+.observatory-source-health-list li > div,
+.observatory-source-health-list li > div:first-child,
+.observatory-source-health-list li > div:nth-child(2) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.observatory-source-health-list small,
+.observatory-relationship-list small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.observatory-inventory-controls {
+  margin: 14px 0;
+}
+
+.observatory-inventory-controls label {
+  display: grid;
+  min-width: 180px;
+  flex: 1;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.observatory-inventory-controls input,
+.observatory-inventory-controls select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.observatory-inventory-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.observatory-inventory-list p,
+.observatory-relationship-list p {
+  margin: 8px 0;
+}
+
+.observatory-inventory-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.observatory-inventory-list dl div {
+  min-width: 0;
+}
+
+.observatory-inventory-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.observatory-inventory-list dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.observatory-inventory-source {
+  grid-column: 1 / -1;
+}
+
+.observatory-topology-map {
+  width: 100%;
+  min-height: 120px;
+  margin-top: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.observatory-topology-map line {
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+
+@media (max-width: 640px) {
+  .observatory-inventory-list,
+  .observatory-inventory-list dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .observatory-source {

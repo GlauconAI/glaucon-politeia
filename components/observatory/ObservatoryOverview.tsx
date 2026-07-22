@@ -3,6 +3,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { SourceStatus } from "@/components/observatory/SourceStatus";
+import { FreshnessSummary } from "@/components/observatory/FreshnessSummary";
+import { SystemInventory } from "@/components/observatory/SystemInventory";
+import { SystemTopology } from "@/components/observatory/SystemTopology";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 
 export type ObservatoryOverviewState =
@@ -232,6 +235,30 @@ export function ObservatoryOverview({
           </dl>
         ))}
       </section>
+
+      {"assets" in state.snapshot ? (
+        <>
+          <FreshnessSummary sources={state.snapshot.source_health} />
+          <SystemInventory assets={state.snapshot.assets} />
+          <SystemTopology
+            assets={state.snapshot.assets}
+            coreEndpointLabels={Object.fromEntries(
+              state.snapshot.agents.map((agent) => [
+                `agent:${agent.id}`,
+                agent.display_name || agent.id,
+              ]),
+            )}
+            relationships={state.snapshot.relationships}
+          />
+        </>
+      ) : (
+        <section className="observatory-v1-notice" aria-label="System inventory status">
+          <p>
+            Core objects are available from the v1 Snapshot. The expanded system
+            inventory will appear after the first validated v2 refresh.
+          </p>
+        </section>
+      )}
 
       <section className="observatory-catalog" aria-labelledby="catalog-heading">
         <div className="observatory-panel-heading">
