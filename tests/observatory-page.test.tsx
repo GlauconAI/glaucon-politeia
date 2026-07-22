@@ -35,7 +35,7 @@ vi.mock("@/lib/observatory/repository", () => ({
   }),
 }));
 
-import ObservatoryPage, { dynamic } from "@/app/observatory/page";
+import DashboardPage, { dynamic } from "@/app/dashboard/page";
 
 const registry = {
   schema_version: "1.0.0",
@@ -105,7 +105,7 @@ function snapshotRow(value: unknown = payload) {
   };
 }
 
-describe("ObservatoryPage", () => {
+describe("DashboardPage", () => {
   beforeEach(() => {
     mocks.currentAdmin = {
       user_id: "admin-1",
@@ -125,27 +125,28 @@ describe("ObservatoryPage", () => {
   it("redirects anonymous and non-admin visitors before reading snapshots", async () => {
     mocks.currentAdmin = null;
 
-    await expect(ObservatoryPage()).rejects.toThrow(
-      "redirect:/auth?redirectTo=/observatory",
+    await expect(DashboardPage()).rejects.toThrow(
+      "redirect:/auth?redirectTo=/dashboard",
     );
     expect(mocks.redirect).toHaveBeenCalledWith(
-      "/auth?redirectTo=/observatory",
+      "/auth?redirectTo=/dashboard",
     );
     expect(mocks.getLatestSuccessfulSnapshot).not.toHaveBeenCalled();
   });
 
   it("renders the admin overview and Quick Capture", async () => {
-    render(await ObservatoryPage());
+    render(await DashboardPage());
 
     expect(
-      screen.getByRole("heading", { name: /openclaw observatory/i }),
+      screen.getByRole("heading", { name: /^dashboard$/i }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText(/dashboard access/i)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
   });
 
   it("generates a distinct cryptographically random capture key per page request", async () => {
-    const firstRender = render(await ObservatoryPage());
+    const firstRender = render(await DashboardPage());
     const firstKey = (
       screen.getByRole("form", { name: /quick capture/i }).querySelector(
         'input[name="idempotencyKey"]',
@@ -153,7 +154,7 @@ describe("ObservatoryPage", () => {
     ).value;
     firstRender.unmount();
 
-    render(await ObservatoryPage());
+    render(await DashboardPage());
     const secondKey = (
       screen.getByRole("form", { name: /quick capture/i }).querySelector(
         'input[name="idempotencyKey"]',
@@ -172,7 +173,7 @@ describe("ObservatoryPage", () => {
   it("keeps Quick Capture useful when no snapshot exists", async () => {
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(null);
 
-    render(await ObservatoryPage());
+    render(await DashboardPage());
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       /no snapshot has been published yet/i,
@@ -185,7 +186,7 @@ describe("ObservatoryPage", () => {
       snapshotRow({ ...payload, runtime_session: "private-session" }),
     );
 
-    render(await ObservatoryPage());
+    render(await DashboardPage());
 
     expect(screen.getByRole("alert")).toHaveTextContent(/failed validation/i);
     expect(screen.queryByText("private-session")).not.toBeInTheDocument();
@@ -196,7 +197,7 @@ describe("ObservatoryPage", () => {
       new Error("private database detail"),
     );
 
-    render(await ObservatoryPage());
+    render(await DashboardPage());
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       /latest snapshot could not be loaded/i,
