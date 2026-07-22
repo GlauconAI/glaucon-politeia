@@ -13,6 +13,8 @@ export interface ObservatoryAdminProfile {
 
 interface ObservatoryAuthDependencyFailure {
   code?: string;
+  name?: string;
+  status?: number;
   message: string;
 }
 
@@ -78,6 +80,9 @@ export async function getCurrentObservatoryAdmin(
     const { data, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
+      if (authError.name === "AuthSessionMissingError") {
+        return null;
+      }
       throw new ObservatoryAdminAuthError();
     }
     if (!data.user) {

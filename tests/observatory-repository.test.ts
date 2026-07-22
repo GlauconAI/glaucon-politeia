@@ -111,6 +111,30 @@ describe("getCurrentObservatoryAdmin", () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
+  it("treats Supabase's missing-session response as an anonymous caller", async () => {
+    const createAdminClient = vi.fn();
+
+    await expect(
+      getCurrentObservatoryAdmin({
+        isConfigured: () => true,
+        createServerClient: async () => ({
+          auth: {
+            getUser: async () => ({
+              data: { user: null },
+              error: {
+                name: "AuthSessionMissingError",
+                status: 400,
+                message: "Auth session missing!",
+              },
+            }),
+          },
+        }),
+        createAdminClient,
+      }),
+    ).resolves.toBeNull();
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
   it("returns only a 402V administrator profile", async () => {
     let profile: typeof adminProfile | { is_admin: false } | null = adminProfile;
     const maybeSingle = vi.fn(async () => ({ data: profile, error: null }));
