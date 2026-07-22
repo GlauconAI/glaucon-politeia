@@ -12,6 +12,8 @@
     "#observatory-system-collector": "./lib/observatory/system-collector.ts",
     "#observatory-filesystem-metadata": "./lib/observatory/filesystem-metadata.ts",
     "#observatory-collect-options": "./lib/observatory/collect-options.ts",
+    "#observatory-refresh-state": "./lib/observatory/refresh-state.ts",
+    "#observatory-refresh-files": "./lib/observatory/refresh-files.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
     "#observatory-command-runner": "./scripts/observatory/run-command.ts",
     "#observatory-publisher": "./lib/observatory/publisher.ts"
@@ -24,6 +26,9 @@
     "import:ghost": "node scripts/import-ghost.mjs",
     "observatory:collect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/collect.ts",
     "observatory:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/publish.ts",
+    "observatory:refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/refresh.ts",
+    "observatory:retention": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/retention.ts",
+    "observatory:mark-release": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/mark-release.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",

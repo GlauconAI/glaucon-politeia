@@ -8,7 +8,9 @@ export type ObservatoryPublisherErrorCode =
   | "DIGEST_MISMATCH"
   | "CONFIG_MISSING"
   | "PUBLISH_FAILED"
-  | "DUPLICATE_CONFIRM_FAILED";
+  | "DUPLICATE_CONFIRM_FAILED"
+  | "RETENTION_FAILED"
+  | "RELEASE_MARK_FAILED";
 
 export class ObservatoryPublisherError extends Error {
   readonly code: ObservatoryPublisherErrorCode;
@@ -59,6 +61,28 @@ function endpointFor(supabaseUrl: string): string {
     );
   }
   return `${url.toString().replace(/\/$/u, "")}/rest/v1/observatory_snapshots`;
+}
+
+function rpcEndpointFor(supabaseUrl: string, rpcName: string): string {
+  const snapshotsEndpoint = endpointFor(supabaseUrl);
+  return snapshotsEndpoint.replace(
+    /\/rest\/v1\/observatory_snapshots$/u,
+    `/rest/v1/rpc/${rpcName}`,
+  );
+}
+
+function serviceRoleHeaders(serviceRoleKey: string) {
+  if (!serviceRoleKey) {
+    throw new ObservatoryPublisherError(
+      "CONFIG_MISSING",
+      "SUPABASE_SERVICE_ROLE_KEY is missing.",
+    );
+  }
+  return {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    "Content-Type": "application/json",
+  };
 }
 
 async function request(
@@ -190,4 +214,73 @@ export async function publishObservatorySnapshot(
     );
   }
   return { published: false, idempotent: true };
+}
+
+export async function pruneObservatorySnapshots(
+  keep: number,
+  dependencies: ObservatoryPublisherDependencies,
+): Promise<number> {
+  if (!Number.isSafeInteger(keep) || keep < 1 || keep > 365) {
+    throw new ObservatoryPublisherError(
+      "CONFIG_MISSING",
+      "The Observatory retention count must be an integer from 1 to 365.",
+    );
+  }
+  const response = await request(
+    dependencies.fetch,
+    rpcEndpointFor(dependencies.supabaseUrl, "prune_observatory_snapshots"),
+    {
+      method: "POST",
+      headers: serviceRoleHeaders(dependencies.serviceRoleKey),
+      body: JSON.stringify({ p_keep: keep }),
+    },
+    "PUBLISH_FAILED",
+  );
+  if (!response.ok) {
+    throw new ObservatoryPublisherError(
+      "RETENTION_FAILED",
+      `Supabase rejected Observatory retention with HTTP ${response.status}.`,
+    );
+  }
+  try {
+    const deleted = await response.json();
+    if (!Number.isSafeInteger(deleted) || deleted < 0) throw new TypeError();
+    return deleted;
+  } catch {
+    throw new ObservatoryPublisherError(
+      "RETENTION_FAILED",
+      "Supabase returned an invalid Observatory retention result.",
+    );
+  }
+}
+
+export async function markObservatorySnapshotReleaseEvidence(
+  digest: string,
+  dependencies: ObservatoryPublisherDependencies,
+): Promise<void> {
+  if (!/^[a-f0-9]{64}$/u.test(digest)) {
+    throw new ObservatoryPublisherError(
+      "CONFIG_MISSING",
+      "The release evidence digest must be a lowercase SHA-256 digest.",
+    );
+  }
+  const response = await request(
+    dependencies.fetch,
+    rpcEndpointFor(
+      dependencies.supabaseUrl,
+      "mark_observatory_snapshot_release",
+    ),
+    {
+      method: "POST",
+      headers: serviceRoleHeaders(dependencies.serviceRoleKey),
+      body: JSON.stringify({ p_digest: digest }),
+    },
+    "PUBLISH_FAILED",
+  );
+  if (!response.ok) {
+    throw new ObservatoryPublisherError(
+      "RELEASE_MARK_FAILED",
+      `Supabase rejected the release evidence marker with HTTP ${response.status}.`,
+    );
+  }
 }

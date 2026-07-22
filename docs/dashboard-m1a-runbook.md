@@ -1,8 +1,8 @@
-# Dashboard M1A runbook
+# Dashboard System Observatory runbook
 
 > Dashboard is the current external project name and `/dashboard` is the canonical route. Internal `observatory_*` identifiers and historical release evidence are intentionally preserved for compatibility.
 
-This runbook covers the M1A local vertical slice: validate the migration contract, collect a privacy-reduced snapshot from the canonical registry and read-only OpenClaw CLI, verify it locally, and prepare an explicitly approved staging or production release. Collection is read-only. Migration, publication, deployment, scheduling, Gateway changes, and user-facing Quick Capture checks are separate write gates.
+This runbook retains the M1A release evidence and adds the completed System Observatory workflow: collect a strict v2 asset inventory, publish the last-known-good Snapshot, prune bounded history, and operate automatic refresh without any Gateway lifecycle action. Collection is read-only. Migration, publication, deployment, and scheduling remain distinct release gates.
 
 ## Safety boundary
 
@@ -61,7 +61,7 @@ supabase stop --no-backup
 docker network rm observatory-local-loopback
 ```
 
-### 3. Collect the real local snapshot
+### 3. Collect the real local v2 snapshot
 
 ```bash
 umask 077
@@ -70,12 +70,28 @@ npm run observatory:collect -- "$OBSERVATORY_REGISTRY_PATH" ".observatory/observ
 git check-ignore -v .observatory/observatory-snapshot.json
 ```
 
-The collector invokes only these OpenClaw commands, each with a 10-second timeout:
+For the complete System Observatory inventory, provide the explicit trusted roots. They are used only to derive bounded metadata; snapshot output never contains absolute paths or file content.
+
+```bash
+OBSERVATORY_WORKSPACE_ROOT="/Users/glaucon/.openclaw/workspace"
+OBSERVATORY_VAULT_ROOT="/Users/glaucon/Obsidian/Glaucon's Vault"
+OBSERVATORY_CONFIG_PATH="/Users/glaucon/.openclaw/openclaw.json"
+npm run observatory:collect -- \
+  "$OBSERVATORY_REGISTRY_PATH" \
+  ".observatory/observatory-snapshot.json" \
+  --workspace-root "$OBSERVATORY_WORKSPACE_ROOT" \
+  --vault-root "$OBSERVATORY_VAULT_ROOT" \
+  --config-path "$OBSERVATORY_CONFIG_PATH"
+```
+
+The legacy collector invokes only these OpenClaw commands, each with a 10-second timeout:
 
 ```text
 openclaw agents list --json
 openclaw status --json
 ```
+
+The v2 collector extends that committed read-only allowlist with per-agent skill availability plus global plugin/tool, Cron, Gateway, and runtime summaries. Raw command objects, Cron payloads, delivery destinations, session keys, config values, file contents, and absolute roots are never serialized.
 
 If either input, command, schema validation, digesting, or atomic write fails, stop. Do not publish. The destination is replaced only after a complete validated write; an existing local last-known-good file remains intact on collection/rename failure.
 
@@ -174,6 +190,64 @@ git status --short --branch
 
 If resources are constrained, Vitest can be serialized with `npm test -- --maxWorkers=1 --no-file-parallelism`. A sandbox can prevent Turbopack from creating its local helper process or binding a loopback port; in that case rerun the exact build under approved local verification permissions. Do not change application behavior to bypass a sandbox restriction.
 
+## Automatic refresh, recovery, and retention
+
+### One-shot refresh
+
+The refresh command takes the registry, workspace root, Vault root, and optional config path as positional arguments. It acquires `.observatory/refresh.lock` exclusively, collects into the local last-known-good file, validates and publishes it idempotently, and writes only bounded state to `.observatory/refresh-state.json`. Lock and state files are mode `0600`; raw stderr is discarded.
+
+```bash
+npm run observatory:refresh -- \
+  "$OBSERVATORY_REGISTRY_PATH" \
+  "$OBSERVATORY_WORKSPACE_ROOT" \
+  "$OBSERVATORY_VAULT_ROOT" \
+  "$OBSERVATORY_CONFIG_PATH"
+```
+
+Safe machine-readable results are:
+
+- `OBSERVATORY_REFRESH_OK`: collection and publication succeeded.
+- `OBSERVATORY_REFRESH_SKIPPED_LOCKED`: another run owns the fresh lock; this is a safe overlap skip.
+- `OBSERVATORY_REFRESH_FAILURE`: the third consecutive failure threshold was reached.
+- `OBSERVATORY_REFRESH_STALE`: no success has occurred for 45 minutes; emitted once until recovery.
+- `OBSERVATORY_REFRESH_RECOVERY`: the first success after failure or stale state.
+
+Every failed attempt exits nonzero with the generic `OBSERVATORY_REFRESH_FAILED` message. A failed candidate never replaces the local last-known-good Snapshot and is never published.
+
+### Failure and recovery drill
+
+Use an intentionally missing registry path; do not alter Gateway, Cron, or production credentials. Execute three times to reach the notification threshold, inspect only the safe state counters, then run once with the canonical path and require one recovery code.
+
+```bash
+for attempt in 1 2 3; do
+  npm run observatory:refresh -- \
+    ".observatory/missing-registry.html" \
+    "$OBSERVATORY_WORKSPACE_ROOT" \
+    "$OBSERVATORY_VAULT_ROOT" \
+    "$OBSERVATORY_CONFIG_PATH" || true
+done
+npm run observatory:refresh -- \
+  "$OBSERVATORY_REGISTRY_PATH" \
+  "$OBSERVATORY_WORKSPACE_ROOT" \
+  "$OBSERVATORY_VAULT_ROOT" \
+  "$OBSERVATORY_CONFIG_PATH"
+```
+
+### Release evidence and retention
+
+The migration `20260722000100_observatory_snapshot_retention.sql` preserves table immutability for every direct caller and exposes two `service_role`-only RPCs. Mark release evidence before pruning. Retention keeps the newest 30 non-release Snapshots plus every release-marked Snapshot.
+
+```bash
+npm run observatory:mark-release -- .observatory/observatory-snapshot.json
+npm run observatory:retention -- 30
+```
+
+Both commands require server-only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. They reject remote HTTP, invalid digests, and retention counts outside 1–365. Never put either credential in a Cron payload, command argument, Snapshot, Git file, or client environment.
+
+### Disable and rollback
+
+Disable the OpenClaw refresh Cron first. Do not restart Gateway. The UI remains on the latest successful Snapshot. If v2 rendering is rolled back, v1 history remains readable. The retention migration is additive; leave the column and restricted RPCs in place during an application rollback. Emergency database rollback means revoking both retention RPCs, not deleting Snapshot history.
+
 ## Staging/readiness gate
 
 Staging is an external-write environment, not an extension of local verification. Before any staging action, obtain approval for the exact environment and action.
@@ -196,7 +270,7 @@ The owner must explicitly approve each of these gates, in order:
 3. **First production snapshot publication:** the exact digest and privacy-scan result reviewed; `npm run observatory:publish` authorized against the named production Supabase URL.
 4. **Deployment:** production build evidence reviewed; the exact Vercel deployment authorized; auth callback and admin identity verified.
 5. **First user mutation:** an authorized admin explicitly approves a production Quick Capture smoke test and its retained audit row.
-6. **Automation or runtime changes:** Cron/scheduling and every Gateway start/stop/restart/update are outside M1A and require a separate design and explicit approval.
+6. **Automation:** create or update only the approved isolated 15-minute refresh Cron after all System Observatory production gates pass. The payload may run collect/publish/retention and announce only safe failure/stale/recovery codes. It must never contain secrets or a Gateway start/stop/restart/update action.
 
 ## Last-known-good, stale state, and rollback
 
