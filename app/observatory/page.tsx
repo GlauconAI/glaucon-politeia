@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { redirect } from "next/navigation";
 
 import {
@@ -52,6 +54,7 @@ export default async function ObservatoryPage() {
   }
 
   const overviewState = await loadOverviewState();
+  const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
 
   return (
     <section className="observatory-page">
@@ -73,7 +76,7 @@ export default async function ObservatoryPage() {
       <div className="observatory-layout">
         <ObservatoryOverview state={overviewState} />
         <aside className="observatory-capture" aria-label="Work item capture">
-          <QuickCapture />
+          <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
         </aside>
       </div>
     </section>

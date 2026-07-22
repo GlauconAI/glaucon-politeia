@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef } from "react";
+import { startTransition, useActionState, useState } from "react";
 
 import {
   captureObservatoryWorkItemAction,
@@ -14,6 +14,7 @@ type QuickCaptureAction = (
 
 type QuickCaptureProps = {
   action?: QuickCaptureAction;
+  initialIdempotencyKey: string;
   initialState?: ObservatoryQuickCaptureActionState;
 };
 
@@ -21,23 +22,35 @@ const idleState: ObservatoryQuickCaptureActionState = { status: "idle" };
 
 export function QuickCapture({
   action = captureObservatoryWorkItemAction,
+  initialIdempotencyKey,
   initialState = idleState,
 }: QuickCaptureProps) {
-  const [state, formAction, pending] = useActionState(action, initialState);
-  const formId = useId().replace(/[^A-Za-z0-9._:-]/gu, "") || "form";
-  const formRef = useRef<HTMLFormElement>(null);
-  const idempotencyKeyRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (state.status === "success") {
-      formRef.current?.reset();
-      const nextKey = state.workItemId.replace(/[^A-Za-z0-9._:-]/gu, "");
-      if (idempotencyKeyRef.current) {
-        idempotencyKeyRef.current.value =
-          `observatory-capture-${nextKey || "next"}-next`;
+  const [selectedType, setSelectedType] = useState<
+    "idea" | "feature" | "bug"
+  >("idea");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(
+    initialIdempotencyKey,
+  );
+  const [state, formAction, pending] = useActionState(
+    async (
+      previousState: ObservatoryQuickCaptureActionState,
+      formData: FormData,
+    ) => {
+      const nextState = await action(previousState, formData);
+      if (nextState.status === "success") {
+        setSelectedType("idea");
+        setTitle("");
+        setDescription("");
+        setIdempotencyKey(
+          `observatory-capture-${globalThis.crypto.randomUUID()}`,
+        );
       }
-    }
-  }, [state]);
+      return nextState;
+    },
+    initialState,
+  );
 
   const fieldErrors = state.status === "error" ? state.fieldErrors : undefined;
   const titleError = fieldErrors?.title?.[0];
@@ -59,16 +72,19 @@ export function QuickCapture({
       </p>
 
       <form
-        ref={formRef}
         action={formAction}
         className="observatory-capture-form"
         aria-label="Quick Capture"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          startTransition(() => formAction(formData));
+        }}
       >
         <input
-          ref={idempotencyKeyRef}
           type="hidden"
           name="idempotencyKey"
-          defaultValue={`observatory-capture-${formId}-0`}
+          value={idempotencyKey}
         />
 
         <fieldset
@@ -77,15 +93,16 @@ export function QuickCapture({
         >
           <legend>Type</legend>
           <div>
-            {(["idea", "feature", "bug"] as const).map((type) => (
-              <label key={type}>
+            {(["idea", "feature", "bug"] as const).map((itemType) => (
+              <label key={itemType}>
                 <input
                   type="radio"
                   name="type"
-                  value={type}
-                  defaultChecked={type === "idea"}
+                  value={itemType}
+                  checked={selectedType === itemType}
+                  onChange={() => setSelectedType(itemType)}
                 />
-                <span>{type[0].toUpperCase() + type.slice(1)}</span>
+                <span>{itemType[0].toUpperCase() + itemType.slice(1)}</span>
               </label>
             ))}
           </div>
@@ -107,6 +124,8 @@ export function QuickCapture({
             aria-invalid={titleError ? true : undefined}
             aria-describedby={titleError ? "observatory-title-error" : undefined}
             placeholder="What needs attention?"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
           />
         </label>
         {titleError ? (
@@ -130,6 +149,8 @@ export function QuickCapture({
               descriptionError ? "observatory-description-error" : undefined
             }
             placeholder="Context, desired outcome, or reproduction steps"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
           />
         </label>
         {descriptionError ? (
@@ -142,7 +163,9 @@ export function QuickCapture({
         ) : null}
 
         {idempotencyError ? (
-          <p className="observatory-field-error">{idempotencyError}</p>
+          <p className="observatory-form-error" role="alert">
+            {idempotencyError}
+          </p>
         ) : null}
         {state.status === "error" && state.formError ? (
           <p className="observatory-form-error" role="alert">

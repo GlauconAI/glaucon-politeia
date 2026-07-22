@@ -144,6 +144,31 @@ describe("ObservatoryPage", () => {
     expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
   });
 
+  it("generates a distinct cryptographically random capture key per page request", async () => {
+    const firstRender = render(await ObservatoryPage());
+    const firstKey = (
+      screen.getByRole("form", { name: /quick capture/i }).querySelector(
+        'input[name="idempotencyKey"]',
+      ) as HTMLInputElement
+    ).value;
+    firstRender.unmount();
+
+    render(await ObservatoryPage());
+    const secondKey = (
+      screen.getByRole("form", { name: /quick capture/i }).querySelector(
+        'input[name="idempotencyKey"]',
+      ) as HTMLInputElement
+    ).value;
+
+    expect(firstKey).toMatch(
+      /^observatory-capture-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+    expect(secondKey).toMatch(
+      /^observatory-capture-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+    expect(secondKey).not.toBe(firstKey);
+  });
+
   it("keeps Quick Capture useful when no snapshot exists", async () => {
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(null);
 

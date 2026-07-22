@@ -31,14 +31,18 @@ function ObjectList({ id, title, items, searching }: ObjectListProps) {
         <span>{items.length}</span>
       </div>
       {items.length ? (
-        <div className="observatory-object-list">
+        <ul className="observatory-object-list">
           {items.map((item) => (
-            <article key={item.id}>{item.content}</article>
+            <li key={item.id}>
+              <article>{item.content}</article>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
         <p className="empty-text">
-          {searching ? `No matching ${title.toLowerCase()}.` : `No ${title.toLowerCase()} reported.`}
+          {searching
+            ? `No matching ${title.toLowerCase()}.`
+            : `No ${title.toLowerCase()} reported.`}
         </p>
       )}
     </section>
@@ -49,7 +53,11 @@ function includesQuery(item: SearchItem, query: string) {
   return item.searchText.toLocaleLowerCase().includes(query);
 }
 
-export function ObservatoryOverview({ state }: { state: ObservatoryOverviewState }) {
+export function ObservatoryOverview({
+  state,
+}: {
+  state: ObservatoryOverviewState;
+}) {
   const [query, setQuery] = useState("");
 
   const lists = useMemo(() => {
@@ -74,11 +82,17 @@ export function ObservatoryOverview({ state }: { state: ObservatoryOverviewState
           content: (
             <>
               <div className="observatory-object-title">
-                <h4>{project.title ?? project.name}</h4>
-                <span>{project.status}</span>
+                <h4 className="observatory-wrap">
+                  {project.title ?? project.name}
+                </h4>
+                <span className="observatory-object-badge observatory-wrap">
+                  {project.status}
+                </span>
               </div>
-              <p>{project.description || "No description supplied."}</p>
-              <small>
+              <p className="observatory-wrap">
+                {project.description || "No description supplied."}
+              </p>
+              <small className="observatory-wrap">
                 {group.owner} · {project.project_key}
               </small>
             </>
@@ -100,11 +114,13 @@ export function ObservatoryOverview({ state }: { state: ObservatoryOverviewState
       content: (
         <>
           <div className="observatory-object-title">
-            <h4>{scene.name}</h4>
-            <span>{scene.id}</span>
+            <h4 className="observatory-wrap">{scene.name}</h4>
+            <span className="observatory-object-badge observatory-wrap">
+              {scene.id}
+            </span>
           </div>
-          <p>{scene.description}</p>
-          <small>
+          <p className="observatory-wrap">{scene.description}</p>
+          <small className="observatory-wrap">
             {scene.flow}
             {scene.recommended_stage_owner
               ? ` · ${scene.recommended_stage_owner}`
@@ -126,14 +142,18 @@ export function ObservatoryOverview({ state }: { state: ObservatoryOverviewState
       content: (
         <>
           <div className="observatory-object-title">
-            <h4>
+            <h4 className="observatory-wrap">
               {agent.emoji ? `${agent.emoji} ` : ""}
               {agent.display_name || agent.id}
             </h4>
-            <span>{agent.binding_count} bindings</span>
+            <span className="observatory-object-badge observatory-wrap">
+              {agent.binding_count} bindings
+            </span>
           </div>
-          <p>{agent.model_label || "Model not reported"}</p>
-          <small>
+          <p className="observatory-wrap">
+            {agent.model_label || "Model not reported"}
+          </p>
+          <small className="observatory-wrap">
             {agent.workspace_label}
             {agent.default ? " · default" : ""}
           </small>
@@ -150,16 +170,21 @@ export function ObservatoryOverview({ state }: { state: ObservatoryOverviewState
           flow.tier_label,
           flow.use_when,
           flow.controller,
+          flow.core_output,
           flow.topology,
         ].join(" "),
         content: (
           <>
             <div className="observatory-object-title">
-              <h4>{flow.name}</h4>
-              <span>{flow.id}</span>
+              <h4 className="observatory-wrap">{flow.name}</h4>
+              <span className="observatory-object-badge observatory-wrap">
+                {flow.id}
+              </span>
             </div>
-            <p>{flow.use_when || flow.core_output}</p>
-            <small>
+            <p className="observatory-wrap">
+              {flow.use_when || flow.core_output}
+            </p>
+            <small className="observatory-wrap">
               {flow.topology} · {flow.team_allowed ? "team allowed" : "solo"}
             </small>
           </>

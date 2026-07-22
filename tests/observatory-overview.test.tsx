@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -231,6 +234,26 @@ describe("ObservatoryOverview", () => {
     );
   });
 
+  it("makes unknown source freshness visually and semantically explicit", () => {
+    const unknownSnapshot: ObservatoryCollectionEnvelope = {
+      ...snapshot,
+      registry: {
+        ...snapshot.registry,
+        source: { ...snapshot.registry.source, freshness: "unknown" },
+      },
+      summary: { ...snapshot.summary, freshness: "unknown" },
+    };
+
+    render(<ObservatoryOverview state={readyState(unknownSnapshot)} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /freshness is unknown/i,
+    );
+    expect(
+      screen.getByRole("region", { name: /snapshot source/i }),
+    ).toHaveAttribute("data-status", "unknown");
+  });
+
   it.each([
     [
       { status: "empty" } as const,
@@ -270,5 +293,73 @@ describe("ObservatoryOverview", () => {
     expect(screen.queryByText("Fast Flow")).not.toBeInTheDocument();
     expect(screen.queryByText("Socrates", { selector: "h4" })).not.toBeInTheDocument();
     expect(screen.getAllByText(/no matching/i)).toHaveLength(3);
+  });
+
+  it("includes flow core output in object search", () => {
+    render(<ObservatoryOverview state={readyState()} />);
+
+    fireEvent.change(
+      screen.getByRole("searchbox", {
+        name: /search projects, scenes, agents, and flows/i,
+      }),
+      { target: { value: "One artifact" } },
+    );
+
+    expect(screen.getByText("Fast Flow")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Build Flow", { selector: "h4" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses semantic document-flow lists without clipped nested scrolling", () => {
+    render(<ObservatoryOverview state={readyState()} />);
+
+    const projects = screen.getByRole("region", { name: "Projects" });
+    expect(within(projects).getByRole("list").tagName).toBe("UL");
+    expect(within(projects).getAllByRole("listitem")).toHaveLength(2);
+
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    expect(css).not.toMatch(
+      /\.observatory-object-list\s*\{[^}]*(?:max-height|overflow\s*:)/u,
+    );
+  });
+
+  it("marks schema-valid long object text and badges for responsive wrapping", () => {
+    const longTitle = "t".repeat(4096);
+    const longStatus = "s".repeat(4096);
+    const longSnapshot: ObservatoryCollectionEnvelope = {
+      ...snapshot,
+      registry: {
+        ...snapshot.registry,
+        project_groups: snapshot.registry.project_groups.map((group, index) =>
+          index === 0
+            ? {
+                ...group,
+                projects: group.projects.map((project) => ({
+                  ...project,
+                  title: longTitle,
+                  status: longStatus,
+                })),
+              }
+            : group,
+        ),
+      },
+    };
+
+    render(<ObservatoryOverview state={readyState(longSnapshot)} />);
+
+    expect(screen.getByText(longTitle)).toHaveClass("observatory-wrap");
+    expect(screen.getByText(longStatus)).toHaveClass(
+      "observatory-wrap",
+      "observatory-object-badge",
+    );
+
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    expect(css).toMatch(
+      /\.observatory-wrap\s*\{[^}]*overflow-wrap:\s*anywhere/u,
+    );
+    expect(css).toMatch(
+      /\.observatory-object-badge\s*\{[^}]*max-width:/u,
+    );
   });
 });

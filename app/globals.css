@@ -322,10 +322,11 @@
 
 .observatory-object-list {
   display: flex;
-  max-height: 360px;
   flex-direction: column;
   gap: 8px;
-  overflow: auto;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 .observatory-object-list article {
@@ -333,14 +334,26 @@
   padding: 10px 2px 2px;
 }
 
-.observatory-object-title h4 {
+.observatory-object-title {
   min-width: 0;
-  font-size: 14px;
-  overflow-wrap: anywhere;
+  align-items: flex-start;
 }
 
-.observatory-object-title span {
+.observatory-object-title h4 {
+  font-size: 14px;
+}
+
+.observatory-wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.observatory-object-badge {
+  max-width: 45%;
   flex: 0 0 auto;
+  white-space: normal;
+  text-align: right;
 }
 
 .observatory-object-list p {
@@ -472,10 +485,6 @@
 
   .observatory-provenance-wide {
     grid-column: auto;
-  }
-
-  .observatory-object-list {
-    max-height: none;
   }
 
   .observatory-keyboard-label {
