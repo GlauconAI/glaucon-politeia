@@ -89,7 +89,7 @@ describe("captureObservatoryWorkItemAction", () => {
         captureObservatoryWorkItemAction(initialState, validFormData()),
       ).resolves.toEqual({
         status: "error",
-        formError: "Observatory is temporarily unavailable. Try again.",
+        formError: "Dashboard is temporarily unavailable. Try again.",
       });
       expect(mocks.createQuickCapture).not.toHaveBeenCalled();
       expect(mocks.revalidatePath).not.toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe("captureObservatoryWorkItemAction", () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("creates a normalized Quick Capture and revalidates Observatory", async () => {
+  it("creates a normalized Quick Capture and revalidates Dashboard", async () => {
     const result = await captureObservatoryWorkItemAction(
       initialState,
       validFormData(),
@@ -133,7 +133,7 @@ describe("captureObservatoryWorkItemAction", () => {
       state: "inbox",
       idempotencyKey: "capture-20260721-1",
     });
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/observatory");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
     expect(result).toEqual({ status: "success", workItemId: "item-1" });
   });
 
@@ -158,7 +158,7 @@ describe("captureObservatoryWorkItemAction", () => {
       captureObservatoryWorkItemAction(initialState, validFormData()),
     ).resolves.toEqual({ status: "success", workItemId: "item-1" });
     expect(mocks.createQuickCapture).toHaveBeenCalledTimes(1);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/observatory");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("returns a stable form error for duplicate idempotency conflicts", async () => {

@@ -31,8 +31,8 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
         <div className="header-actions">
           {canPublish ? (
             <>
-              <Link href="/observatory" className="operator-link">
-                Observatory
+              <Link href="/dashboard" className="operator-link">
+                Dashboard
               </Link>
               <Link href="/editor" className="write-link">
                 Publish

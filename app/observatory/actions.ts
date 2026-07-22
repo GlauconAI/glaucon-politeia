@@ -50,7 +50,7 @@ function formError(error: unknown): string {
 function operationalError(): ObservatoryQuickCaptureActionState {
   return {
     status: "error",
-    formError: "Observatory is temporarily unavailable. Try again.",
+    formError: "Dashboard is temporarily unavailable. Try again.",
   };
 }
 
@@ -111,7 +111,7 @@ export async function captureObservatoryWorkItemAction(
   }
 
   try {
-    revalidatePath("/observatory");
+    revalidatePath("/dashboard");
   } catch {
     // The RPC already committed. Cache invalidation is best-effort here.
   }
