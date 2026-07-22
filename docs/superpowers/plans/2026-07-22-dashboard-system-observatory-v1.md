@@ -176,4 +176,3 @@ export const ObservatoryAssetSchema = z.strictObject({
 - Type consistency: all new components consume the v2 `assets`, `relationships`, and `source_health` fields defined in Task 4; v1 remains supported.
 - Dependency check: no new npm dependency is required.
 - Scope check: Delivery Governance and Work Tracker expansion remain outside this plan.
-

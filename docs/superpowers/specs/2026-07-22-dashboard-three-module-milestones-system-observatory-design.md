@@ -1,7 +1,7 @@
 # Dashboard Three-Module Milestones And System Observatory Design
 
-**Status:** Approved for implementation by Glaucon on 2026-07-22  
-**Scope:** Dashboard planning model plus the complete System Observatory module  
+**Status:** Approved for implementation by Glaucon on 2026-07-22
+**Scope:** Dashboard planning model plus the complete System Observatory module
 **Out of scope:** Delivery Governance product views, Work Tracker workflow expansion, automatic agent claiming, and any Dashboard control that mutates OpenClaw or restarts Gateway
 
 ## 1. Decision
@@ -142,4 +142,3 @@ M1 requires:
 - data rollback: page falls back to the latest valid v1 or v2 Snapshot; no historical row is overwritten.
 - automation rollback: disable/remove the Dashboard refresh Cron; no Gateway restart is needed.
 - collector rollback: run the previous M1A collector/publisher commands.
-
