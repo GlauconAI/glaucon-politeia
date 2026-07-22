@@ -1,4 +1,6 @@
-# OpenClaw Observatory M1A runbook
+# Dashboard M1A runbook
+
+> Dashboard is the current external project name and `/dashboard` is the canonical route. Internal `observatory_*` identifiers and historical release evidence are intentionally preserved for compatibility.
 
 This runbook covers the M1A local vertical slice: validate the migration contract, collect a privacy-reduced snapshot from the canonical registry and read-only OpenClaw CLI, verify it locally, and prepare an explicitly approved staging or production release. Collection is read-only. Migration, publication, deployment, scheduling, Gateway changes, and user-facing Quick Capture checks are separate write gates.
 
@@ -177,7 +179,7 @@ If resources are constrained, Vitest can be serialized with `npm test -- --maxWo
 Staging is an external-write environment, not an extension of local verification. Before any staging action, obtain approval for the exact environment and action.
 
 1. Use an isolated staging Supabase project and staging deployment. Confirm no production URL, database URL, or service-role key is loaded.
-2. Review and apply only `20260721000100_openclaw_observatory_m1a.sql` after its prerequisite migrations. Confirm all three Observatory tables have RLS enabled, snapshots are immutable, work-item events are append-only, and only admins can read through authenticated policies.
+2. Review and apply only `20260721000100_openclaw_observatory_m1a.sql` after its prerequisite migrations. Confirm all three Dashboard tables with legacy `observatory_*` identifiers have RLS enabled, snapshots are immutable, work-item events are append-only, and only admins can read through authenticated policies.
 3. Configure the application with staging `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and the repository's existing server-only Supabase credential. Keep database connection strings out of Vercel.
 4. Recollect and pass the local schema/privacy gate. With separate publication approval, provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` only to the server-side publisher process, then run `npm run observatory:publish -- .observatory/observatory-snapshot.json`.
 5. Verify publication idempotency by digest, latest-successful selection, admin rendering, anonymous and non-admin redirect, invalid-payload error state, and responsive/keyboard behavior.
@@ -200,11 +202,11 @@ The owner must explicitly approve each of these gates, in order:
 
 - **Collection failure:** no failed artifact is publishable. Atomic local writes preserve the previous destination on failure.
 - **Publication failure:** the publisher validates the strict schema and both digests before network I/O. A rejected request inserts nothing. A `409` is success only after the digest is confirmed, so the database keeps the existing row.
-- **Last-known-good read:** `/observatory` selects the newest row whose status is `success`. If collection or publication fails, the previously published successful row remains available.
+- **Last-known-good read:** `/dashboard` selects the newest row whose status is `success`; `/observatory` is only a legacy redirect. If collection or publication fails, the previously published successful row remains available.
 - **Stale/unknown display:** the UI visibly warns when a validated payload says `stale` or `unknown`; invalid payloads are not rendered. M1A does not derive freshness from wall-clock age, and the current successful collector labels its source `fresh`. Therefore an aging last-known-good snapshot can still carry `fresh`; operators must compare `generated_at` with an owner-approved maximum age before relying on it. Automated age-based staleness is a post-M1A concern.
 - **Application rollback:** redeploy the previously approved application build. Snapshot and event data remain untouched.
 - **Bad but schema-valid latest snapshot:** snapshots are immutable. Do not update/delete the row. Correct the source or collector, repeat all local gates, and—with publication approval—publish a newer corrected snapshot.
-- **Migration rollback:** do not drop Observatory tables or disable protections during an incident. Roll back the application first. Any schema reversal must be a separately reviewed forward migration with backup and explicit production approval.
+- **Migration rollback:** do not drop Dashboard tables with legacy `observatory_*` identifiers or disable protections during an incident. Roll back the application first. Any schema reversal must be a separately reviewed forward migration with backup and explicit production approval.
 
 ## Credential handling
 
