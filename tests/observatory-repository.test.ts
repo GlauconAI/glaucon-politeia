@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
@@ -13,6 +16,17 @@ const adminProfile = {
   display_name: "Glaucon",
   is_admin: true,
 };
+
+describe("Observatory server-only boundary", () => {
+  it.each([
+    "lib/observatory/admin-auth.ts",
+    "lib/observatory/repository.ts",
+  ])("marks %s as server-only", (path) => {
+    const source = readFileSync(join(process.cwd(), path), "utf8");
+
+    expect(source).toMatch(/^import "server-only";/u);
+  });
+});
 
 function repositoryClient(input?: {
   snapshotData?: unknown;
