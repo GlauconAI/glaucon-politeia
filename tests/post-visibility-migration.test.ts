@@ -63,13 +63,18 @@ describe("post visibility and html migration", () => {
     expect(sql).toContain("alter column visibility set default 'private'");
   });
 
-  it("keeps public email signup disabled in local and pushed Supabase auth config", () => {
+  it("keeps public signup closed while enabling existing email-password login", () => {
     const config = readFileSync(
       join(process.cwd(), "supabase/config.toml"),
       "utf8",
     ).toLowerCase();
 
-    expect(config).toContain("enable_signup = false");
+    expect(config).toMatch(
+      /\[auth\][\s\S]*?enable_signup\s*=\s*false[\s\S]*?\[auth\.email\]/u,
+    );
+    expect(config).toMatch(
+      /\[auth\.email\][\s\S]*?enable_signup\s*=\s*true/u,
+    );
   });
 
   it("restricts post and post tag mutations to admin users", () => {
