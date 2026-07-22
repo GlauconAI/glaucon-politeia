@@ -1,7 +1,7 @@
 import type {
   ObservatorySourceDomain,
   ObservatorySourceHealth,
-} from "@/lib/observatory/asset-schema";
+} from "#observatory-asset-schema";
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1_000;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1_000;

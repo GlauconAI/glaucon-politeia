@@ -4,13 +4,22 @@ import { basename, dirname, join } from "node:path";
 import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION,
   OBSERVATORY_COLLECTOR_VERSION,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
+  OBSERVATORY_COLLECTOR_VERSION_V2,
   ObservatoryAgentSchema,
   ObservatoryCollectionEnvelopeSchema,
+  ObservatoryCollectionEnvelopeV1Schema,
+  ObservatoryCollectionEnvelopeV2Schema,
   ObservatoryRuntimeSchema,
   type ObservatoryAgent,
   type ObservatoryCollectionEnvelope,
+  type ObservatoryCollectionEnvelopeV2,
   type ObservatoryRuntime,
 } from "#observatory-collection-schema";
+import {
+  ObservatoryAssetInventorySchema,
+  type ObservatoryAssetInventory,
+} from "#observatory-asset-schema";
 import { parseOrchestrationRegistryHtml } from "#observatory-registry";
 
 export const OBSERVATORY_CLI_STDOUT_MAX_BYTES = 5 * 1024 * 1024;
@@ -406,6 +415,37 @@ export function computeObservatorySnapshotDigest(
     .digest("hex");
 }
 
+export function upgradeObservatorySnapshotToV2(
+  coreSnapshotInput: unknown,
+  inventoryInput: unknown,
+): ObservatoryCollectionEnvelopeV2 {
+  const coreSnapshot = ObservatoryCollectionEnvelopeV1Schema.parse(
+    coreSnapshotInput,
+  );
+  const inventory = ObservatoryAssetInventorySchema.parse(inventoryInput);
+  const placeholderDigest = "0".repeat(64);
+  const draft = ObservatoryCollectionEnvelopeV2Schema.parse({
+    ...coreSnapshot,
+    schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
+    collector_version: OBSERVATORY_COLLECTOR_VERSION_V2,
+    source_digest: placeholderDigest,
+    registry: {
+      ...coreSnapshot.registry,
+      source: { ...coreSnapshot.registry.source, digest: placeholderDigest },
+    },
+    ...inventory,
+  });
+  const digest = computeObservatorySnapshotDigest(draft);
+  return ObservatoryCollectionEnvelopeV2Schema.parse({
+    ...draft,
+    source_digest: digest,
+    registry: {
+      ...draft.registry,
+      source: { ...draft.registry.source, digest },
+    },
+  });
+}
+
 export async function collectObservatorySnapshot(
   input: { registryPath: string },
   dependencies: CollectorDependencies,
@@ -661,6 +701,22 @@ export async function collectAndWriteObservatorySnapshot(
   dependencies: CollectAndWriteDependencies,
 ): Promise<ObservatoryCollectionEnvelope> {
   const snapshot = await collectObservatorySnapshot(input, dependencies);
+  await writeObservatorySnapshotWithSourceProtection(
+    snapshot,
+    input,
+    dependencies,
+  );
+  return snapshot;
+}
+
+export async function writeObservatorySnapshotWithSourceProtection(
+  snapshot: ObservatoryCollectionEnvelope,
+  input: { registryPath: string; destinationPath: string },
+  dependencies: Pick<
+    CollectAndWriteDependencies,
+    "files" | "identities" | "createTempPath"
+  >,
+): Promise<void> {
   const pinnedDestination = await resolveSafeDestinationPath(
     input.registryPath,
     input.destinationPath,
@@ -685,5 +741,4 @@ export async function collectAndWriteObservatorySnapshot(
       }
     },
   );
-  return snapshot;
 }

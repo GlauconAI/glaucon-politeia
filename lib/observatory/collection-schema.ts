@@ -1,9 +1,14 @@
 import { z } from "zod";
 
+import { ObservatoryAssetInventorySchema } from "#observatory-asset-schema";
 import { ObservatoryRegistrySnapshotSchema } from "#observatory-schema";
 
-export const OBSERVATORY_COLLECTION_SCHEMA_VERSION = "1.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1 = "1.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2 = "2.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION =
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
+export const OBSERVATORY_COLLECTOR_VERSION_V2 = "2.0.0" as const;
 export const OBSERVATORY_AGENT_MAX_COUNT = 256;
 export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
@@ -53,19 +58,25 @@ export const ObservatoryCollectionSummarySchema = z.strictObject({
   task_totals: ObservatoryRuntimeTaskTotalsSchema,
 });
 
-export const ObservatoryCollectionEnvelopeSchema = z
-  .strictObject({
-    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION),
+const CollectionEnvelopeBaseShape = {
     status: z.literal("success"),
     generated_at: IsoTimestampSchema,
     source_digest: Sha256Schema,
-    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION),
     registry: ObservatoryRegistrySnapshotSchema,
     agents: z.array(ObservatoryAgentSchema).max(OBSERVATORY_AGENT_MAX_COUNT),
     runtime: ObservatoryRuntimeSchema,
     summary: ObservatoryCollectionSummarySchema,
-  })
-  .superRefine((snapshot, context) => {
+};
+
+function validateSummary(
+  snapshot: {
+    registry: z.infer<typeof ObservatoryRegistrySnapshotSchema>;
+    agents: z.infer<typeof ObservatoryAgentSchema>[];
+    runtime: z.infer<typeof ObservatoryRuntimeSchema>;
+    summary: z.infer<typeof ObservatoryCollectionSummarySchema>;
+  },
+  context: z.core.$RefinementCtx,
+) {
     const expected = {
       freshness: snapshot.registry.source.freshness,
       ...snapshot.registry.summary,
@@ -88,10 +99,55 @@ export const ObservatoryCollectionEnvelopeSchema = z
         });
       }
     }
+}
+
+export const ObservatoryCollectionEnvelopeV1Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION),
+    ...CollectionEnvelopeBaseShape,
+  })
+  .superRefine(validateSummary);
+
+export const ObservatoryCollectionEnvelopeV2Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION_V2),
+    ...CollectionEnvelopeBaseShape,
+    ...ObservatoryAssetInventorySchema.shape,
+  })
+  .superRefine((snapshot, context) => {
+    validateSummary(snapshot, context);
+    const inventoryResult = ObservatoryAssetInventorySchema.safeParse({
+      assets: snapshot.assets,
+      core_endpoint_ids: snapshot.core_endpoint_ids,
+      relationships: snapshot.relationships,
+      source_health: snapshot.source_health,
+    });
+    if (!inventoryResult.success) {
+      inventoryResult.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        }),
+      );
+    }
   });
+
+export const ObservatoryCollectionEnvelopeSchema = z.union([
+  ObservatoryCollectionEnvelopeV1Schema,
+  ObservatoryCollectionEnvelopeV2Schema,
+]);
 
 export type ObservatoryCollectionEnvelope = z.infer<
   typeof ObservatoryCollectionEnvelopeSchema
+>;
+export type ObservatoryCollectionEnvelopeV1 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV1Schema
+>;
+export type ObservatoryCollectionEnvelopeV2 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV2Schema
 >;
 export type ObservatoryAgent = z.infer<typeof ObservatoryAgentSchema>;
 export type ObservatoryRuntime = z.infer<typeof ObservatoryRuntimeSchema>;

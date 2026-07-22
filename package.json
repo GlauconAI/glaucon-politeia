@@ -6,6 +6,12 @@
     "#observatory-schema": "./lib/observatory/schema.ts",
     "#observatory-registry": "./lib/observatory/registry.ts",
     "#observatory-collection-schema": "./lib/observatory/collection-schema.ts",
+    "#observatory-asset-schema": "./lib/observatory/asset-schema.ts",
+    "#observatory-freshness": "./lib/observatory/freshness.ts",
+    "#observatory-system-assets": "./lib/observatory/system-assets.ts",
+    "#observatory-system-collector": "./lib/observatory/system-collector.ts",
+    "#observatory-filesystem-metadata": "./lib/observatory/filesystem-metadata.ts",
+    "#observatory-collect-options": "./lib/observatory/collect-options.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
     "#observatory-command-runner": "./scripts/observatory/run-command.ts",
     "#observatory-publisher": "./lib/observatory/publisher.ts"

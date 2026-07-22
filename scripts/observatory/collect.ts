@@ -13,10 +13,16 @@ import {
   OBSERVATORY_REGISTRY_HTML_MAX_BYTES,
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
+  collectObservatorySnapshot,
+  upgradeObservatorySnapshotToV2,
+  writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
 } from "#observatory-collector";
 import { runCommand } from "#observatory-command-runner";
+import { parseObservatoryCollectOptions } from "#observatory-collect-options";
+import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
+import { collectSystemInventory } from "#observatory-system-collector";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {
@@ -111,35 +117,63 @@ const identities: FileIdentityAdapter = {
 };
 
 async function main(): Promise<void> {
-  const registryArgument = process.argv[2];
-  if (!registryArgument) {
-    throw new ObservatoryCollectorError(
-      "REGISTRY_READ_FAILED",
-      "Usage: npm run observatory:collect -- <canonical-registry-path> [output-path]",
-    );
-  }
+  const options = parseObservatoryCollectOptions(process.argv.slice(2));
   const destinationPath = resolve(
-    process.argv[3] ?? ".observatory/observatory-snapshot.json",
+    options.outputPath ?? ".observatory/observatory-snapshot.json",
   );
   await mkdir(dirname(destinationPath), { recursive: true });
-  const snapshot = await collectAndWriteObservatorySnapshot(
-    {
-      registryPath: resolve(registryArgument),
-      destinationPath,
-    },
-    {
-      runCommand,
-      readTextFile: readTextFileBounded,
-      now: () => new Date(),
-      files,
-      identities,
-      createTempPath: (destination) =>
-        join(
-          dirname(destination),
-          `.${basename(destination)}.${process.pid}.${randomUUID()}.tmp`,
-        ),
-    },
-  );
+  const commonDependencies = {
+    runCommand,
+    readTextFile: readTextFileBounded,
+    now: () => new Date(),
+  };
+  const writeDependencies = {
+    ...commonDependencies,
+    files,
+    identities,
+    createTempPath: (destination: string) =>
+      join(
+        dirname(destination),
+        `.${basename(destination)}.${process.pid}.${randomUUID()}.tmp`,
+      ),
+  };
+  const registryPath = resolve(options.registryPath);
+  let snapshot;
+  if (options.systemRoots) {
+    const coreSnapshot = await collectObservatorySnapshot(
+      { registryPath },
+      commonDependencies,
+    );
+    snapshot = upgradeObservatorySnapshotToV2(
+      coreSnapshot,
+      await collectSystemInventory(
+          {
+            agents: coreSnapshot.agents,
+            metadata: await collectSystemMetadataFromRoots({
+              workspaceRoot: resolve(options.systemRoots.workspaceRoot),
+              vaultRoot: resolve(options.systemRoots.vaultRoot),
+              ...(options.systemRoots.configPath
+                ? { configPath: resolve(options.systemRoots.configPath) }
+                : {}),
+            }),
+          },
+          { runCommand, now: () => new Date() },
+      ),
+    );
+    await writeObservatorySnapshotWithSourceProtection(
+      snapshot,
+      { registryPath, destinationPath },
+      writeDependencies,
+    );
+  } else {
+    snapshot = await collectAndWriteObservatorySnapshot(
+      {
+        registryPath,
+        destinationPath,
+      },
+      writeDependencies,
+    );
+  }
   process.stdout.write(
     `Collected Observatory snapshot ${snapshot.source_digest}.\n`,
   );

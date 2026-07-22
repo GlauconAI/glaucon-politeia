@@ -3,7 +3,7 @@ import {
   ObservatoryRelationshipSchema,
   type ObservatoryAsset,
   type ObservatoryRelationship,
-} from "@/lib/observatory/asset-schema";
+} from "#observatory-asset-schema";
 
 type UnknownRecord = Record<string, unknown>;
 
