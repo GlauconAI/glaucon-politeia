@@ -8,6 +8,7 @@ describe("QuickCapture", () => {
     render(<QuickCapture />);
 
     const form = screen.getByRole("form", { name: /quick capture/i });
+    expect(screen.getByText("Tab ↹ · Enter ↵")).toBeVisible();
     expect(within(form).getByRole("radio", { name: "Idea" })).toBeChecked();
     expect(within(form).getByRole("radio", { name: "Feature" })).toBeEnabled();
     expect(within(form).getByRole("radio", { name: "Bug" })).toBeEnabled();
