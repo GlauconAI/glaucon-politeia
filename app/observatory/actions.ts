@@ -47,12 +47,24 @@ function formError(error: unknown): string {
   }
 }
 
+function operationalError(): ObservatoryQuickCaptureActionState {
+  return {
+    status: "error",
+    formError: "Observatory is temporarily unavailable. Try again.",
+  };
+}
+
 export async function captureObservatoryWorkItemAction(
   previousState: ObservatoryQuickCaptureActionState,
   formData: FormData,
 ): Promise<ObservatoryQuickCaptureActionState> {
   void previousState;
-  const currentAdmin = await getCurrentObservatoryAdmin();
+  let currentAdmin;
+  try {
+    currentAdmin = await getCurrentObservatoryAdmin();
+  } catch {
+    return operationalError();
+  }
 
   if (!currentAdmin) {
     return {
@@ -81,15 +93,28 @@ export async function captureObservatoryWorkItemAction(
     };
   }
 
+  let repository;
   try {
     const supabase = await createSupabaseServerClient();
-    const repository = createObservatoryRepository(
+    repository = createObservatoryRepository(
       supabase as unknown as ObservatoryRepositoryClient,
     );
-    const workItem = await repository.createQuickCapture(validation.data);
-    revalidatePath("/observatory");
-    return { status: "success", workItemId: workItem.id };
+  } catch {
+    return operationalError();
+  }
+
+  let workItem;
+  try {
+    workItem = await repository.createQuickCapture(validation.data);
   } catch (error) {
     return { status: "error", formError: formError(error) };
   }
+
+  try {
+    revalidatePath("/observatory");
+  } catch {
+    // The RPC already committed. Cache invalidation is best-effort here.
+  }
+
+  return { status: "success", workItemId: workItem.id };
 }

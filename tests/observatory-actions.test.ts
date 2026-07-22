@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   currentAdmin: { user_id: "admin-1" } as { user_id: string } | null,
+  authError: null as Error | null,
+  serverClientError: null as Error | null,
   createQuickCapture: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -9,11 +11,17 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
 vi.mock("@/lib/observatory/admin-auth", () => ({
-  getCurrentObservatoryAdmin: async () => mocks.currentAdmin,
+  getCurrentObservatoryAdmin: async () => {
+    if (mocks.authError) throw mocks.authError;
+    return mocks.currentAdmin;
+  },
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: async () => ({ from: vi.fn(), rpc: vi.fn() }),
+  createSupabaseServerClient: async () => {
+    if (mocks.serverClientError) throw mocks.serverClientError;
+    return { from: vi.fn(), rpc: vi.fn() };
+  },
 }));
 
 vi.mock("@/lib/observatory/repository", async (importOriginal) => {
@@ -48,6 +56,8 @@ function validFormData() {
 describe("captureObservatoryWorkItemAction", () => {
   beforeEach(() => {
     mocks.currentAdmin = { user_id: "admin-1" };
+    mocks.authError = null;
+    mocks.serverClientError = null;
     mocks.createQuickCapture.mockReset();
     mocks.createQuickCapture.mockResolvedValue({ id: "item-1" });
     mocks.revalidatePath.mockReset();
@@ -65,6 +75,26 @@ describe("captureObservatoryWorkItemAction", () => {
     expect(mocks.createQuickCapture).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
+
+  it.each(["authorization", "server client"] as const)(
+    "returns a structured operational error when the %s dependency fails",
+    async (dependency) => {
+      if (dependency === "authorization") {
+        mocks.authError = new Error("private auth outage detail");
+      } else {
+        mocks.serverClientError = new Error("private client outage detail");
+      }
+
+      await expect(
+        captureObservatoryWorkItemAction(initialState, validFormData()),
+      ).resolves.toEqual({
+        status: "error",
+        formError: "Observatory is temporarily unavailable. Try again.",
+      });
+      expect(mocks.createQuickCapture).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns structured field errors for untrusted form data", async () => {
     const formData = validFormData();
@@ -117,6 +147,18 @@ describe("captureObservatoryWorkItemAction", () => {
     expect(mocks.createQuickCapture).toHaveBeenCalledWith(
       expect.objectContaining({ description: "" }),
     );
+  });
+
+  it("keeps a committed capture successful when revalidation fails", async () => {
+    mocks.revalidatePath.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, validFormData()),
+    ).resolves.toEqual({ status: "success", workItemId: "item-1" });
+    expect(mocks.createQuickCapture).toHaveBeenCalledTimes(1);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/observatory");
   });
 
   it("returns a stable form error for duplicate idempotency conflicts", async () => {

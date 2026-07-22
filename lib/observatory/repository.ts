@@ -43,21 +43,22 @@ interface ObservatoryDatabaseError {
   message: string;
 }
 
+interface ObservatoryOrderedSnapshotQuery {
+  order(
+    column: "generated_at" | "created_at",
+    options: { ascending: false },
+  ): ObservatoryOrderedSnapshotQuery;
+  limit(count: 1): {
+    maybeSingle(): PromiseLike<{
+      data: ObservatorySnapshotRow | null;
+      error: ObservatoryDatabaseError | null;
+    }>;
+  };
+}
+
 interface ObservatorySnapshotQuery {
   select(columns: string): {
-    eq(column: "status", value: "success"): {
-      order(
-        column: "generated_at",
-        options: { ascending: false },
-      ): {
-        limit(count: 1): {
-          maybeSingle(): PromiseLike<{
-            data: ObservatorySnapshotRow | null;
-            error: ObservatoryDatabaseError | null;
-          }>;
-        };
-      };
-    };
+    eq(column: "status", value: "success"): ObservatoryOrderedSnapshotQuery;
   };
 }
 
@@ -151,6 +152,7 @@ export function createObservatoryRepository(
         )
         .eq("status", "success")
         .order("generated_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 

@@ -11,10 +11,25 @@ export interface ObservatoryAdminProfile {
   is_admin: true;
 }
 
+interface ObservatoryAuthDependencyFailure {
+  code?: string;
+  message: string;
+}
+
+export class ObservatoryAdminAuthError extends Error {
+  readonly code = "AUTH_DEPENDENCY_FAILED" as const;
+
+  constructor() {
+    super("Observatory authorization is temporarily unavailable.");
+    this.name = "ObservatoryAdminAuthError";
+  }
+}
+
 interface ObservatoryServerAuthClient {
   auth: {
     getUser(): PromiseLike<{
       data: { user: { id: string } | null };
+      error: ObservatoryAuthDependencyFailure | null;
     }>;
   };
 }
@@ -30,6 +45,7 @@ interface ObservatoryAdminProfileClient {
               })
             | { is_admin: false }
             | null;
+          error: ObservatoryAuthDependencyFailure | null;
         }>;
       };
     };
@@ -57,19 +73,33 @@ export async function getCurrentObservatoryAdmin(
     return null;
   }
 
-  const supabase = await dependencies.createServerClient();
-  const { data } = await supabase.auth.getUser();
+  try {
+    const supabase = await dependencies.createServerClient();
+    const { data, error: authError } = await supabase.auth.getUser();
 
-  if (!data.user) {
-    return null;
+    if (authError) {
+      throw new ObservatoryAdminAuthError();
+    }
+    if (!data.user) {
+      return null;
+    }
+
+    const admin = dependencies.createAdminClient();
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("user_id, username, display_name, is_admin")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new ObservatoryAdminAuthError();
+    }
+
+    return profile?.is_admin ? (profile as ObservatoryAdminProfile) : null;
+  } catch (error) {
+    if (error instanceof ObservatoryAdminAuthError) {
+      throw error;
+    }
+    throw new ObservatoryAdminAuthError();
   }
-
-  const admin = dependencies.createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("user_id, username, display_name, is_admin")
-    .eq("user_id", data.user.id)
-    .maybeSingle();
-
-  return profile?.is_admin ? (profile as ObservatoryAdminProfile) : null;
 }

@@ -26,6 +26,16 @@ describe("Observatory server-only boundary", () => {
 
     expect(source).toMatch(/^import "server-only";/u);
   });
+
+  it("uses a repository-owned server-only shim in Vitest", () => {
+    const config = readFileSync(
+      join(process.cwd(), "vitest.config.ts"),
+      "utf8",
+    );
+
+    expect(config).toContain('"tests/server-only.ts"');
+    expect(config).not.toContain("next/dist/compiled/server-only");
+  });
 });
 
 function repositoryClient(input?: {
@@ -39,7 +49,15 @@ function repositoryClient(input?: {
     error: input?.snapshotError ?? null,
   });
   const limit = vi.fn(() => ({ maybeSingle }));
-  const order = vi.fn(() => ({ limit }));
+  const orderedQuery: {
+    order: ReturnType<typeof vi.fn>;
+    limit: typeof limit;
+  } = {
+    order: vi.fn(),
+    limit,
+  };
+  orderedQuery.order.mockImplementation(() => orderedQuery);
+  const order = orderedQuery.order;
   const eq = vi.fn(() => ({ order }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
@@ -83,7 +101,9 @@ describe("getCurrentObservatoryAdmin", () => {
       getCurrentObservatoryAdmin({
         isConfigured: () => true,
         createServerClient: async () => ({
-          auth: { getUser: async () => ({ data: { user: null } }) },
+          auth: {
+            getUser: async () => ({ data: { user: null }, error: null }),
+          },
         }),
         createAdminClient,
       }),
@@ -93,14 +113,19 @@ describe("getCurrentObservatoryAdmin", () => {
 
   it("returns only a 402V administrator profile", async () => {
     let profile: typeof adminProfile | { is_admin: false } | null = adminProfile;
-    const maybeSingle = vi.fn(async () => ({ data: profile }));
+    const maybeSingle = vi.fn(async () => ({ data: profile, error: null }));
     const eq = vi.fn(() => ({ maybeSingle }));
     const select = vi.fn(() => ({ eq }));
 
     const dependencies = {
       isConfigured: () => true,
       createServerClient: async () => ({
-        auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) },
+        auth: {
+          getUser: async () => ({
+            data: { user: { id: "admin-1" } },
+            error: null,
+          }),
+        },
       }),
       createAdminClient: () => ({ from: () => ({ select }) }),
     };
@@ -115,6 +140,63 @@ describe("getCurrentObservatoryAdmin", () => {
 
     profile = { is_admin: false };
     await expect(getCurrentObservatoryAdmin(dependencies)).resolves.toBeNull();
+  });
+
+  it.each(["auth", "profile"] as const)(
+    "fails closed with a stable dependency error on %s query failure",
+    async (failureAt) => {
+      const dependencyError = {
+        code: "08006",
+        message: "private connection detail",
+      };
+      const dependencies = {
+        isConfigured: () => true,
+        createServerClient: async () => ({
+          auth: {
+            getUser: async () => ({
+              data: { user: { id: "admin-1" } },
+              error: failureAt === "auth" ? dependencyError : null,
+            }),
+          },
+        }),
+        createAdminClient: () => ({
+          from: () => ({
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: adminProfile,
+                  error: failureAt === "profile" ? dependencyError : null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      await expect(
+        getCurrentObservatoryAdmin(dependencies),
+      ).rejects.toMatchObject({
+        name: "ObservatoryAdminAuthError",
+        code: "AUTH_DEPENDENCY_FAILED",
+        message: "Observatory authorization is temporarily unavailable.",
+      });
+    },
+  );
+
+  it("wraps a thrown authorization dependency without leaking details", async () => {
+    await expect(
+      getCurrentObservatoryAdmin({
+        isConfigured: () => true,
+        createServerClient: async () => {
+          throw new Error("private client construction detail");
+        },
+        createAdminClient: vi.fn(),
+      }),
+    ).rejects.toMatchObject({
+      name: "ObservatoryAdminAuthError",
+      code: "AUTH_DEPENDENCY_FAILED",
+      message: "Observatory authorization is temporarily unavailable.",
+    });
   });
 });
 
@@ -142,7 +224,35 @@ describe("Observatory repository", () => {
     expect(boundary.order).toHaveBeenCalledWith("generated_at", {
       ascending: false,
     });
+    expect(boundary.order).toHaveBeenCalledWith("created_at", {
+      ascending: false,
+    });
+    expect(boundary.order.mock.calls).toEqual([
+      ["generated_at", { ascending: false }],
+      ["created_at", { ascending: false }],
+    ]);
     expect(boundary.limit).toHaveBeenCalledWith(1);
+  });
+
+  it.each([
+    {
+      label: "forbidden",
+      error: { code: "42501", message: "private policy detail" },
+      expectedCode: "FORBIDDEN",
+    },
+    {
+      label: "generic",
+      error: { code: "08006", message: "private connection detail" },
+      expectedCode: "SNAPSHOT_READ_FAILED",
+    },
+  ])("maps $label snapshot read errors", async ({ error, expectedCode }) => {
+    const repository = createObservatoryRepository(
+      repositoryClient({ snapshotError: error }).client,
+    );
+
+    await expect(
+      repository.getLatestSuccessfulSnapshot(),
+    ).rejects.toMatchObject({ code: expectedCode });
   });
 
   it("creates a Quick Capture through the atomic audited RPC", async () => {
@@ -235,6 +345,62 @@ describe("Observatory repository", () => {
       },
     );
   });
+
+  it("reports a missing work item explicitly", async () => {
+    const repository = createObservatoryRepository(
+      repositoryClient({
+        rpcError: {
+          code: "P0002",
+          message: "OBSERVATORY_WORK_ITEM_NOT_FOUND",
+        },
+      }).client,
+    );
+
+    await expect(
+      repository.updateWorkItem({
+        workItemId: "missing-item",
+        expectedVersion: 1,
+        type: "bug",
+        title: "Missing",
+        description: "",
+      }),
+    ).rejects.toMatchObject({ code: "WORK_ITEM_NOT_FOUND" });
+  });
+
+  it.each(["create", "update"] as const)(
+    "maps a generic %s mutation failure",
+    async (operation) => {
+      const repository = createObservatoryRepository(
+        repositoryClient({
+          rpcError: { code: "08006", message: "private connection detail" },
+        }).client,
+      );
+
+      const promise =
+        operation === "create"
+          ? repository.createQuickCapture({
+              type: "idea",
+              title: "Capture",
+              description: "",
+              state: "inbox",
+              idempotencyKey: "capture-generic-error",
+            })
+          : repository.updateWorkItem({
+              workItemId: "item-1",
+              expectedVersion: 1,
+              type: "idea",
+              title: "Update",
+              description: "",
+            });
+
+      await expect(promise).rejects.toMatchObject({
+        code:
+          operation === "create"
+            ? "WORK_ITEM_CREATE_FAILED"
+            : "WORK_ITEM_UPDATE_FAILED",
+      });
+    },
+  );
 
   it("maps database authorization failures without exposing their messages", async () => {
     const boundary = repositoryClient({
