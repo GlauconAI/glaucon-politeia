@@ -1,0 +1,671 @@
+import assert from "node:assert/strict";
+import { randomBytes, randomUUID } from "node:crypto";
+
+import postgres from "postgres";
+
+const LOCAL_DATABASE_URL =
+  process.env.OBSERVATORY_LOCAL_DB_URL ??
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const parsedDatabaseUrl = new URL(LOCAL_DATABASE_URL);
+
+if (
+  !["127.0.0.1", "localhost"].includes(parsedDatabaseUrl.hostname) ||
+  parsedDatabaseUrl.port !== "54322" ||
+  parsedDatabaseUrl.pathname !== "/postgres"
+) {
+  throw new Error(
+    "OBSERVATORY_LOCAL_DB_URL must target the disposable loopback database on port 54322.",
+  );
+}
+
+const sql = postgres(LOCAL_DATABASE_URL, {
+  connect_timeout: 10,
+  idle_timeout: 5,
+  max: 8,
+  onnotice: () => undefined,
+});
+
+type DatabaseRole = "anon" | "authenticated" | "service_role";
+type Transaction = postgres.TransactionSql;
+
+const checks: string[] = [];
+
+function record(check: string): void {
+  checks.push(check);
+}
+
+function pgError(error: unknown): { code?: string; message?: string } {
+  if (error && typeof error === "object") {
+    return error as { code?: string; message?: string };
+  }
+  return {};
+}
+
+async function expectPgError(
+  label: string,
+  expectedCode: string,
+  action: () => Promise<unknown>,
+  messagePattern?: RegExp,
+): Promise<void> {
+  try {
+    await action();
+  } catch (error) {
+    const candidate = pgError(error);
+    assert.equal(candidate.code, expectedCode, `${label}: PostgreSQL code`);
+    if (messagePattern) {
+      assert.match(candidate.message ?? "", messagePattern, `${label}: message`);
+    }
+    record(label);
+    return;
+  }
+  assert.fail(`${label}: expected PostgreSQL error ${expectedCode}`);
+}
+
+async function asRole<T>(
+  role: DatabaseRole,
+  userId: string | null,
+  action: (transaction: Transaction) => Promise<T>,
+): Promise<T> {
+  const result = await sql.begin(async (transaction) => {
+    await transaction`select set_config('request.jwt.claim.role', ${role}, true)`;
+    await transaction`select set_config('request.jwt.claim.sub', ${userId ?? ""}, true)`;
+    await transaction.unsafe(`set local role ${role}`);
+    return { value: await action(transaction) };
+  });
+  return result.value;
+}
+
+async function createWorkItem(
+  userId: string,
+  input: {
+    type: "idea" | "feature" | "bug";
+    title: string;
+    description: string;
+    idempotencyKey: string;
+  },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [item] = await transaction<
+      {
+        id: string;
+        type: string;
+        title: string;
+        description: string;
+        state: string;
+        version: number;
+      }[]
+    >`
+      select id, type, title, description, state, version
+      from public.create_observatory_work_item(
+        ${input.type},
+        ${input.title},
+        ${input.description},
+        ${input.idempotencyKey}
+      )
+    `;
+    assert.ok(item, "create_observatory_work_item returned a row");
+    return item;
+  });
+}
+
+async function updateWorkItem(
+  userId: string,
+  input: {
+    id: string;
+    expectedVersion: number;
+    type: "idea" | "feature" | "bug";
+    title: string;
+    description: string;
+  },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [item] = await transaction<
+      {
+        id: string;
+        title: string;
+        version: number;
+      }[]
+    >`
+      select id, title, version
+      from public.update_observatory_work_item(
+        ${input.id},
+        ${input.expectedVersion},
+        ${input.type},
+        ${input.title},
+        ${input.description}
+      )
+    `;
+    assert.ok(item, "update_observatory_work_item returned a row");
+    return item;
+  });
+}
+
+async function main(): Promise<void> {
+  const runId = randomUUID();
+  const adminId = randomUUID();
+  const userId = randomUUID();
+  const digest = randomBytes(32).toString("hex");
+
+  await sql.begin(async (transaction) => {
+    await transaction`select set_config('request.jwt.claim.role', 'service_role', true)`;
+    await transaction`
+      insert into auth.users (
+        id,
+        aud,
+        role,
+        email,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at
+      )
+      values
+        (
+          ${adminId},
+          'authenticated',
+          'authenticated',
+          ${`observatory-admin-${runId}@example.invalid`},
+          '{}'::jsonb,
+          '{}'::jsonb,
+          now(),
+          now()
+        ),
+        (
+          ${userId},
+          'authenticated',
+          'authenticated',
+          ${`observatory-user-${runId}@example.invalid`},
+          '{}'::jsonb,
+          '{}'::jsonb,
+          now(),
+          now()
+        )
+    `;
+    await transaction`
+      insert into public.profiles (
+        user_id,
+        username,
+        display_name,
+        is_admin
+      )
+      values
+        (${adminId}, ${`observatory-admin-${runId}`}, 'Observatory Admin', true),
+        (${userId}, ${`observatory-user-${runId}`}, 'Observatory User', false)
+    `;
+  });
+  record("fixtures created through service-role claim boundary");
+
+  const tablePrivileges = await sql<
+    {
+      role_name: string;
+      table_name: string;
+      can_select: boolean;
+      can_insert: boolean;
+      can_update: boolean;
+      can_delete: boolean;
+      can_truncate: boolean;
+    }[]
+  >`
+    select role_name, table_name,
+      has_table_privilege(role_name, 'public.' || table_name, 'select') as can_select,
+      has_table_privilege(role_name, 'public.' || table_name, 'insert') as can_insert,
+      has_table_privilege(role_name, 'public.' || table_name, 'update') as can_update,
+      has_table_privilege(role_name, 'public.' || table_name, 'delete') as can_delete,
+      has_table_privilege(role_name, 'public.' || table_name, 'truncate') as can_truncate
+    from unnest(array['anon', 'authenticated', 'service_role']) role_name
+    cross join unnest(array[
+      'observatory_snapshots',
+      'observatory_work_items',
+      'observatory_work_item_events'
+    ]) table_name
+    order by role_name, table_name
+  `;
+
+  for (const privilege of tablePrivileges) {
+    const expectedSelect =
+      privilege.role_name === "authenticated" ||
+      privilege.role_name === "service_role" &&
+        privilege.table_name === "observatory_snapshots";
+    const expectedInsert =
+      privilege.role_name === "service_role" &&
+      privilege.table_name === "observatory_snapshots";
+    assert.equal(
+      privilege.can_select,
+      expectedSelect,
+      `${privilege.role_name} ${privilege.table_name}: select grant`,
+    );
+    assert.equal(
+      privilege.can_insert,
+      expectedInsert,
+      `${privilege.role_name} ${privilege.table_name}: insert grant`,
+    );
+    assert.equal(privilege.can_update, false);
+    assert.equal(privilege.can_delete, false);
+    assert.equal(privilege.can_truncate, false);
+  }
+  record("exact table grants and truncate denial");
+
+  const rlsRows = await sql<{ relname: string; relrowsecurity: boolean }[]>`
+    select relname, relrowsecurity
+    from pg_class
+    where relname in (
+      'observatory_snapshots',
+      'observatory_work_items',
+      'observatory_work_item_events'
+    )
+    order by relname
+  `;
+  assert.equal(rlsRows.length, 3);
+  assert.ok(rlsRows.every((row) => row.relrowsecurity));
+  record("RLS enabled on all Observatory tables");
+
+  const functionPrivileges = await sql<
+    {
+      role_name: string;
+      can_create: boolean;
+      can_update: boolean;
+    }[]
+  >`
+    select role_name,
+      has_function_privilege(
+        role_name,
+        'public.create_observatory_work_item(text,text,text,text)',
+        'execute'
+      ) as can_create,
+      has_function_privilege(
+        role_name,
+        'public.update_observatory_work_item(uuid,integer,text,text,text)',
+        'execute'
+      ) as can_update
+    from unnest(array['anon', 'authenticated', 'service_role']) role_name
+    order by role_name
+  `;
+  for (const privilege of functionPrivileges) {
+    const expected = privilege.role_name === "authenticated";
+    assert.equal(privilege.can_create, expected);
+    assert.equal(privilege.can_update, expected);
+  }
+  record("RPC execute grants limited to authenticated");
+
+  await asRole("service_role", null, async (transaction) => {
+    await transaction`
+      insert into public.observatory_snapshots (
+        schema_version,
+        generated_at,
+        source_digest,
+        payload,
+        summary,
+        collector_version
+      )
+      values (
+        '1',
+        now(),
+        ${digest},
+        '{"kind":"integration"}'::jsonb,
+        '{"project_count":0}'::jsonb,
+        'integration-test'
+      )
+    `;
+  });
+  record("service role snapshot insert");
+
+  for (const table of [
+    "observatory_snapshots",
+    "observatory_work_items",
+    "observatory_work_item_events",
+  ] as const) {
+    await expectPgError(
+      `anonymous ${table} read denied`,
+      "42501",
+      () =>
+        asRole("anon", null, async (transaction) => {
+          await transaction.unsafe(`select * from public.${table}`);
+        }),
+    );
+  }
+
+  await asRole("authenticated", userId, async (transaction) => {
+    const [counts] = await transaction<
+      { snapshots: number; work_items: number; events: number }[]
+    >`
+      select
+        (select count(*)::integer from public.observatory_snapshots) as snapshots,
+        (select count(*)::integer from public.observatory_work_items) as work_items,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events
+        ) as events
+    `;
+    assert.deepEqual(counts, { snapshots: 0, work_items: 0, events: 0 });
+  });
+  record("non-admin authenticated reads filtered across all RLS tables");
+
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [snapshotCount] = await transaction<{ count: number }[]>`
+      select count(*)::integer as count
+      from public.observatory_snapshots
+      where source_digest = ${digest}
+    `;
+    assert.equal(
+      snapshotCount?.count,
+      1,
+      "admin can read the snapshot created by this verification run",
+    );
+  });
+  record("admin authenticated read allowed by RLS");
+
+  await expectPgError(
+    "non-admin Quick Capture denied",
+    "42501",
+    () =>
+      createWorkItem(userId, {
+        type: "idea",
+        title: "Denied capture",
+        description: "",
+        idempotencyKey: `denied-${runId}`,
+      }),
+    /Administrator access required/u,
+  );
+
+  await expectPgError(
+    "authenticated direct work-item insert denied",
+    "42501",
+    () =>
+      asRole("authenticated", adminId, async (transaction) => {
+        await transaction`
+          insert into public.observatory_work_items (
+            type,
+            title,
+            description,
+            idempotency_key,
+            created_by
+          )
+          values ('idea', 'Bypass', '', ${`bypass-${runId}`}, ${adminId})
+        `;
+      }),
+  );
+
+  const createInput = {
+    type: "idea" as const,
+    title: "Local integration capture",
+    description: "Created through the audited RPC.",
+    idempotencyKey: `create-${runId}`,
+  };
+  const created = await createWorkItem(adminId, createInput);
+  assert.equal(created.version, 1);
+  assert.equal(created.state, "inbox");
+
+  const repeated = await createWorkItem(adminId, createInput);
+  assert.equal(repeated.id, created.id);
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [eventCount] = await transaction<{ count: number }[]>`
+      select count(*)::integer as count
+      from public.observatory_work_item_events
+      where work_item_id = ${created.id}
+    `;
+    assert.equal(eventCount?.count, 1);
+  });
+  record("exact idempotent retry returns one item and one event");
+
+  await expectPgError(
+    "idempotency payload conflict rejected",
+    "23505",
+    () =>
+      createWorkItem(adminId, {
+        ...createInput,
+        title: "Conflicting payload",
+      }),
+    /OBSERVATORY_IDEMPOTENCY_CONFLICT/u,
+  );
+
+  const concurrentInput = {
+    type: "feature" as const,
+    title: "Concurrent create",
+    description: "Same request from two sessions.",
+    idempotencyKey: `concurrent-create-${runId}`,
+  };
+  const concurrentCreates = await Promise.all([
+    createWorkItem(adminId, concurrentInput),
+    createWorkItem(adminId, concurrentInput),
+  ]);
+  assert.equal(concurrentCreates[0]?.id, concurrentCreates[1]?.id);
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [counts] = await transaction<{ items: number; events: number }[]>`
+      select
+        (
+          select count(*)::integer
+          from public.observatory_work_items
+          where created_by = ${adminId}
+            and idempotency_key = ${concurrentInput.idempotencyKey}
+        ) as items,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events events
+          join public.observatory_work_items items
+            on items.id = events.work_item_id
+          where items.created_by = ${adminId}
+            and items.idempotency_key = ${concurrentInput.idempotencyKey}
+        ) as events
+    `;
+    assert.deepEqual(counts, { items: 1, events: 1 });
+  });
+  record("concurrent identical Quick Capture is atomic and idempotent");
+
+  const optimistic = await createWorkItem(adminId, {
+    type: "bug",
+    title: "Optimistic update",
+    description: "Two writers share version one.",
+    idempotencyKey: `optimistic-${runId}`,
+  });
+  const updateResults = await Promise.allSettled([
+    updateWorkItem(adminId, {
+      id: optimistic.id,
+      expectedVersion: 1,
+      type: "bug",
+      title: "Optimistic winner A",
+      description: "A",
+    }),
+    updateWorkItem(adminId, {
+      id: optimistic.id,
+      expectedVersion: 1,
+      type: "bug",
+      title: "Optimistic winner B",
+      description: "B",
+    }),
+  ]);
+  const fulfilledUpdates = updateResults.filter(
+    (result) => result.status === "fulfilled",
+  );
+  const rejectedUpdates = updateResults.filter(
+    (result) => result.status === "rejected",
+  );
+  assert.equal(fulfilledUpdates.length, 1);
+  assert.equal(rejectedUpdates.length, 1);
+  assert.equal(
+    pgError(rejectedUpdates[0]?.reason).code,
+    "40001",
+    "losing optimistic update returns serialization conflict",
+  );
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [state] = await transaction<
+      { version: number; events: number }[]
+    >`
+      select items.version,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events events
+          where events.work_item_id = items.id
+        ) as events
+      from public.observatory_work_items items
+      where items.id = ${optimistic.id}
+    `;
+    assert.deepEqual(state, { version: 2, events: 2 });
+  });
+  record("concurrent optimistic update has one winner and one audited event");
+
+  await expectPgError(
+    "stale optimistic update rejected",
+    "40001",
+    () =>
+      updateWorkItem(adminId, {
+        id: optimistic.id,
+        expectedVersion: 1,
+        type: "bug",
+        title: "Stale update",
+        description: "Must not commit.",
+      }),
+    /OBSERVATORY_VERSION_CONFLICT/u,
+  );
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [state] = await transaction<
+      { version: number; events: number }[]
+    >`
+      select items.version,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events events
+          where events.work_item_id = items.id
+        ) as events
+      from public.observatory_work_items items
+      where items.id = ${optimistic.id}
+    `;
+    assert.deepEqual(state, { version: 2, events: 2 });
+  });
+  record("stale optimistic update rolls back without an audit event");
+
+  const rollbackItem = await createWorkItem(adminId, {
+    type: "feature",
+    title: "Rollback probe",
+    description: "An injected event failure must roll back the item update.",
+    idempotencyKey: `rollback-${runId}`,
+  });
+  await expectPgError(
+    "RPC event failure aborts the work-item update",
+    "P0001",
+    () =>
+      sql.begin(async (transaction) => {
+        await transaction.unsafe(`
+          create or replace function pg_temp.reject_observatory_updated_event()
+          returns trigger
+          language plpgsql
+          as $$
+          begin
+            raise exception 'INTEGRATION_FORCED_EVENT_FAILURE';
+          end;
+          $$
+        `);
+        await transaction.unsafe(`
+          create trigger observatory_integration_reject_updated_event
+          before insert on public.observatory_work_item_events
+          for each row
+          when (new.event_type = 'updated')
+          execute function pg_temp.reject_observatory_updated_event()
+        `);
+        await transaction`select set_config('request.jwt.claim.role', 'authenticated', true)`;
+        await transaction`select set_config('request.jwt.claim.sub', ${adminId}, true)`;
+        await transaction.unsafe("set local role authenticated");
+        await transaction`
+          select *
+          from public.update_observatory_work_item(
+            ${rollbackItem.id},
+            1,
+            'feature',
+            'Must roll back',
+            'The event insert is forced to fail.'
+          )
+        `;
+      }),
+    /INTEGRATION_FORCED_EVENT_FAILURE/u,
+  );
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [state] = await transaction<
+      { title: string; version: number; events: number }[]
+    >`
+      select items.title, items.version,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events events
+          where events.work_item_id = items.id
+        ) as events
+      from public.observatory_work_items items
+      where items.id = ${rollbackItem.id}
+    `;
+    assert.deepEqual(state, {
+      title: "Rollback probe",
+      version: 1,
+      events: 1,
+    });
+  });
+  record("RPC rollback preserves item and audit history after event failure");
+
+  await expectPgError(
+    "snapshot update blocked by immutable trigger",
+    "P0001",
+    async () => {
+      await sql`
+        update public.observatory_snapshots
+        set collector_version = 'mutated'
+        where source_digest = ${digest}
+      `;
+    },
+    /snapshots are immutable/iu,
+  );
+
+  await expectPgError(
+    "snapshot delete blocked by immutable trigger",
+    "P0001",
+    async () => {
+      await sql`
+        delete from public.observatory_snapshots
+        where source_digest = ${digest}
+      `;
+    },
+    /snapshots are immutable/iu,
+  );
+
+  await expectPgError(
+    "event update blocked by append-only trigger",
+    "P0001",
+    async () => {
+      await sql`
+        update public.observatory_work_item_events
+        set data = '{"mutated":true}'::jsonb
+        where work_item_id = ${created.id}
+      `;
+    },
+    /events are append-only/iu,
+  );
+
+  await expectPgError(
+    "service-role truncate denied",
+    "42501",
+    () =>
+      asRole("service_role", null, async (transaction) => {
+        await transaction`truncate table public.observatory_snapshots`;
+      }),
+  );
+
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        status: "pass",
+        check_count: checks.length,
+        checks,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+main()
+  .catch((error: unknown) => {
+    const candidate = pgError(error);
+    process.stderr.write(
+      `OBSERVATORY_LOCAL_DB_VERIFY_FAILED: ${candidate.message ?? "Unknown error"}\n`,
+    );
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await sql.end({ timeout: 5 });
+  });

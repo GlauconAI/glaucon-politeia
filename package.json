@@ -18,6 +18,7 @@
     "import:ghost": "node scripts/import-ghost.mjs",
     "observatory:collect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/collect.ts",
     "observatory:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/publish.ts",
+    "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",

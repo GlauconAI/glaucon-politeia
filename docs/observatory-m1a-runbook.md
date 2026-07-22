@@ -29,14 +29,35 @@ The M1A migration is `supabase/migrations/20260721000100_openclaw_observatory_m1
 npm test -- tests/migration-sql.test.ts tests/observatory-migration.test.ts
 ```
 
-For an integration check, use a disposable local Supabase instance only. Confirm the CLI is targeting local loopback, then run:
+For an integration check, use a disposable local Supabase instance only. Bind its published ports to loopback through a dedicated Docker network, then rebuild the database from migrations and run the live contract verifier:
 
 ```bash
-supabase status
-supabase db reset --local
+# OrbStack preflight: this setting takes effect after an OrbStack restart.
+test "$(orbctl config get docker.expose_ports_to_lan)" = "false" || {
+  orbctl config set docker.expose_ports_to_lan false
+  echo "Restart OrbStack, then rerun this workflow."
+  exit 1
+}
+docker network inspect observatory-local-loopback >/dev/null 2>&1 || \
+  docker network create \
+    -o com.docker.network.bridge.host_binding_ipv4=127.0.0.1 \
+    observatory-local-loopback
+supabase start \
+  --network-id observatory-local-loopback \
+  --exclude edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,storage-api,studio,supavisor,vector \
+  --yes
+supabase db reset --local --no-seed
+npm run observatory:verify-local-db
 ```
 
-Do not set a remote `SUPABASE_DB_URL` for this check, and do not substitute the repository's remote `supabase:apply-missing` operation. A local reset is destructive to the disposable local database, so preserve any local data that matters before running it.
+Use `docker ps` to review the ports requested by the CLI, then use `lsof` to verify the effective host listeners. Supabase CLI's generic security notice and Docker metadata can still show `0.0.0.0`; on OrbStack the gate is `docker.expose_ports_to_lan=false` plus effective listeners for API port `54321` and database port `54322` on `127.0.0.1` only. Stop immediately if `lsof` shows either port on `[::]` or `*`. The verifier rejects any database URL whose host is not `127.0.0.1`/`localhost`, port is not `54322`, or database is not `postgres`. It checks live grants, RLS, role access, idempotency and conflicts, concurrent create/update behavior, RPC rollback, optimistic locking, immutability, append-only events, and `TRUNCATE` denial.
+
+Do not set a remote `SUPABASE_DB_URL` for this check, and do not substitute the repository's remote `supabase:apply-missing` operation. A local reset is destructive to the disposable local database, so preserve any local data that matters before running it. When verification is complete and no disposable data is needed, remove the local stack and dedicated network:
+
+```bash
+supabase stop --no-backup
+docker network rm observatory-local-loopback
+```
 
 ### 3. Collect the real local snapshot
 
@@ -201,3 +222,12 @@ The owner must explicitly approve each of these gates, in order:
 - `npm test`: 46 files and 243 tests passed. `npm run lint` and `npm run typecheck`: exit 0. `npm run build`: compiled successfully and confirmed `/observatory` as dynamic.
 - The initial sandboxed collector status query and build were blocked by local runtime/port permissions; each exact command passed when rerun with approved local verification permissions. No source change was made for either sandbox-only failure.
 - No production migration, snapshot publication, Vercel deployment, Cron creation, Gateway lifecycle/change command, or external user write was performed.
+
+### Disposable database integration evidence
+
+- Starting commit: `5830636ae65546b0423c1c38619429d8e64b6ca9` on local `main`, verified in isolated branch `chore/observatory-m1a-local-integration`.
+- Runtime: OrbStack 2.2.1, Docker Engine 29.4.0, and Supabase CLI 2.109.1. OrbStack LAN port exposure was disabled before the accepted run.
+- `supabase db reset --local --no-seed` recreated the disposable database and applied every migration from zero through `20260721000100_openclaw_observatory_m1a.sql`.
+- The live verifier passed 24 checks covering exact grants, RLS and anonymous/non-admin/admin access, service Snapshot insert, direct-write denial, Quick Capture authorization, idempotent retry and payload conflict, concurrent create/update, optimistic-lock conflict, RPC rollback, Snapshot immutability, append-only Events, and `TRUNCATE` denial.
+- Effective API and database listeners were both restricted to `127.0.0.1`; a probe through the Mac's LAN address confirmed database port `54322` was blocked.
+- No production database, remote Supabase project, publication endpoint, Vercel deployment, Cron, Gateway, or retained external user data was touched.
