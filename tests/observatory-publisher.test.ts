@@ -182,6 +182,9 @@ describe("publishObservatorySnapshot", () => {
 
     expect(result).toEqual({ published: false, idempotent: true });
     expect(fetchAdapter).toHaveBeenCalledTimes(2);
+    expect(
+      fetchAdapter.mock.calls.map(([, init]) => init?.redirect),
+    ).toEqual(["error", "error"]);
     expect(fetchAdapter.mock.calls[1][0]).toContain(
       `/rest/v1/observatory_snapshots?source_digest=eq.${snapshot.source_digest}`,
     );

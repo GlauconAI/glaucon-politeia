@@ -68,7 +68,7 @@ async function request(
   failureCode: "PUBLISH_FAILED" | "DUPLICATE_CONFIRM_FAILED",
 ): Promise<Response> {
   try {
-    return await fetchAdapter(input, init);
+    return await fetchAdapter(input, { ...init, redirect: "error" });
   } catch {
     throw new ObservatoryPublisherError(
       failureCode,
