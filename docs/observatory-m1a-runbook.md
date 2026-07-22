@@ -149,7 +149,7 @@ git diff --check
 git status --short --branch
 ```
 
-If resources are constrained, Vitest can be serialized with `npm test -- --maxWorkers=1 --minWorkers=1`. A sandbox can prevent Turbopack from creating its local helper process or binding a loopback port; in that case rerun the exact build under approved local verification permissions. Do not change application behavior to bypass a sandbox restriction.
+If resources are constrained, Vitest can be serialized with `npm test -- --maxWorkers=1 --no-file-parallelism`. A sandbox can prevent Turbopack from creating its local helper process or binding a loopback port; in that case rerun the exact build under approved local verification permissions. Do not change application behavior to bypass a sandbox restriction.
 
 ## Staging/readiness gate
 
