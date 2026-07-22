@@ -14,6 +14,7 @@
     "#observatory-collect-options": "./lib/observatory/collect-options.ts",
     "#observatory-refresh-state": "./lib/observatory/refresh-state.ts",
     "#observatory-refresh-files": "./lib/observatory/refresh-files.ts",
+    "#observatory-privacy-scan": "./lib/observatory/privacy-scan.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
     "#observatory-command-runner": "./scripts/observatory/run-command.ts",
     "#observatory-publisher": "./lib/observatory/publisher.ts"
@@ -29,6 +30,7 @@
     "observatory:refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/refresh.ts",
     "observatory:retention": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/retention.ts",
     "observatory:mark-release": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/mark-release.ts",
+    "observatory:verify-snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-snapshot.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",

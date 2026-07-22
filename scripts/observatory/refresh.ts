@@ -7,12 +7,11 @@ import {
   writeObservatoryRefreshState,
 } from "#observatory-refresh-files";
 import {
+  OBSERVATORY_REFRESH_STEP_TIMEOUT_MS,
   evaluateObservatoryRefreshStaleness,
   transitionObservatoryRefreshState,
   type ObservatoryRefreshNotification,
 } from "#observatory-refresh-state";
-
-const STEP_TIMEOUT_MS = 2 * 60 * 1000;
 
 function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> {
   return new Promise((resolveResult) => {
@@ -61,7 +60,7 @@ function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> 
           child.kill("SIGKILL");
         }
       }, 2_000);
-    }, STEP_TIMEOUT_MS);
+    }, OBSERVATORY_REFRESH_STEP_TIMEOUT_MS);
     child.once("error", () => finish(false));
     child.once("close", (code) => finish(!timedOut && code === 0));
   });

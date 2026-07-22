@@ -450,7 +450,7 @@ export async function collectObservatorySnapshot(
   input: { registryPath: string },
   dependencies: CollectorDependencies,
 ): Promise<ObservatoryCollectionEnvelope> {
-  const timeoutMs = dependencies.commandTimeoutMs ?? 10_000;
+  const timeoutMs = dependencies.commandTimeoutMs ?? 30_000;
   let html: string;
   try {
     html = await dependencies.readTextFile(input.registryPath);

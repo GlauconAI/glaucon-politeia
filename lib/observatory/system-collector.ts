@@ -102,7 +102,7 @@ export async function collectSystemInventory(
   dependencies: SystemCollectorDependencies,
 ): Promise<ObservatoryAssetInventory> {
   const collectedAt = dependencies.now().toISOString();
-  const timeoutMs = dependencies.commandTimeoutMs ?? 10_000;
+  const timeoutMs = dependencies.commandTimeoutMs ?? 30_000;
   const assets: ObservatoryAsset[] = input.metadata.map((entry) =>
     metadataAsset(entry, collectedAt),
   );

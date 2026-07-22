@@ -127,10 +127,10 @@ describe("collectSystemInventory", () => {
     );
 
     expect(seen).toEqual([
-      { command: "openclaw", args: ["skills", "list", "--agent", "plato", "--json"], timeoutMs: 10_000 },
-      { command: "openclaw", args: ["plugins", "list", "--json"], timeoutMs: 10_000 },
-      { command: "openclaw", args: ["cron", "list", "--all", "--json"], timeoutMs: 10_000 },
-      { command: "openclaw", args: ["gateway", "status", "--json"], timeoutMs: 10_000 },
+      { command: "openclaw", args: ["skills", "list", "--agent", "plato", "--json"], timeoutMs: 30_000 },
+      { command: "openclaw", args: ["plugins", "list", "--json"], timeoutMs: 30_000 },
+      { command: "openclaw", args: ["cron", "list", "--all", "--json"], timeoutMs: 30_000 },
+      { command: "openclaw", args: ["gateway", "status", "--json"], timeoutMs: 30_000 },
     ]);
     expect(inventory.assets.map((item) => item.kind)).toEqual([
       "cron",

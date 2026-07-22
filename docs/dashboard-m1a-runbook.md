@@ -84,7 +84,7 @@ npm run observatory:collect -- \
   --config-path "$OBSERVATORY_CONFIG_PATH"
 ```
 
-The legacy collector invokes only these OpenClaw commands, each with a 10-second timeout:
+The legacy collector invokes only these OpenClaw commands, each with a 30-second timeout:
 
 ```text
 openclaw agents list --json
@@ -96,6 +96,12 @@ The v2 collector extends that committed read-only allowlist with per-agent skill
 If either input, command, schema validation, digesting, or atomic write fails, stop. Do not publish. The destination is replaced only after a complete validated write; an existing local last-known-good file remains intact on collection/rename failure.
 
 ### 4. Validate provenance, consistency, and privacy
+
+Run the committed v2 verifier first. It reports only schema/count/check results and privacy category counts; it never prints matched values.
+
+```bash
+npm run observatory:verify-snapshot -- .observatory/observatory-snapshot.json
+```
 
 The committed Zod schema is the allowlist: strict-object parsing rejects additional keys. The verifier below then checks source identity, supported versions, digest shape, summary consistency, known canonical counts, and denylist categories. It reports only category counts and never prints matching values.
 

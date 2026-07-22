@@ -109,12 +109,12 @@ describe("collectObservatorySnapshot", () => {
       {
         command: "openclaw",
         args: ["agents", "list", "--json"],
-        timeoutMs: 10_000,
+        timeoutMs: 30_000,
       },
       {
         command: "openclaw",
         args: ["status", "--json"],
-        timeoutMs: 10_000,
+        timeoutMs: 30_000,
       },
     ]);
     expect(snapshot.status).toBe("success");
