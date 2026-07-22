@@ -30,9 +30,14 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
 
         <div className="header-actions">
           {canPublish ? (
-            <Link href="/editor" className="write-link">
-              Publish
-            </Link>
+            <>
+              <Link href="/observatory" className="operator-link">
+                Observatory
+              </Link>
+              <Link href="/editor" className="write-link">
+                Publish
+              </Link>
+            </>
           ) : null}
           <ThemeToggle />
           {userEmail ? (

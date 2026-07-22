@@ -66,6 +66,9 @@ describe("app shell", () => {
       "href",
       "/editor",
     );
+    expect(
+      screen.getByRole("link", { name: /observatory/i }),
+    ).toHaveAttribute("href", "/observatory");
   });
 
   it("does not show publishing access to logged-in non-admin users", () => {
@@ -78,6 +81,9 @@ describe("app shell", () => {
     expect(screen.getByText("reader@example.com")).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /publish/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /observatory/i }),
     ).not.toBeInTheDocument();
   });
 

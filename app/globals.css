@@ -19,6 +19,476 @@
   color-scheme: light;
 }
 
+/* OpenClaw Observatory command surface */
+
+.operator-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--accent-strong);
+  padding: 0 12px;
+  font-weight: 700;
+}
+
+.operator-link:hover {
+  border-color: rgba(124, 58, 237, 0.75);
+  background: rgba(124, 58, 237, 0.2);
+  color: var(--strong);
+}
+
+.observatory-page,
+.observatory-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.observatory-hero,
+.observatory-source,
+.observatory-catalog,
+.observatory-capture-panel,
+.observatory-summary-card {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(18, 20, 25, 0.88);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+}
+
+.observatory-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+  padding: 22px;
+}
+
+.observatory-hero h1 {
+  margin: 14px 0 0;
+  color: var(--strong);
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 650;
+  line-height: 1.04;
+}
+
+.observatory-hero h1 span {
+  color: var(--success);
+}
+
+.observatory-hero p:not(.eyebrow) {
+  margin: 14px 0 0;
+  color: var(--text);
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  line-height: 1.45;
+}
+
+.observatory-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 14px;
+  align-items: start;
+}
+
+.observatory-capture {
+  position: sticky;
+  top: 82px;
+}
+
+.observatory-source,
+.observatory-catalog,
+.observatory-capture-panel {
+  padding: 18px;
+}
+
+.observatory-source {
+  border-left: 3px solid var(--success);
+}
+
+.observatory-source-stale,
+.observatory-source-unknown,
+.observatory-source-missing {
+  border-left-color: var(--warning);
+}
+
+.observatory-source-failed {
+  border-left-color: #fb7185;
+}
+
+.observatory-panel-heading,
+.observatory-object-heading,
+.observatory-object-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.observatory-panel-heading {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  padding-bottom: 12px;
+}
+
+.observatory-panel-heading h2,
+.observatory-object-heading h3,
+.observatory-object-title h4 {
+  margin: 0;
+  color: var(--strong);
+}
+
+.observatory-panel-heading h2 {
+  font-size: 20px;
+}
+
+.observatory-status-badge,
+.observatory-keyboard-label,
+.observatory-object-heading span,
+.observatory-object-title span {
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+  padding: 4px 9px;
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: 11px;
+}
+
+.observatory-source-fresh .observatory-status-badge {
+  border-color: rgba(67, 211, 139, 0.45);
+  color: var(--success);
+}
+
+.observatory-source-stale .observatory-status-badge,
+.observatory-source-unknown .observatory-status-badge,
+.observatory-source-missing .observatory-status-badge {
+  border-color: color-mix(in srgb, var(--warning) 55%, transparent);
+  color: var(--warning);
+}
+
+.observatory-source-failed .observatory-status-badge,
+.observatory-source-failed [role="alert"] {
+  color: #fb7185;
+}
+
+.observatory-source > p,
+.observatory-panel-copy,
+.observatory-object-list p,
+.observatory-state-hint {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.observatory-state-hint {
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.observatory-provenance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.observatory-provenance div {
+  min-width: 0;
+}
+
+.observatory-provenance-wide {
+  grid-column: 1 / -1;
+}
+
+.observatory-provenance dt,
+.observatory-summary-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.observatory-provenance dd,
+.observatory-summary-card dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--strong);
+}
+
+.observatory-provenance code,
+.observatory-form-success code {
+  color: var(--success);
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+}
+
+.observatory-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.observatory-summary-card {
+  margin: 0;
+  padding: 14px;
+}
+
+.observatory-summary-card dd {
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.observatory-search,
+.observatory-field,
+.observatory-capture-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.observatory-search {
+  margin-top: 14px;
+  color: var(--strong);
+  font-weight: 700;
+}
+
+.observatory-search input,
+.observatory-field input,
+.observatory-field textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  padding: 11px 12px;
+}
+
+.observatory-search input:focus,
+.observatory-field input:focus,
+.observatory-field textarea:focus {
+  border-color: rgba(124, 58, 237, 0.72);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.observatory-object-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.observatory-object-group {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px;
+}
+
+.observatory-object-heading {
+  padding-bottom: 10px;
+}
+
+.observatory-object-heading h3 {
+  font-size: 16px;
+}
+
+.observatory-object-list {
+  display: flex;
+  max-height: 360px;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.observatory-object-list article {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 2px 2px;
+}
+
+.observatory-object-title h4 {
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.observatory-object-title span {
+  flex: 0 0 auto;
+}
+
+.observatory-object-list p {
+  margin: 7px 0;
+  font-size: 13px;
+}
+
+.observatory-object-list small {
+  color: var(--muted);
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.observatory-capture-panel {
+  border-color: rgba(124, 58, 237, 0.35);
+}
+
+.observatory-panel-copy {
+  margin: 14px 0;
+}
+
+.observatory-capture-form {
+  gap: 12px;
+}
+
+.observatory-type-picker {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.observatory-type-picker legend,
+.observatory-field > span {
+  margin-bottom: 8px;
+  color: var(--strong);
+  font-weight: 700;
+}
+
+.observatory-field small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.observatory-type-picker > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.observatory-type-picker label {
+  display: flex;
+  min-height: 42px;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.observatory-type-picker input {
+  accent-color: var(--success);
+}
+
+.observatory-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.observatory-field-error,
+.observatory-form-error,
+.observatory-form-success {
+  margin: -4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.observatory-field-error,
+.observatory-form-error {
+  color: #fb7185;
+}
+
+.observatory-form-success {
+  color: var(--success);
+}
+
+.observatory-capture-form .button-primary {
+  min-height: 44px;
+  width: 100%;
+}
+
+.observatory-capture-form .button-primary:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+@media (max-width: 960px) {
+  .observatory-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .observatory-capture {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .observatory-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px;
+  }
+
+  .observatory-summary,
+  .observatory-object-grid,
+  .observatory-provenance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .observatory-provenance-wide {
+    grid-column: auto;
+  }
+
+  .observatory-object-list {
+    max-height: none;
+  }
+
+  .observatory-keyboard-label {
+    display: none;
+  }
+
+  .operator-link {
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+}
+
 :root[data-theme="dark"] {
   --bg: #10110f;
   --panel: #181a17;
