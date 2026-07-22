@@ -6,8 +6,14 @@ export const ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE =
   "shared/projects/openclaw-orchestration-control/orchestration-system-design.html#orchestration-registry" as const;
 export const DERIVED_PROJECT_KEY_PATTERN =
   /^[a-z0-9]+(?:-[a-z0-9]+)*\/(?!\.{1,2}$)(?!\s*$)[^/\\\p{C}]+$/u;
+export const OBSERVATORY_REGISTRY_MAX_ITEMS = 1_000;
+export const OBSERVATORY_REGISTRY_MAX_TEXT_LENGTH = 4_096;
 
 const IsoTimestampSchema = z.iso.datetime({ offset: true });
+const RegistryTextSchema = z
+  .string()
+  .max(OBSERVATORY_REGISTRY_MAX_TEXT_LENGTH);
+const RequiredRegistryTextSchema = RegistryTextSchema.min(1);
 
 export const ObservatorySourceSchema = z.strictObject({
   logical_reference: z.literal(ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE),
@@ -21,6 +27,7 @@ export const ObservatorySourceSchema = z.strictObject({
 export const ObservatoryProjectSchema = z.strictObject({
   project_key: z
     .string()
+    .max(OBSERVATORY_REGISTRY_MAX_TEXT_LENGTH)
     .regex(
       DERIVED_PROJECT_KEY_PATTERN,
       "Expected a normalized-owner/original-project-name derived key.",
@@ -28,44 +35,49 @@ export const ObservatoryProjectSchema = z.strictObject({
     .describe(
       "Derived identifier: normalize(project group owner) + '/' + the original canonical project name. It is not a canonical source ID.",
     ),
-  name: z.string().min(1),
-  title: z.string().min(1).optional(),
-  status: z.string().min(1),
-  description: z.string(),
-  scene_ids: z.array(
-    z
-      .string()
-      .min(1)
-      .describe("Canonical scene ID copied from the project's explicit scenes list."),
-  ),
+  name: RequiredRegistryTextSchema,
+  title: RequiredRegistryTextSchema.optional(),
+  status: RequiredRegistryTextSchema,
+  description: RegistryTextSchema,
+  scene_ids: z
+    .array(
+      RequiredRegistryTextSchema.describe(
+        "Canonical scene ID copied from the project's explicit scenes list.",
+      ),
+    )
+    .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
 });
 
 export const ObservatoryProjectGroupSchema = z.strictObject({
-  owner: z.string().min(1),
-  focus: z.string(),
-  projects: z.array(ObservatoryProjectSchema),
+  owner: RequiredRegistryTextSchema,
+  focus: RegistryTextSchema,
+  projects: z
+    .array(ObservatoryProjectSchema)
+    .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
 });
 
 export const ObservatorySceneSchema = z.strictObject({
-  id: z.string().min(1).describe("Canonical scene ID."),
-  name: z.string().min(1),
-  flow: z.string().min(1),
-  description: z.string(),
-  recommended_stage_owner: z.string().min(1).nullable(),
-  stage_model: z.string().min(1).optional(),
+  id: RequiredRegistryTextSchema.describe("Canonical scene ID."),
+  name: RequiredRegistryTextSchema,
+  flow: RequiredRegistryTextSchema,
+  description: RegistryTextSchema,
+  recommended_stage_owner: RequiredRegistryTextSchema.nullable(),
+  stage_model: RequiredRegistryTextSchema.optional(),
 });
 
 export const ObservatoryExecutionFlowSchema = z.strictObject({
-  id: z.string().min(1).describe("Canonical execution-flow ID."),
-  name: z.string().min(1),
-  tier_label: z.string(),
-  use_when: z.string(),
-  controller: z.string(),
-  subagent_structure: z.string(),
-  core_output: z.string(),
-  topology: z.string().min(1),
+  id: RequiredRegistryTextSchema.describe("Canonical execution-flow ID."),
+  name: RequiredRegistryTextSchema,
+  tier_label: RegistryTextSchema,
+  use_when: RegistryTextSchema,
+  controller: RegistryTextSchema,
+  subagent_structure: RegistryTextSchema,
+  core_output: RegistryTextSchema,
+  topology: RequiredRegistryTextSchema,
   team_allowed: z.boolean(),
-  completion_requirements: z.array(z.string().min(1)),
+  completion_requirements: z
+    .array(RequiredRegistryTextSchema)
+    .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
 });
 
 export const ObservatoryRegistrySummarySchema = z.strictObject({
@@ -85,12 +97,18 @@ export const ObservatoryRegistrySnapshotSchema = z
   .strictObject({
     schema_version: z.literal(OBSERVATORY_SNAPSHOT_SCHEMA_VERSION),
     registry_schema_version: z.literal(ORCHESTRATION_REGISTRY_SCHEMA_VERSION),
-    registry_version: z.string().min(1),
+    registry_version: RequiredRegistryTextSchema,
     source: ObservatorySourceSchema,
     summary: ObservatoryRegistrySummarySchema,
-    project_groups: z.array(ObservatoryProjectGroupSchema),
-    scenes: z.array(ObservatorySceneSchema),
-    execution_flows: z.array(ObservatoryExecutionFlowSchema),
+    project_groups: z
+      .array(ObservatoryProjectGroupSchema)
+      .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
+    scenes: z
+      .array(ObservatorySceneSchema)
+      .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
+    execution_flows: z
+      .array(ObservatoryExecutionFlowSchema)
+      .max(OBSERVATORY_REGISTRY_MAX_ITEMS),
   })
   .superRefine((snapshot, context) => {
     const projectCount = snapshot.project_groups.reduce(

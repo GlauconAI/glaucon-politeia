@@ -13,6 +13,9 @@ import {
 } from "#observatory-collection-schema";
 import { parseOrchestrationRegistryHtml } from "#observatory-registry";
 
+export const OBSERVATORY_CLI_STDOUT_MAX_BYTES = 5 * 1024 * 1024;
+export const OBSERVATORY_REGISTRY_HTML_MAX_BYTES = 10 * 1024 * 1024;
+
 export type ObservatoryCollectorErrorCode =
   | "REGISTRY_READ_FAILED"
   | "REGISTRY_INVALID"
@@ -21,9 +24,11 @@ export type ObservatoryCollectorErrorCode =
   | "CLI_JSON_MALFORMED"
   | "CLI_SCHEMA_INVALID"
   | "SNAPSHOT_INVALID"
+  | "RESOURCE_LIMIT_EXCEEDED"
   | "FILE_IDENTITY_FAILED"
   | "SOURCE_WRITE_FORBIDDEN"
-  | "ATOMIC_WRITE_FAILED";
+  | "ATOMIC_WRITE_FAILED"
+  | "DIRECTORY_SYNC_FAILED";
 
 export class ObservatoryCollectorError extends Error {
   readonly code: ObservatoryCollectorErrorCode;
@@ -46,6 +51,7 @@ export interface CommandResult {
   stdout: string;
   stderr?: string;
   timedOut?: boolean;
+  outputLimitExceeded?: boolean;
 }
 
 export type CommandRunner = (
@@ -62,6 +68,7 @@ export interface AtomicFileAdapter {
   openExclusive(path: string): Promise<AtomicWritableFile>;
   rename(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
+  syncDirectory?(path: string): Promise<void>;
 }
 
 export interface FileIdentity {
@@ -167,7 +174,7 @@ function mapAgents(candidate: unknown): ObservatoryAgent[] {
     );
   }
 
-  return entries.map((entry, index) => {
+  const agents = entries.map((entry, index) => {
     const agent = asRecord(entry);
     const identity = firstRecord(agent?.identity);
     const model = firstRecord(agent?.model);
@@ -226,6 +233,9 @@ function mapAgents(candidate: unknown): ObservatoryAgent[] {
     }
     return parsed.data;
   });
+  return agents.sort((left, right) =>
+    left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
+  );
 }
 
 function mapRuntime(
@@ -336,6 +346,15 @@ async function runJsonCommand(
       `OpenClaw ${label} exceeded the ${timeoutMs}ms timeout.`,
     );
   }
+  if (
+    result.outputLimitExceeded ||
+    Buffer.byteLength(result.stdout, "utf8") > OBSERVATORY_CLI_STDOUT_MAX_BYTES
+  ) {
+    throw new ObservatoryCollectorError(
+      "RESOURCE_LIMIT_EXCEEDED",
+      `OpenClaw ${label} exceeded the ${OBSERVATORY_CLI_STDOUT_MAX_BYTES}-byte stdout limit.`,
+    );
+  }
   if (result.exitCode !== 0) {
     throw new ObservatoryCollectorError(
       "COMMAND_FAILED",
@@ -351,17 +370,39 @@ function canonicalize(value: unknown): unknown {
   if (!record) return value;
   return Object.fromEntries(
     Object.keys(record)
-      .filter((key) => key !== "digest" && key !== "source_digest")
       .sort()
       .map((key) => [key, canonicalize(record[key])]),
   );
+}
+
+function observatoryDigestMaterial(
+  snapshot: ObservatoryCollectionEnvelope,
+): unknown {
+  const {
+    generated_at: _generatedAt,
+    source_digest: _sourceDigest,
+    registry,
+    ...stableEnvelope
+  } = snapshot;
+  const {
+    collected_at: _collectedAt,
+    digest: _registryDigest,
+    ...stableSource
+  } = registry.source;
+  return {
+    ...stableEnvelope,
+    registry: {
+      ...registry,
+      source: stableSource,
+    },
+  };
 }
 
 export function computeObservatorySnapshotDigest(
   snapshot: ObservatoryCollectionEnvelope,
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify(canonicalize(snapshot)))
+    .update(JSON.stringify(canonicalize(observatoryDigestMaterial(snapshot))))
     .digest("hex");
 }
 
@@ -373,10 +414,19 @@ export async function collectObservatorySnapshot(
   let html: string;
   try {
     html = await dependencies.readTextFile(input.registryPath);
-  } catch {
+  } catch (error) {
+    if (error instanceof ObservatoryCollectorError) throw error;
     throw new ObservatoryCollectorError(
       "REGISTRY_READ_FAILED",
       "Unable to read the explicitly configured canonical registry source.",
+    );
+  }
+  if (
+    Buffer.byteLength(html, "utf8") > OBSERVATORY_REGISTRY_HTML_MAX_BYTES
+  ) {
+    throw new ObservatoryCollectorError(
+      "RESOURCE_LIMIT_EXCEEDED",
+      `The canonical registry source exceeded the ${OBSERVATORY_REGISTRY_HTML_MAX_BYTES}-byte input limit.`,
     );
   }
 
@@ -465,6 +515,7 @@ export async function writeObservatorySnapshotAtomically(
       dirname(destination),
       `.${basename(destination)}.${process.pid}.${randomUUID()}.tmp`,
     ),
+  beforeRename?: () => Promise<void>,
 ): Promise<void> {
   const tempPath = createTempPath(destinationPath);
   let handle: AtomicWritableFile | undefined;
@@ -477,9 +528,10 @@ export async function writeObservatorySnapshotAtomically(
     await handle.sync?.();
     await handle.close();
     closed = true;
+    await beforeRename?.();
     await files.rename(tempPath, destinationPath);
     ownsTemp = false;
-  } catch {
+  } catch (error) {
     if (handle && !closed) {
       try {
         await handle.close();
@@ -494,20 +546,46 @@ export async function writeObservatorySnapshotAtomically(
         // Never remove anything except this task-owned temp path.
       }
     }
+    if (error instanceof ObservatoryCollectorError) throw error;
     throw new ObservatoryCollectorError(
       "ATOMIC_WRITE_FAILED",
       "Unable to atomically replace the local Observatory snapshot; the prior file was preserved.",
     );
   }
+
+  if (!files.syncDirectory) return;
+  try {
+    await files.syncDirectory(dirname(destinationPath));
+  } catch (error) {
+    if (isExpectedUnsupportedDirectorySync(error)) return;
+    throw new ObservatoryCollectorError(
+      "DIRECTORY_SYNC_FAILED",
+      "The Observatory snapshot was replaced, but its destination directory could not be durably synchronized.",
+    );
+  }
 }
 
-async function assertDistinctSourceAndDestination(
+function isExpectedUnsupportedDirectorySync(error: unknown): boolean {
+  if (error === null || typeof error !== "object" || !("code" in error)) {
+    return false;
+  }
+  const code = error.code;
+  return (
+    code === "EINVAL" ||
+    code === "ENOTSUP" ||
+    code === "EOPNOTSUPP" ||
+    code === "EISDIR" ||
+    (process.platform === "win32" && code === "EPERM")
+  );
+}
+
+async function resolveSafeDestinationPath(
   sourcePath: string,
   destinationPath: string,
   identities: FileIdentityAdapter,
-): Promise<void> {
+): Promise<string> {
   let sourceCanonical: string;
-  let destinationCanonical: string;
+  let destinationResolved: string | undefined;
   let sourceIdentity: FileIdentity | undefined;
   let destinationIdentity: FileIdentity | undefined;
   try {
@@ -520,24 +598,9 @@ async function assertDistinctSourceAndDestination(
     }
     sourceCanonical = sourceResolved;
 
-    const destinationResolved =
-      await identities.realpathIfExists(destinationPath);
-    if (destinationResolved) {
-      destinationCanonical = destinationResolved;
-    } else {
-      const parentResolved = await identities.realpathIfExists(
-        dirname(destinationPath),
-      );
-      const destinationName = basename(destinationPath);
-      if (!parentResolved || !destinationName) {
-        throw new ObservatoryCollectorError(
-          "FILE_IDENTITY_FAILED",
-          "The local snapshot destination parent cannot be resolved safely.",
-        );
-      }
-      destinationCanonical = join(parentResolved, destinationName);
-    }
-
+    destinationResolved = await identities.realpathIfExists(
+      destinationPath,
+    );
     [sourceIdentity, destinationIdentity] = await Promise.all([
       identities.statIfExists(sourcePath),
       identities.statIfExists(destinationPath),
@@ -550,7 +613,9 @@ async function assertDistinctSourceAndDestination(
     );
   }
 
-  const sameCanonicalPath = sourceCanonical === destinationCanonical;
+  const sameCanonicalPath =
+    destinationResolved !== undefined &&
+    sourceCanonical === destinationResolved;
   const sameFileIdentity =
     sourceIdentity !== undefined &&
     destinationIdentity !== undefined &&
@@ -562,6 +627,33 @@ async function assertDistinctSourceAndDestination(
       "The local snapshot destination resolves to the canonical registry source.",
     );
   }
+
+  try {
+    const canonicalParent = await identities.realpathIfExists(
+      dirname(destinationPath),
+    );
+    const destinationName = basename(destinationPath);
+    if (!canonicalParent || !destinationName) {
+      throw new ObservatoryCollectorError(
+        "FILE_IDENTITY_FAILED",
+        "The local snapshot destination parent cannot be resolved safely.",
+      );
+    }
+    const pinnedDestination = join(canonicalParent, destinationName);
+    if (sourceCanonical === pinnedDestination) {
+      throw new ObservatoryCollectorError(
+        "SOURCE_WRITE_FORBIDDEN",
+        "The local snapshot destination resolves to the canonical registry source.",
+      );
+    }
+    return pinnedDestination;
+  } catch (error) {
+    if (error instanceof ObservatoryCollectorError) throw error;
+    throw new ObservatoryCollectorError(
+      "FILE_IDENTITY_FAILED",
+      "Unable to resolve the local snapshot destination parent safely.",
+    );
+  }
 }
 
 export async function collectAndWriteObservatorySnapshot(
@@ -569,16 +661,29 @@ export async function collectAndWriteObservatorySnapshot(
   dependencies: CollectAndWriteDependencies,
 ): Promise<ObservatoryCollectionEnvelope> {
   const snapshot = await collectObservatorySnapshot(input, dependencies);
-  await assertDistinctSourceAndDestination(
+  const pinnedDestination = await resolveSafeDestinationPath(
     input.registryPath,
     input.destinationPath,
     dependencies.identities,
   );
   await writeObservatorySnapshotAtomically(
     snapshot,
-    input.destinationPath,
+    pinnedDestination,
     dependencies.files,
     dependencies.createTempPath,
+    async () => {
+      const revalidatedDestination = await resolveSafeDestinationPath(
+        input.registryPath,
+        input.destinationPath,
+        dependencies.identities,
+      );
+      if (revalidatedDestination !== pinnedDestination) {
+        throw new ObservatoryCollectorError(
+          "FILE_IDENTITY_FAILED",
+          "The local snapshot destination changed before atomic replacement.",
+        );
+      }
+    },
   );
   return snapshot;
 }

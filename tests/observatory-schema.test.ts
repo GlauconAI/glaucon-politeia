@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  OBSERVATORY_REGISTRY_MAX_ITEMS,
+  OBSERVATORY_REGISTRY_MAX_TEXT_LENGTH,
   OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   ObservatoryRegistrySnapshotSchema,
 } from "@/lib/observatory/schema";
@@ -269,6 +271,46 @@ describe("ObservatoryRegistrySnapshotSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("rejects oversized registry text at its schema path", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      project_groups: [
+        {
+          ...validSnapshot.project_groups[0],
+          focus: "x".repeat(OBSERVATORY_REGISTRY_MAX_TEXT_LENGTH + 1),
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ["project_groups", 0, "focus"] }),
+        ]),
+      );
+    }
+  });
+
+  it("rejects oversized registry collections before accepting them", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      scenes: Array.from(
+        { length: OBSERVATORY_REGISTRY_MAX_ITEMS + 1 },
+        () => validSnapshot.scenes[0],
+      ),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: "too_big", path: ["scenes"] }),
+        ]),
+      );
+    }
   });
 
   it("documents project_key as derived while canonical ids remain unchanged", () => {

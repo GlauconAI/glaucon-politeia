@@ -4,18 +4,21 @@ import { ObservatoryRegistrySnapshotSchema } from "#observatory-schema";
 
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION = "1.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
+export const OBSERVATORY_AGENT_MAX_COUNT = 256;
+export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
 const IsoTimestampSchema = z.iso.datetime({ offset: true });
 const Sha256Schema = z
   .string()
   .regex(/^[a-f0-9]{64}$/, "Expected a SHA-256 digest.");
+const AgentTextSchema = z.string().max(OBSERVATORY_AGENT_MAX_TEXT_LENGTH);
 
 export const ObservatoryAgentSchema = z.strictObject({
-  id: z.string().min(1),
-  display_name: z.string(),
-  emoji: z.string(),
-  model_label: z.string(),
-  workspace_label: z.string().min(1),
+  id: AgentTextSchema.min(1),
+  display_name: AgentTextSchema,
+  emoji: AgentTextSchema,
+  model_label: AgentTextSchema,
+  workspace_label: AgentTextSchema.min(1),
   binding_count: z.number().int().nonnegative(),
   default: z.boolean(),
 });
@@ -29,7 +32,7 @@ export const ObservatoryRuntimeTaskTotalsSchema = z.strictObject({
 });
 
 export const ObservatoryRuntimeSchema = z.strictObject({
-  runtime_version: z.string().min(1),
+  runtime_version: AgentTextSchema.min(1),
   gateway_running: z.boolean(),
   gateway_reachable: z.boolean(),
   configured_agent_count: z.number().int().nonnegative(),
@@ -58,7 +61,7 @@ export const ObservatoryCollectionEnvelopeSchema = z
     source_digest: Sha256Schema,
     collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION),
     registry: ObservatoryRegistrySnapshotSchema,
-    agents: z.array(ObservatoryAgentSchema),
+    agents: z.array(ObservatoryAgentSchema).max(OBSERVATORY_AGENT_MAX_COUNT),
     runtime: ObservatoryRuntimeSchema,
     summary: ObservatoryCollectionSummarySchema,
   })

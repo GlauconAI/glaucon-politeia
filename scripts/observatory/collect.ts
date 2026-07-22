@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import {
   mkdir,
   open,
-  readFile,
   realpath,
   rename,
   stat,
@@ -12,6 +11,8 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 
 import {
+  OBSERVATORY_CLI_STDOUT_MAX_BYTES,
+  OBSERVATORY_REGISTRY_HTML_MAX_BYTES,
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
   type AtomicFileAdapter,
@@ -27,12 +28,22 @@ function runCommand(invocation: CommandInvocation): Promise<CommandResult> {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const stdout: Buffer[] = [];
+    let stdoutBytes = 0;
+    let outputLimitExceeded = false;
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
     }, invocation.timeoutMs);
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > OBSERVATORY_CLI_STDOUT_MAX_BYTES) {
+        outputLimitExceeded = true;
+        child.kill("SIGKILL");
+        return;
+      }
+      stdout.push(chunk);
+    });
     child.stderr.resume();
     child.once("error", (error) => {
       clearTimeout(timeout);
@@ -44,6 +55,7 @@ function runCommand(invocation: CommandInvocation): Promise<CommandResult> {
         exitCode: code ?? -1,
         stdout: Buffer.concat(stdout).toString("utf8"),
         timedOut,
+        outputLimitExceeded,
       });
     });
   });
@@ -68,7 +80,49 @@ const files: AtomicFileAdapter = {
   remove: async (path) => {
     await unlink(path);
   },
+  syncDirectory: async (path) => {
+    const handle = await open(path, "r");
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  },
 };
+
+async function readTextFileBounded(path: string): Promise<string> {
+  const handle = await open(path, "r");
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const buffer = Buffer.alloc(
+        Math.min(
+          64 * 1024,
+          OBSERVATORY_REGISTRY_HTML_MAX_BYTES + 1 - totalBytes,
+        ),
+      );
+      const { bytesRead } = await handle.read(
+        buffer,
+        0,
+        buffer.length,
+        null,
+      );
+      if (bytesRead === 0) break;
+      totalBytes += bytesRead;
+      if (totalBytes > OBSERVATORY_REGISTRY_HTML_MAX_BYTES) {
+        throw new ObservatoryCollectorError(
+          "RESOURCE_LIMIT_EXCEEDED",
+          `The canonical registry source exceeded the ${OBSERVATORY_REGISTRY_HTML_MAX_BYTES}-byte input limit.`,
+        );
+      }
+      chunks.push(buffer.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks, totalBytes).toString("utf8");
+  } finally {
+    await handle.close();
+  }
+}
 
 function isMissing(error: unknown): boolean {
   return (
@@ -118,7 +172,7 @@ async function main(): Promise<void> {
     },
     {
       runCommand,
-      readTextFile: async (path) => readFile(path, "utf8"),
+      readTextFile: readTextFileBounded,
       now: () => new Date(),
       files,
       identities,

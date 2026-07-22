@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  OBSERVATORY_CLI_STDOUT_MAX_BYTES,
+  OBSERVATORY_REGISTRY_HTML_MAX_BYTES,
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
   collectObservatorySnapshot,
@@ -13,7 +15,11 @@ import {
   type CommandResult,
   type FileIdentityAdapter,
 } from "@/lib/observatory/collector";
-import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
+import {
+  OBSERVATORY_AGENT_MAX_COUNT,
+  OBSERVATORY_AGENT_MAX_TEXT_LENGTH,
+  ObservatoryCollectionEnvelopeSchema,
+} from "@/lib/observatory/collection-schema";
 
 const registryHtml = readFileSync(
   join(process.cwd(), "tests/fixtures/observatory-registry.html"),
@@ -171,10 +177,26 @@ describe("collectObservatorySnapshot", () => {
   });
 
   it("computes a deterministic SHA-256 digest from canonical validated content", async () => {
+    const primaryAgent = JSON.parse(agentsOutput).agents[0];
+    const agentSet = [
+      primaryAgent,
+      {
+        id: "athena",
+        identityName: "Athena",
+        identityEmoji: "🦉",
+        model: "openai/gpt-5",
+        workspace: "/Users/private/.openclaw/workspace/athena",
+        bindings: 0,
+        isDefault: false,
+      },
+    ];
     const first = await collectObservatorySnapshot(
       { registryPath: "/canonical/registry.html" },
       {
-        runCommand: successfulRunner(),
+        runCommand: successfulRunner([], {
+          agents: JSON.stringify({ agents: agentSet }),
+          status: statusOutput,
+        }),
         readTextFile: async () => registryHtml,
         now: () => fixedNow,
       },
@@ -183,7 +205,7 @@ describe("collectObservatorySnapshot", () => {
       { registryPath: "/different/private/source/path.html" },
       {
         runCommand: successfulRunner([], {
-          agents: JSON.stringify(JSON.parse(agentsOutput), null, 2),
+          agents: JSON.stringify({ agents: [...agentSet].reverse() }, null, 2),
           status: JSON.stringify({
             tasks: JSON.parse(statusOutput).tasks,
             agents: JSON.parse(statusOutput).agents,
@@ -193,14 +215,47 @@ describe("collectObservatorySnapshot", () => {
           }),
         }),
         readTextFile: async () => registryHtml,
-        now: () => fixedNow,
+        now: () => new Date("2026-07-22T23:00:00.000Z"),
       },
     );
 
+    expect(first.agents.map((agent) => agent.id)).toEqual(["athena", "plato"]);
+    expect(second.agents).toEqual(first.agents);
+    expect(second.generated_at).not.toBe(first.generated_at);
     expect(first.source_digest).toMatch(/^[a-f0-9]{64}$/);
     expect(first.source_digest).toBe(second.source_digest);
     expect(first.registry.source.digest).toBe(first.source_digest);
     expect(JSON.stringify(first)).not.toContain("/canonical/registry.html");
+  });
+
+  it("enforces emitted agent text and collection ceilings in the Zod contract", async () => {
+    const snapshot = await collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+    const oversizedText = ObservatoryCollectionEnvelopeSchema.safeParse({
+      ...snapshot,
+      agents: [
+        {
+          ...snapshot.agents[0],
+          display_name: "x".repeat(OBSERVATORY_AGENT_MAX_TEXT_LENGTH + 1),
+        },
+      ],
+    });
+    const oversizedAgents = ObservatoryCollectionEnvelopeSchema.safeParse({
+      ...snapshot,
+      agents: Array.from(
+        { length: OBSERVATORY_AGENT_MAX_COUNT + 1 },
+        () => snapshot.agents[0],
+      ),
+    });
+
+    expect(oversizedText.success).toBe(false);
+    expect(oversizedAgents.success).toBe(false);
   });
 
   it("keeps a stopped Gateway service stopped regardless of reachability", async () => {
@@ -264,14 +319,18 @@ describe("collectObservatorySnapshot", () => {
       },
     );
 
-    expect(snapshot.agents.map((agent) => agent.workspace_label)).toEqual([
-      "plato",
-      "athena",
-      "socrates",
-      "unknown",
-      "plato-prod",
-      "unknown",
-    ]);
+    expect(
+      Object.fromEntries(
+        snapshot.agents.map((agent) => [agent.id, agent.workspace_label]),
+      ),
+    ).toEqual({
+      nested: "plato",
+      windows: "athena",
+      unc: "socrates",
+      missing: "unknown",
+      logical: "plato-prod",
+      invalid: "unknown",
+    });
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain("private-tail");
     expect(serialized).not.toContain("private-user");
@@ -299,6 +358,64 @@ describe("collectObservatorySnapshot", () => {
       "message",
       expect.stringContaining(secret),
     );
+  });
+
+  it("rejects oversized CLI stdout before attempting JSON parsing", async () => {
+    const secret = "private-cli-tail";
+    const oversized = `${" ".repeat(OBSERVATORY_CLI_STDOUT_MAX_BYTES)}${secret}`;
+    const action = collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: async () => ({ exitCode: 0, stdout: oversized }),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "RESOURCE_LIMIT_EXCEEDED",
+    });
+    await expect(action).rejects.not.toHaveProperty(
+      "message",
+      expect.stringContaining(secret),
+    );
+  });
+
+  it("reports the CLI adapter's output-limit signal before its killed exit code", async () => {
+    const action = collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: async () => ({
+          exitCode: -1,
+          stdout: "",
+          outputLimitExceeded: true,
+        }),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "RESOURCE_LIMIT_EXCEEDED",
+    });
+  });
+
+  it("rejects oversized registry HTML before running CLI commands", async () => {
+    const runCommand = vi.fn(successfulRunner());
+    const action = collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand,
+        readTextFile: async () =>
+          "x".repeat(OBSERVATORY_REGISTRY_HTML_MAX_BYTES + 1),
+        now: () => fixedNow,
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "RESOURCE_LIMIT_EXCEEDED",
+    });
+    expect(runCommand).not.toHaveBeenCalled();
   });
 
   it("reports explicit timeouts", async () => {
@@ -509,6 +626,67 @@ describe("collectAndWriteObservatorySnapshot", () => {
     expect(opened).toBe(false);
   });
 
+  it("pins the canonical destination parent and rejects a destination rebound before rename", async () => {
+    const sourcePath = "/canonical/source.html";
+    const destinationPath = "/logical-output/snapshot.json";
+    let destinationChecks = 0;
+    let openedTemp = "";
+    let renamed = false;
+    const removed: string[] = [];
+    const identities: FileIdentityAdapter = {
+      realpathIfExists: async (path) => {
+        if (path === sourcePath) return "/real/canonical/source.html";
+        if (path === "/logical-output") return "/real/output";
+        if (path === destinationPath) {
+          destinationChecks += 1;
+          return destinationChecks === 1
+            ? undefined
+            : "/real/canonical/source.html";
+        }
+        return undefined;
+      },
+      statIfExists: async (path) =>
+        path === sourcePath ||
+        (path === destinationPath && destinationChecks > 1)
+          ? { device: 7, inode: 11 }
+          : undefined,
+    };
+
+    const action = collectAndWriteObservatorySnapshot(
+      { registryPath: sourcePath, destinationPath },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+        identities,
+        files: {
+          openExclusive: async (path) => {
+            openedTemp = path;
+            return {
+              write: async () => undefined,
+              sync: async () => undefined,
+              close: async () => undefined,
+            };
+          },
+          rename: async () => {
+            renamed = true;
+          },
+          remove: async (path) => {
+            removed.push(path);
+          },
+          syncDirectory: async () => undefined,
+        },
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "SOURCE_WRITE_FORBIDDEN",
+    });
+    expect(openedTemp.startsWith("/real/output/")).toBe(true);
+    expect(renamed).toBe(false);
+    expect(removed).toEqual([openedTemp]);
+  });
+
   it("preserves the last-known-good file and removes only its owned temp file on rename failure", async () => {
     const destination = "/safe/output/observatory-snapshot.json";
     const temp = "/safe/output/.observatory-snapshot.json.task-owned.tmp";
@@ -590,5 +768,108 @@ describe("collectAndWriteObservatorySnapshot", () => {
       ),
     ).rejects.toMatchObject({ code: "ATOMIC_WRITE_FAILED" });
     expect(removed).toEqual([]);
+  });
+
+  it("syncs the canonical destination directory after rename", async () => {
+    const snapshot = await collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+    const syncedDirectories: string[] = [];
+
+    await writeObservatorySnapshotAtomically(
+      snapshot,
+      "/real/output/snapshot.json",
+      {
+        openExclusive: async () => ({
+          write: async () => undefined,
+          sync: async () => undefined,
+          close: async () => undefined,
+        }),
+        rename: async () => undefined,
+        remove: async () => undefined,
+        syncDirectory: async (path) => {
+          syncedDirectories.push(path);
+        },
+      },
+      () => "/real/output/.snapshot.task.tmp",
+    );
+
+    expect(syncedDirectories).toEqual(["/real/output"]);
+  });
+
+  it("ignores only documented unsupported directory-sync errors", async () => {
+    const snapshot = await collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+    let attempts = 0;
+    const adapter: AtomicFileAdapter = {
+      openExclusive: async () => ({
+        write: async () => undefined,
+        close: async () => undefined,
+      }),
+      rename: async () => undefined,
+      remove: async () => undefined,
+      syncDirectory: async () => {
+        attempts += 1;
+        throw Object.assign(new Error("unsupported private path"), {
+          code: "ENOTSUP",
+        });
+      },
+    };
+
+    await expect(
+      writeObservatorySnapshotAtomically(
+        snapshot,
+        "/real/output/snapshot.json",
+        adapter,
+      ),
+    ).resolves.toBeUndefined();
+    expect(attempts).toBe(1);
+  });
+
+  it("reports unexpected destination-directory sync failures without raw details", async () => {
+    const snapshot = await collectObservatorySnapshot(
+      { registryPath: "/canonical/registry.html" },
+      {
+        runCommand: successfulRunner(),
+        readTextFile: async () => registryHtml,
+        now: () => fixedNow,
+      },
+    );
+    const action = writeObservatorySnapshotAtomically(
+      snapshot,
+      "/real/output/snapshot.json",
+      {
+        openExclusive: async () => ({
+          write: async () => undefined,
+          close: async () => undefined,
+        }),
+        rename: async () => undefined,
+        remove: async () => undefined,
+        syncDirectory: async () => {
+          throw Object.assign(new Error("EIO at /private/output"), {
+            code: "EIO",
+          });
+        },
+      },
+    );
+
+    await expect(action).rejects.toMatchObject({
+      code: "DIRECTORY_SYNC_FAILED",
+    });
+    await expect(action).rejects.not.toHaveProperty(
+      "message",
+      expect.stringContaining("/private/output"),
+    );
   });
 });
