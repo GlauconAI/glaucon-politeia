@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   mkdir,
@@ -11,55 +10,13 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 
 import {
-  OBSERVATORY_CLI_STDOUT_MAX_BYTES,
   OBSERVATORY_REGISTRY_HTML_MAX_BYTES,
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
   type AtomicFileAdapter,
-  type CommandInvocation,
-  type CommandResult,
   type FileIdentityAdapter,
 } from "#observatory-collector";
-
-function runCommand(invocation: CommandInvocation): Promise<CommandResult> {
-  return new Promise((resolveResult, reject) => {
-    const child = spawn(invocation.command, [...invocation.args], {
-      shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const stdout: Buffer[] = [];
-    let stdoutBytes = 0;
-    let outputLimitExceeded = false;
-    let timedOut = false;
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-    }, invocation.timeoutMs);
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdoutBytes += chunk.length;
-      if (stdoutBytes > OBSERVATORY_CLI_STDOUT_MAX_BYTES) {
-        outputLimitExceeded = true;
-        child.kill("SIGKILL");
-        return;
-      }
-      stdout.push(chunk);
-    });
-    child.stderr.resume();
-    child.once("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.once("close", (code) => {
-      clearTimeout(timeout);
-      resolveResult({
-        exitCode: code ?? -1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        timedOut,
-        outputLimitExceeded,
-      });
-    });
-  });
-}
+import { runCommand } from "#observatory-command-runner";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {

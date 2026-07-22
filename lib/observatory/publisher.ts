@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import { ObservatoryCollectionEnvelopeSchema } from "#observatory-collection-schema";
 import { computeObservatorySnapshotDigest } from "#observatory-collector";
 
@@ -29,6 +31,14 @@ export interface ObservatoryPublishResult {
   idempotent: boolean;
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+  if (normalized === "localhost" || normalized === "::1") return true;
+  return isIP(normalized) === 4 && normalized.split(".")[0] === "127";
+}
+
 function endpointFor(supabaseUrl: string): string {
   let url: URL;
   try {
@@ -39,10 +49,13 @@ function endpointFor(supabaseUrl: string): string {
       "SUPABASE_URL is missing or invalid.",
     );
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
+  if (
+    url.protocol !== "https:" &&
+    (url.protocol !== "http:" || !isLoopbackHostname(url.hostname))
+  ) {
     throw new ObservatoryPublisherError(
       "CONFIG_MISSING",
-      "SUPABASE_URL must use HTTP or HTTPS.",
+      "SUPABASE_URL must use HTTPS; HTTP is allowed only for loopback development endpoints.",
     );
   }
   return `${url.toString().replace(/\/$/u, "")}/rest/v1/observatory_snapshots`;

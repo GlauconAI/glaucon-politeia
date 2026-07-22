@@ -7,6 +7,7 @@
     "#observatory-registry": "./lib/observatory/registry.ts",
     "#observatory-collection-schema": "./lib/observatory/collection-schema.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
+    "#observatory-command-runner": "./scripts/observatory/run-command.ts",
     "#observatory-publisher": "./lib/observatory/publisher.ts"
   },
   "scripts": {

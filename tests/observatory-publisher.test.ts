@@ -62,6 +62,42 @@ const config = {
 };
 
 describe("publishObservatorySnapshot", () => {
+  it("rejects remote HTTP endpoints before sending credentials", async () => {
+    const snapshot = await validSnapshot();
+    const fetchAdapter = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 201 }),
+    );
+
+    await expect(
+      publishObservatorySnapshot(snapshot, {
+        supabaseUrl: "http://project.supabase.co",
+        serviceRoleKey: config.serviceRoleKey,
+        fetch: fetchAdapter,
+      }),
+    ).rejects.toMatchObject({ code: "CONFIG_MISSING" });
+    expect(fetchAdapter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "http://127.23.45.67:54321",
+    "http://[::1]:54321",
+    "http://localhost:54321",
+  ])("allows an HTTP loopback endpoint at %s", async (supabaseUrl) => {
+    const snapshot = await validSnapshot();
+    const fetchAdapter = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 201 }),
+    );
+
+    await expect(
+      publishObservatorySnapshot(snapshot, {
+        supabaseUrl,
+        serviceRoleKey: config.serviceRoleKey,
+        fetch: fetchAdapter,
+      }),
+    ).resolves.toEqual({ published: true, idempotent: false });
+    expect(fetchAdapter).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a failed snapshot before network I/O", async () => {
     const fetchAdapter = vi.fn<typeof fetch>();
 
