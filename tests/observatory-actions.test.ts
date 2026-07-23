@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   authError: null as Error | null,
   serverClientError: null as Error | null,
   createQuickCapture: vi.fn(),
+  updateWorkItem: vi.fn(),
+  transitionWorkItem: vi.fn(),
+  addWorkItemEvidence: vi.fn(),
+  removeWorkItemEvidence: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -32,13 +36,21 @@ vi.mock("@/lib/observatory/repository", async (importOriginal) => {
     ...original,
     createObservatoryRepository: () => ({
       createQuickCapture: mocks.createQuickCapture,
+      updateWorkItem: mocks.updateWorkItem,
+      transitionWorkItem: mocks.transitionWorkItem,
+      addWorkItemEvidence: mocks.addWorkItemEvidence,
+      removeWorkItemEvidence: mocks.removeWorkItemEvidence,
     }),
   };
 });
 
 import {
+  addObservatoryWorkItemEvidenceAction,
   captureObservatoryWorkItemAction,
+  removeObservatoryWorkItemEvidenceAction,
+  transitionObservatoryWorkItemAction,
   type ObservatoryQuickCaptureActionState,
+  updateObservatoryWorkItemAction,
 } from "@/app/observatory/actions";
 import { ObservatoryRepositoryError } from "@/lib/observatory/repository";
 
@@ -177,5 +189,154 @@ describe("captureObservatoryWorkItemAction", () => {
         "This capture key was already used for different content. Refresh and try again.",
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("Work Tracker mutation actions", () => {
+  const workItemId = "11111111-1111-4111-8111-111111111111";
+  const ownerId = "22222222-2222-4222-8222-222222222222";
+
+  beforeEach(() => {
+    mocks.currentAdmin = { user_id: ownerId };
+    mocks.authError = null;
+    mocks.serverClientError = null;
+    mocks.updateWorkItem.mockReset();
+    mocks.transitionWorkItem.mockReset();
+    mocks.addWorkItemEvidence.mockReset();
+    mocks.removeWorkItemEvidence.mockReset();
+    for (const mutation of [
+      mocks.updateWorkItem,
+      mocks.transitionWorkItem,
+      mocks.addWorkItemEvidence,
+      mocks.removeWorkItemEvidence,
+    ]) {
+      mutation.mockResolvedValue({ id: workItemId, version: 4 });
+    }
+    mocks.revalidatePath.mockReset();
+  });
+
+  it("rejects a transition before parsing when the caller is unauthorized", async () => {
+    mocks.currentAdmin = null;
+
+    await expect(
+      transitionObservatoryWorkItemAction(
+        { status: "idle" },
+        new FormData(),
+      ),
+    ).resolves.toEqual({
+      status: "error",
+      formError: "Administrator access is required.",
+    });
+    expect(mocks.transitionWorkItem).not.toHaveBeenCalled();
+  });
+
+  it("updates normalized fields with the expected version", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("type", "feature");
+    formData.set("title", "  Manual board  ");
+    formData.set("description", "  Admin only.  ");
+    formData.set("acceptanceCriteria", "  Reaches Done.  ");
+    formData.set("priority", "high");
+    formData.set("ownerId", ownerId);
+    formData.set("projectRef", "  dashboard  ");
+    formData.set("milestoneRef", "");
+
+    await expect(
+      updateObservatoryWorkItemAction({ status: "idle" }, formData),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.updateWorkItem).toHaveBeenCalledWith({
+      workItemId,
+      expectedVersion: 3,
+      type: "feature",
+      title: "Manual board",
+      description: "Admin only.",
+      acceptanceCriteria: "Reaches Done.",
+      priority: "high",
+      ownerId,
+      projectRef: "dashboard",
+      milestoneRef: null,
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(
+      `/dashboard/work-items/${workItemId}`,
+    );
+  });
+
+  it("moves a work item and returns a stable Ready Gate error", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("targetState", "ready");
+    mocks.transitionWorkItem.mockRejectedValue(
+      new ObservatoryRepositoryError(
+        "READY_GATE_FAILED",
+        "private database detail",
+      ),
+    );
+
+    await expect(
+      transitionObservatoryWorkItemAction({ status: "idle" }, formData),
+    ).resolves.toEqual({
+      status: "error",
+      formError: "Add acceptance criteria, priority, and owner before Ready.",
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("adds and removes evidence through separate audited mutations", async () => {
+    const addData = new FormData();
+    addData.set("workItemId", workItemId);
+    addData.set("expectedVersion", "3");
+    addData.set("label", "  Production gate  ");
+    addData.set("url", "https://402v.com/dashboard");
+
+    await expect(
+      addObservatoryWorkItemEvidenceAction({ status: "idle" }, addData),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.addWorkItemEvidence).toHaveBeenCalledWith({
+      workItemId,
+      expectedVersion: 3,
+      label: "Production gate",
+      url: "https://402v.com/dashboard",
+    });
+
+    const removeData = new FormData();
+    removeData.set("workItemId", workItemId);
+    removeData.set("evidenceId", "33333333-3333-4333-8333-333333333333");
+    removeData.set("expectedVersion", "4");
+
+    await expect(
+      removeObservatoryWorkItemEvidenceAction(
+        { status: "idle" },
+        removeData,
+      ),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.removeWorkItemEvidence).toHaveBeenCalledWith({
+      workItemId,
+      evidenceId: "33333333-3333-4333-8333-333333333333",
+      expectedVersion: 4,
+    });
+  });
+
+  it("returns a stable conflict message", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("targetState", "triage");
+    mocks.transitionWorkItem.mockRejectedValue(
+      new ObservatoryRepositoryError(
+        "VERSION_CONFLICT",
+        "private database detail",
+      ),
+    );
+
+    await expect(
+      transitionObservatoryWorkItemAction({ status: "idle" }, formData),
+    ).resolves.toEqual({
+      status: "error",
+      formError: "This item changed. Refresh before trying again.",
+    });
   });
 });
