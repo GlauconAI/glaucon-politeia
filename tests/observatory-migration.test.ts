@@ -279,6 +279,7 @@ describe("M3 Work Tracker core migration", () => {
     expect(source).toContain(
       "create table public.observatory_work_item_evidence",
     );
+    expect(source).toContain("url ~* '^https?://[^[:space:]]+$'");
     expect(source).toContain("removed_at timestamptz");
     expect(source).toContain("removed_by uuid");
   });
@@ -363,6 +364,7 @@ describe("M3 Work Tracker core migration", () => {
       "remove_observatory_work_item_evidence",
       "Ready Gate rejects incomplete work",
       "illegal state transition rejected",
+      "invalid evidence URL rejected",
       "evidence add and soft removal are audited",
       "direct evidence insert denied",
     ]) {

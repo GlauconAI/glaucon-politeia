@@ -39,7 +39,7 @@ create table public.observatory_work_item_evidence (
   label text not null check (length(btrim(label)) between 1 and 200),
   url text not null check (
     length(url) between 1 and 2048
-    and url ~ '^https?://'
+    and url ~* '^https?://[^[:space:]]+$'
   ),
   created_by uuid not null references public.profiles(user_id) on delete restrict,
   created_at timestamptz not null default now(),

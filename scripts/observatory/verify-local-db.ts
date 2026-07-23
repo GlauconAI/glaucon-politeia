@@ -748,6 +748,17 @@ async function main(): Promise<void> {
     targetState: "in_progress",
   });
   assert.equal(inProgress.version, 5);
+  await expectPgError(
+    "invalid evidence URL rejected",
+    "23514",
+    () =>
+      addWorkItemEvidence(adminId, {
+        id: workflow.id,
+        expectedVersion: 5,
+        label: "Invalid evidence",
+        url: "https://example.invalid/contains whitespace",
+      }),
+  );
   const evidenceAdded = await addWorkItemEvidence(adminId, {
     id: workflow.id,
     expectedVersion: 5,
