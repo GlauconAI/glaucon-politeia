@@ -24,7 +24,10 @@ import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
-import { collectDashboardGovernance } from "#observatory-governance-collector";
+import {
+  GovernanceCollectionError,
+  collectDashboardGovernance,
+} from "#observatory-governance-collector";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {
@@ -193,7 +196,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  if (error instanceof ObservatoryCollectorError) {
+  if (
+    error instanceof ObservatoryCollectorError ||
+    error instanceof GovernanceCollectionError
+  ) {
     process.stderr.write(`${error.code}: ${error.message}\n`);
   } else {
     process.stderr.write("OBSERVATORY_COLLECT_FAILED: Collection failed.\n");

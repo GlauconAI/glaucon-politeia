@@ -27,6 +27,9 @@ describe("Observatory refresh state", () => {
     expect(
       sanitize("COMMAND_TIMEOUT: OpenClaw status exceeded the bound."),
     ).toBe("COMMAND_TIMEOUT_STATUS");
+    expect(sanitize("GOVERNANCE_INVALID: sanitized detail")).toBe(
+      "GOVERNANCE_INVALID",
+    );
     expect(sanitize("secret-looking untrusted stderr")).toBe("STEP_FAILED");
   });
 
