@@ -952,6 +952,143 @@
   font-size: 11px;
 }
 
+.governance-review {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.governance-formal-review,
+.governance-period-card,
+.governance-attribution,
+.governance-quality,
+.governance-history-grid > section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 12px;
+}
+
+.governance-formal-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.governance-formal-review h3,
+.governance-formal-review p,
+.governance-period-card h3,
+.governance-period-card p,
+.governance-attribution h3,
+.governance-quality h3,
+.governance-history-grid h3 {
+  margin: 0 0 8px;
+}
+
+.governance-formal-review > p {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.governance-review-status {
+  align-self: start;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+.review-on_track {
+  color: var(--success);
+}
+
+.review-at_risk {
+  color: var(--warning);
+}
+
+.review-off_track {
+  color: #fb7185;
+}
+
+.governance-period-grid,
+.governance-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.governance-period-card {
+  display: grid;
+  gap: 5px;
+}
+
+.governance-period-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.governance-issues-table {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.governance-issues-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.governance-issues-table th,
+.governance-issues-table td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.governance-issues-table th span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.governance-attribution,
+.governance-quality {
+  margin-top: 10px;
+}
+
+.governance-attribution ul,
+.governance-quality ul,
+.governance-history-grid ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.governance-attribution li,
+.governance-quality li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+  overflow-wrap: anywhere;
+}
+
+.governance-history-grid li {
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+  overflow-wrap: anywhere;
+}
+
 .observatory-capture-panel {
   border-color: rgba(124, 58, 237, 0.35);
 }
@@ -1064,8 +1201,15 @@
   .cockpit-meta,
   .cockpit-evidence-grid,
   .roadmap-review dl,
-  .flow-metric-grid {
+  .flow-metric-grid,
+  .governance-formal-review,
+  .governance-period-grid,
+  .governance-history-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .governance-formal-review > p {
+    grid-column: auto;
   }
 
   .roadmap-track {
