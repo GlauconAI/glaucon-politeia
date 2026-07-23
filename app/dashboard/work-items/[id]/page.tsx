@@ -55,20 +55,23 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
     notFound();
   }
 
+  let evidence;
+  let events;
   try {
-    const [evidence, events] = await Promise.all([
+    [evidence, events] = await Promise.all([
       repository.listWorkItemEvidence(id),
       repository.listWorkItemEvents(id),
     ]);
-    return (
-      <WorkItemDetail
-        item={item}
-        evidence={evidence}
-        events={events}
-        currentAdmin={currentAdmin}
-      />
-    );
   } catch {
     return unavailableState();
   }
+
+  return (
+    <WorkItemDetail
+      item={item}
+      evidence={evidence}
+      events={events}
+      currentAdmin={currentAdmin}
+    />
+  );
 }
