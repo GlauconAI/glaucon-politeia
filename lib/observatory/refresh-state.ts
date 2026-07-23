@@ -22,7 +22,7 @@ export interface ObservatoryRefreshTransition {
 
 const FAILURE_NOTIFICATION_THRESHOLD = 3;
 export const OBSERVATORY_STALE_THRESHOLD_MS = 45 * 60 * 1000;
-export const OBSERVATORY_REFRESH_STEP_TIMEOUT_MS = 5 * 60 * 1000;
+export const OBSERVATORY_REFRESH_STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
 function requireIsoTimestamp(value: string): string {
   const parsed = Date.parse(value);

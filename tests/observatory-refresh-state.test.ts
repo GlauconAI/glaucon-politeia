@@ -11,7 +11,7 @@ const startedAt = "2026-07-22T20:00:00.000Z";
 
 describe("Observatory refresh state", () => {
   it("allows the measured sequential multi-agent collection window", () => {
-    expect(OBSERVATORY_REFRESH_STEP_TIMEOUT_MS).toBe(5 * 60 * 1000);
+    expect(OBSERVATORY_REFRESH_STEP_TIMEOUT_MS).toBe(10 * 60 * 1000);
   });
 
   it("notifies only when the third consecutive failure is reached", () => {

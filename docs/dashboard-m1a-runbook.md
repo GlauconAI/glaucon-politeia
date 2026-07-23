@@ -202,6 +202,8 @@ If resources are constrained, Vitest can be serialized with `npm test -- --maxWo
 
 The refresh command takes the registry, workspace root, Vault root, and optional config path as positional arguments. It acquires `.observatory/refresh.lock` exclusively, collects into the local last-known-good file, validates and publishes it idempotently, and writes only bounded state to `.observatory/refresh-state.json`. Lock and state files are mode `0600`; raw stderr is discarded.
 
+The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory while remaining below the 15-minute schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
+
 ```bash
 npm run observatory:refresh -- \
   "$OBSERVATORY_REGISTRY_PATH" \
