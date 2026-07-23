@@ -24,6 +24,42 @@ const FAILURE_NOTIFICATION_THRESHOLD = 3;
 export const OBSERVATORY_STALE_THRESHOLD_MS = 45 * 60 * 1000;
 export const OBSERVATORY_REFRESH_STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
+const SAFE_REFRESH_STEP_FAILURE_CODES = [
+  "REGISTRY_READ_FAILED",
+  "REGISTRY_INVALID",
+  "COMMAND_FAILED",
+  "COMMAND_TIMEOUT",
+  "CLI_JSON_MALFORMED",
+  "CLI_SCHEMA_INVALID",
+  "SNAPSHOT_INVALID",
+  "RESOURCE_LIMIT_EXCEEDED",
+  "FILE_IDENTITY_FAILED",
+  "SOURCE_WRITE_FORBIDDEN",
+  "ATOMIC_WRITE_FAILED",
+  "DIRECTORY_SYNC_FAILED",
+  "OBSERVATORY_COLLECT_FAILED",
+  "INVALID_SNAPSHOT",
+  "DIGEST_MISMATCH",
+  "CONFIG_MISSING",
+  "PUBLISH_FAILED",
+  "DUPLICATE_CONFIRM_FAILED",
+] as const;
+
+export function sanitizeObservatoryRefreshStepFailure(input: string): string {
+  if (/COMMAND_TIMEOUT:\s+OpenClaw agents\b/u.test(input)) {
+    return "COMMAND_TIMEOUT_AGENTS";
+  }
+  if (/COMMAND_TIMEOUT:\s+OpenClaw status\b/u.test(input)) {
+    return "COMMAND_TIMEOUT_STATUS";
+  }
+  for (const code of SAFE_REFRESH_STEP_FAILURE_CODES) {
+    if (new RegExp(`(?:^|[^A-Z_])${code}(?:[^A-Z_]|$)`, "u").test(input)) {
+      return code;
+    }
+  }
+  return "STEP_FAILED";
+}
+
 function requireIsoTimestamp(value: string): string {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {

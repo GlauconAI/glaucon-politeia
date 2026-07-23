@@ -204,6 +204,8 @@ The refresh command takes the registry, workspace root, Vault root, and optional
 
 The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory while remaining below the 15-minute schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
 
+The macOS LaunchAgent must use `ProcessType=Standard`. `Background` applies stricter CPU and I/O limits; at production scale it caused the core `openclaw agents list --json` command to exceed its trusted 30-second bound even though the same command completed in about five to six seconds in a normal host shell. Do not use `Interactive`; the refresh is not user-interactive. On a failed child step, the orchestrator may retain up to 8 KiB in memory only long enough to reduce stderr to a whitelisted error code such as `COMMAND_TIMEOUT_AGENTS`; raw child output must never enter notification text or refresh state.
+
 ```bash
 npm run observatory:refresh -- \
   "$OBSERVATORY_REGISTRY_PATH" \

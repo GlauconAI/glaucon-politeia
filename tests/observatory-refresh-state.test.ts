@@ -6,10 +6,30 @@ import {
   evaluateObservatoryRefreshStaleness,
   transitionObservatoryRefreshState,
 } from "@/lib/observatory/refresh-state";
+import * as refreshStateModule from "@/lib/observatory/refresh-state";
 
 const startedAt = "2026-07-22T20:00:00.000Z";
 
 describe("Observatory refresh state", () => {
+  it("reduces child stderr to a whitelisted failure code", () => {
+    const sanitize = Reflect.get(
+      refreshStateModule,
+      "sanitizeObservatoryRefreshStepFailure",
+    );
+
+    expect(sanitize).toBeTypeOf("function");
+    expect(
+      sanitize("COMMAND_FAILED: internal path and untrusted detail"),
+    ).toBe("COMMAND_FAILED");
+    expect(
+      sanitize("COMMAND_TIMEOUT: OpenClaw agents exceeded the bound."),
+    ).toBe("COMMAND_TIMEOUT_AGENTS");
+    expect(
+      sanitize("COMMAND_TIMEOUT: OpenClaw status exceeded the bound."),
+    ).toBe("COMMAND_TIMEOUT_STATUS");
+    expect(sanitize("secret-looking untrusted stderr")).toBe("STEP_FAILED");
+  });
+
   it("allows the measured sequential multi-agent collection window", () => {
     expect(OBSERVATORY_REFRESH_STEP_TIMEOUT_MS).toBe(10 * 60 * 1000);
   });

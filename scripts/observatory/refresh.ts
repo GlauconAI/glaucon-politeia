@@ -9,11 +9,20 @@ import {
 import {
   OBSERVATORY_REFRESH_STEP_TIMEOUT_MS,
   evaluateObservatoryRefreshStaleness,
+  sanitizeObservatoryRefreshStepFailure,
   transitionObservatoryRefreshState,
   type ObservatoryRefreshNotification,
 } from "#observatory-refresh-state";
 
-function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> {
+interface StepResult {
+  success: boolean;
+  failureCode: string | null;
+}
+
+function runStep(
+  scriptPath: string,
+  args: readonly string[],
+): Promise<StepResult> {
   return new Promise((resolveResult) => {
     const child = spawn(
       process.execPath,
@@ -23,19 +32,24 @@ function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> 
         env: process.env,
         detached: process.platform !== "win32",
         shell: false,
-        stdio: "ignore",
+        stdio: ["ignore", "ignore", "pipe"],
       },
     );
     let settled = false;
     let timedOut = false;
+    let stderr = "";
     let killTimeout: ReturnType<typeof setTimeout> | undefined;
-    const finish = (success: boolean) => {
+    const finish = (result: StepResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       if (killTimeout) clearTimeout(killTimeout);
-      resolveResult(success);
+      resolveResult(result);
     };
+    child.stderr?.setEncoding("utf8");
+    child.stderr?.on("data", (chunk: string) => {
+      if (stderr.length < 8_192) stderr = `${stderr}${chunk}`.slice(0, 8_192);
+    });
     const timeout = setTimeout(() => {
       timedOut = true;
       const processId = child.pid;
@@ -43,7 +57,7 @@ function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> 
         try {
           process.kill(-processId, "SIGTERM");
         } catch {
-          finish(false);
+          finish({ success: false, failureCode: "STEP_TIMEOUT" });
           return;
         }
       } else {
@@ -61,8 +75,21 @@ function runStep(scriptPath: string, args: readonly string[]): Promise<boolean> 
         }
       }, 2_000);
     }, OBSERVATORY_REFRESH_STEP_TIMEOUT_MS);
-    child.once("error", () => finish(false));
-    child.once("close", (code) => finish(!timedOut && code === 0));
+    child.once("error", () =>
+      finish({ success: false, failureCode: "STEP_SPAWN_FAILED" }),
+    );
+    child.once("close", (code) =>
+      finish(
+        timedOut
+          ? { success: false, failureCode: "STEP_TIMEOUT" }
+          : code === 0
+            ? { success: true, failureCode: null }
+            : {
+                success: false,
+                failureCode: sanitizeObservatoryRefreshStepFailure(stderr),
+              },
+      ),
+    );
   });
 }
 
@@ -107,9 +134,10 @@ async function main(): Promise<void> {
       resolve("scripts/observatory/collect.ts"),
       collectArgs,
     );
-    const published =
-      collected &&
-      (await runStep(resolve("scripts/observatory/publish.ts"), [snapshotPath]));
+    const publication = collected.success
+      ? await runStep(resolve("scripts/observatory/publish.ts"), [snapshotPath])
+      : null;
+    const published = collected.success && publication?.success === true;
     const transition = transitionObservatoryRefreshState(state, {
       type: published ? "success" : "failure",
       at: now,
@@ -125,7 +153,13 @@ async function main(): Promise<void> {
       }
     }
     if (!published) {
-      process.stderr.write("OBSERVATORY_REFRESH_FAILED: Refresh did not publish.\n");
+      const stage = collected.success ? "publish" : "collect";
+      const failureCode = collected.success
+        ? publication?.failureCode
+        : collected.failureCode;
+      process.stderr.write(
+        `OBSERVATORY_REFRESH_FAILED: ${stage}=${failureCode ?? "STEP_FAILED"}.\n`,
+      );
       process.exitCode = 1;
       return;
     }
