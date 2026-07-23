@@ -26,6 +26,7 @@
     "lint": "eslint .",
     "import:ghost": "node scripts/import-ghost.mjs",
     "observatory:collect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/collect.ts",
+    "observatory:apply-retention-migration": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/apply-retention-migration.ts",
     "observatory:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/publish.ts",
     "observatory:refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/refresh.ts",
     "observatory:retention": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/retention.ts",
