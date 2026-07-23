@@ -116,6 +116,11 @@ async function updateWorkItem(
     type: "idea" | "feature" | "bug";
     title: string;
     description: string;
+    acceptanceCriteria?: string;
+    priority?: "low" | "medium" | "high" | "urgent" | null;
+    ownerId?: string | null;
+    projectRef?: string | null;
+    milestoneRef?: string | null;
   },
 ) {
   return asRole("authenticated", userId, async (transaction) => {
@@ -132,10 +137,77 @@ async function updateWorkItem(
         ${input.expectedVersion},
         ${input.type},
         ${input.title},
-        ${input.description}
+        ${input.description},
+        ${input.acceptanceCriteria ?? ""},
+        ${input.priority ?? null},
+        ${input.ownerId ?? null},
+        ${input.projectRef ?? null},
+        ${input.milestoneRef ?? null}
       )
     `;
     assert.ok(item, "update_observatory_work_item returned a row");
+    return item;
+  });
+}
+
+async function transitionWorkItem(
+  userId: string,
+  input: { id: string; expectedVersion: number; targetState: string },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [item] = await transaction<
+      { id: string; state: string; version: number }[]
+    >`
+      select id, state, version
+      from public.transition_observatory_work_item(
+        ${input.id},
+        ${input.expectedVersion},
+        ${input.targetState}
+      )
+    `;
+    assert.ok(item, "transition_observatory_work_item returned a row");
+    return item;
+  });
+}
+
+async function addWorkItemEvidence(
+  userId: string,
+  input: {
+    id: string;
+    expectedVersion: number;
+    label: string;
+    url: string;
+  },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [item] = await transaction<{ id: string; version: number }[]>`
+      select id, version
+      from public.add_observatory_work_item_evidence(
+        ${input.id},
+        ${input.expectedVersion},
+        ${input.label},
+        ${input.url}
+      )
+    `;
+    assert.ok(item, "add_observatory_work_item_evidence returned a row");
+    return item;
+  });
+}
+
+async function removeWorkItemEvidence(
+  userId: string,
+  input: { id: string; evidenceId: string; expectedVersion: number },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [item] = await transaction<{ id: string; version: number }[]>`
+      select id, version
+      from public.remove_observatory_work_item_evidence(
+        ${input.id},
+        ${input.evidenceId},
+        ${input.expectedVersion}
+      )
+    `;
+    assert.ok(item, "remove_observatory_work_item_evidence returned a row");
     return item;
   });
 }
@@ -216,7 +288,8 @@ async function main(): Promise<void> {
     cross join unnest(array[
       'observatory_snapshots',
       'observatory_work_items',
-      'observatory_work_item_events'
+      'observatory_work_item_events',
+      'observatory_work_item_evidence'
     ]) table_name
     order by role_name, table_name
   `;
@@ -251,11 +324,12 @@ async function main(): Promise<void> {
     where relname in (
       'observatory_snapshots',
       'observatory_work_items',
-      'observatory_work_item_events'
+      'observatory_work_item_events',
+      'observatory_work_item_evidence'
     )
     order by relname
   `;
-  assert.equal(rlsRows.length, 3);
+  assert.equal(rlsRows.length, 4);
   assert.ok(rlsRows.every((row) => row.relrowsecurity));
   record("RLS enabled on all Observatory tables");
 
@@ -264,6 +338,9 @@ async function main(): Promise<void> {
       role_name: string;
       can_create: boolean;
       can_update: boolean;
+      can_transition: boolean;
+      can_add_evidence: boolean;
+      can_remove_evidence: boolean;
       can_prune: boolean;
       can_mark_release: boolean;
     }[]
@@ -276,9 +353,24 @@ async function main(): Promise<void> {
       ) as can_create,
       has_function_privilege(
         role_name,
-        'public.update_observatory_work_item(uuid,integer,text,text,text)',
+        'public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)',
         'execute'
       ) as can_update,
+      has_function_privilege(
+        role_name,
+        'public.transition_observatory_work_item(uuid,integer,text)',
+        'execute'
+      ) as can_transition,
+      has_function_privilege(
+        role_name,
+        'public.add_observatory_work_item_evidence(uuid,integer,text,text)',
+        'execute'
+      ) as can_add_evidence,
+      has_function_privilege(
+        role_name,
+        'public.remove_observatory_work_item_evidence(uuid,uuid,integer)',
+        'execute'
+      ) as can_remove_evidence,
       has_function_privilege(
         role_name,
         'public.prune_observatory_snapshots(integer)',
@@ -296,6 +388,9 @@ async function main(): Promise<void> {
     const expected = privilege.role_name === "authenticated";
     assert.equal(privilege.can_create, expected);
     assert.equal(privilege.can_update, expected);
+    assert.equal(privilege.can_transition, expected);
+    assert.equal(privilege.can_add_evidence, expected);
+    assert.equal(privilege.can_remove_evidence, expected);
     assert.equal(privilege.can_prune, privilege.role_name === "service_role");
     assert.equal(
       privilege.can_mark_release,
@@ -330,6 +425,7 @@ async function main(): Promise<void> {
     "observatory_snapshots",
     "observatory_work_items",
     "observatory_work_item_events",
+    "observatory_work_item_evidence",
   ] as const) {
     await expectPgError(
       `anonymous ${table} read denied`,
@@ -343,7 +439,12 @@ async function main(): Promise<void> {
 
   await asRole("authenticated", userId, async (transaction) => {
     const [counts] = await transaction<
-      { snapshots: number; work_items: number; events: number }[]
+      {
+        snapshots: number;
+        work_items: number;
+        events: number;
+        evidence: number;
+      }[]
     >`
       select
         (select count(*)::integer from public.observatory_snapshots) as snapshots,
@@ -351,9 +452,18 @@ async function main(): Promise<void> {
         (
           select count(*)::integer
           from public.observatory_work_item_events
-        ) as events
+        ) as events,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_evidence
+        ) as evidence
     `;
-    assert.deepEqual(counts, { snapshots: 0, work_items: 0, events: 0 });
+    assert.deepEqual(counts, {
+      snapshots: 0,
+      work_items: 0,
+      events: 0,
+      evidence: 0,
+    });
   });
   record("non-admin authenticated reads filtered across all RLS tables");
 
@@ -398,6 +508,25 @@ async function main(): Promise<void> {
             created_by
           )
           values ('idea', 'Bypass', '', ${`bypass-${runId}`}, ${adminId})
+        `;
+      }),
+  );
+
+  await expectPgError(
+    "direct evidence insert denied",
+    "42501",
+    () =>
+      asRole("authenticated", adminId, async (transaction) => {
+        await transaction`
+          insert into public.observatory_work_item_evidence (
+            work_item_id, label, url, created_by
+          )
+          values (
+            ${randomUUID()},
+            'Bypass',
+            'https://example.invalid',
+            ${adminId}
+          )
         `;
       }),
   );
@@ -550,6 +679,127 @@ async function main(): Promise<void> {
   });
   record("stale optimistic update rolls back without an audit event");
 
+  const workflow = await createWorkItem(adminId, {
+    type: "feature",
+    title: "Manual Work Tracker workflow",
+    description: "Exercise the M3 state machine.",
+    idempotencyKey: `workflow-${runId}`,
+  });
+  const triaged = await transitionWorkItem(adminId, {
+    id: workflow.id,
+    expectedVersion: 1,
+    targetState: "triage",
+  });
+  assert.deepEqual(
+    { state: triaged.state, version: triaged.version },
+    { state: "triage", version: 2 },
+  );
+
+  await expectPgError(
+    "Ready Gate rejects incomplete work",
+    "23514",
+    () =>
+      transitionWorkItem(adminId, {
+        id: workflow.id,
+        expectedVersion: 2,
+        targetState: "ready",
+      }),
+    /OBSERVATORY_READY_GATE_FAILED/u,
+  );
+
+  const prepared = await updateWorkItem(adminId, {
+    id: workflow.id,
+    expectedVersion: 2,
+    type: "feature",
+    title: "Manual Work Tracker workflow",
+    description: "Exercise the M3 state machine.",
+    acceptanceCriteria: "Every mutation is audited.",
+    priority: "high",
+    ownerId: adminId,
+    projectRef: "dashboard",
+    milestoneRef: "OBS-M3",
+  });
+  assert.equal(prepared.version, 3);
+  const ready = await transitionWorkItem(adminId, {
+    id: workflow.id,
+    expectedVersion: 3,
+    targetState: "ready",
+  });
+  assert.deepEqual(
+    { state: ready.state, version: ready.version },
+    { state: "ready", version: 4 },
+  );
+
+  await expectPgError(
+    "illegal state transition rejected",
+    "22023",
+    () =>
+      transitionWorkItem(adminId, {
+        id: workflow.id,
+        expectedVersion: 4,
+        targetState: "done",
+      }),
+    /OBSERVATORY_INVALID_TRANSITION/u,
+  );
+
+  const inProgress = await transitionWorkItem(adminId, {
+    id: workflow.id,
+    expectedVersion: 4,
+    targetState: "in_progress",
+  });
+  assert.equal(inProgress.version, 5);
+  const evidenceAdded = await addWorkItemEvidence(adminId, {
+    id: workflow.id,
+    expectedVersion: 5,
+    label: "Local integration evidence",
+    url: "https://example.invalid/work-tracker-evidence",
+  });
+  assert.equal(evidenceAdded.version, 6);
+  const [activeEvidence] = await asRole(
+    "authenticated",
+    adminId,
+    async (transaction) =>
+      transaction<{ id: string }[]>`
+        select id
+        from public.observatory_work_item_evidence
+        where work_item_id = ${workflow.id}
+          and removed_at is null
+      `,
+  );
+  assert.ok(activeEvidence);
+  const evidenceRemoved = await removeWorkItemEvidence(adminId, {
+    id: workflow.id,
+    evidenceId: activeEvidence.id,
+    expectedVersion: 6,
+  });
+  assert.equal(evidenceRemoved.version, 7);
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [state] = await transaction<
+      { version: number; active_evidence: number; events: number }[]
+    >`
+      select items.version,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_evidence evidence
+          where evidence.work_item_id = items.id
+            and evidence.removed_at is null
+        ) as active_evidence,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events events
+          where events.work_item_id = items.id
+        ) as events
+      from public.observatory_work_items items
+      where items.id = ${workflow.id}
+    `;
+    assert.deepEqual(state, {
+      version: 7,
+      active_evidence: 0,
+      events: 7,
+    });
+  });
+  record("evidence add and soft removal are audited");
+
   const rollbackItem = await createWorkItem(adminId, {
     type: "feature",
     title: "Rollback probe",
@@ -588,7 +838,12 @@ async function main(): Promise<void> {
             1,
             'feature',
             'Must roll back',
-            'The event insert is forced to fail.'
+            'The event insert is forced to fail.',
+            '',
+            null,
+            null,
+            null,
+            null
           )
         `;
       }),

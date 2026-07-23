@@ -351,4 +351,22 @@ describe("M3 Work Tracker core migration", () => {
       "prevent_observatory_work_item_event_mutation",
     );
   });
+
+  it("extends the disposable live verifier across the Work Tracker workflow", () => {
+    const verifier = readFileSync(
+      join(process.cwd(), "scripts/observatory/verify-local-db.ts"),
+      "utf8",
+    );
+    for (const contract of [
+      "transition_observatory_work_item",
+      "add_observatory_work_item_evidence",
+      "remove_observatory_work_item_evidence",
+      "Ready Gate rejects incomplete work",
+      "illegal state transition rejected",
+      "evidence add and soft removal are audited",
+      "direct evidence insert denied",
+    ]) {
+      expect(verifier).toContain(contract);
+    }
+  });
 });
