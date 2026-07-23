@@ -8,6 +8,7 @@ import { SystemInventory } from "@/components/observatory/SystemInventory";
 import { SystemTopology } from "@/components/observatory/SystemTopology";
 import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
+import { FlowAnalytics } from "@/components/observatory/FlowAnalytics";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 
 export type ObservatoryOverviewState =
@@ -311,6 +312,7 @@ export function ObservatoryOverview({
         <>
           <ProjectCockpit governance={state.snapshot.delivery_governance} />
           <DeliveryRoadmap governance={state.snapshot.delivery_governance} />
+          <FlowAnalytics governance={state.snapshot.delivery_governance} />
         </>
       ) : (
         <section

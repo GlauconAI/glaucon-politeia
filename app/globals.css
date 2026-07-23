@@ -857,6 +857,101 @@
   overflow-wrap: anywhere;
 }
 
+.flow-analytics {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.flow-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.flow-metric-card,
+.flow-forecast,
+.flow-provenance {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 11px;
+}
+
+.flow-metric-card h3,
+.flow-metric-card p,
+.flow-forecast h3,
+.flow-forecast p,
+.flow-provenance h3,
+.flow-provenance p {
+  margin: 0 0 7px;
+}
+
+.flow-metric-card h3 {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.flow-metric-card strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.flow-metric-card p,
+.flow-metric-card small,
+.flow-provenance p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.flow-forecast,
+.flow-provenance {
+  margin-top: 12px;
+}
+
+.flow-throughput-table {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.flow-throughput-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.flow-throughput-table th,
+.flow-throughput-table td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.flow-provenance ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 9px;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-provenance li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: 11px;
+}
+
 .observatory-capture-panel {
   border-color: rgba(124, 58, 237, 0.35);
 }
@@ -968,7 +1063,8 @@
   .cockpit-controls,
   .cockpit-meta,
   .cockpit-evidence-grid,
-  .roadmap-review dl {
+  .roadmap-review dl,
+  .flow-metric-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
