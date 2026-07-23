@@ -116,6 +116,20 @@ describe("projectDashboardGovernance", () => {
     expect(JSON.stringify(result)).not.toContain("private/source-contract");
   });
 
+  it("keeps an active milestone active when a nested local gate has passed", () => {
+    const input = sources();
+    input.tracker = input.tracker.replace(
+      "Next / planned",
+      "Active / Project Cockpit local Gate passed",
+    );
+
+    const result = projectDashboardGovernance(input, {
+      collectedAt: "2026-07-23T04:30:00.000Z",
+    });
+
+    expect(result.milestones[0].status_category).toBe("active");
+  });
+
   it("fails closed on duplicate ids, dangling parents, and format drift", () => {
     const duplicate = sources();
     duplicate.baseline = duplicate.baseline.replace(

@@ -182,7 +182,7 @@ const checks = {
   binding_summary: counts.bindings === snapshot.summary.binding_count,
   runtime_summary: snapshot.runtime.configured_agent_count === snapshot.summary.configured_agent_count && JSON.stringify(snapshot.runtime.task_totals) === JSON.stringify(snapshot.summary.task_totals),
   canonical_counts: counts.projects === 62 && counts.primary_scenes === 37 && counts.secondary_scenes === 10,
-  governance_counts: counts.milestones === 5 && counts.features === 17 && counts.tasks === 74 && counts.executor_runs === 28 && counts.gates === 10,
+  governance_counts: counts.milestones === 5 && counts.features === 17 && counts.tasks === 74 && counts.executor_runs === 28 && counts.gates === 11,
 };
 console.log(JSON.stringify({ schema: "pass", counts, checks, privacy_category_counts: violations }, null, 2));
 if (Object.values(checks).some((value) => !value) || Object.values(violations).some((value) => value !== 0)) process.exitCode = 1;
@@ -329,8 +329,8 @@ The owner must explicitly approve each of these gates, in order:
 ## M2 Project Cockpit local release evidence (2026-07-22)
 
 - Base: production `main` at `a85cd35410b0614b1bf2707835d0474a54d88c0d`; implementation remained isolated on `feat/dashboard-m2-cockpit`. The unrelated anonymous-engagement working-tree changes were not present in or copied into this branch.
-- The strict v3 dogfood projection reads exactly four allowlisted Dashboard governance documents and produced 5 Milestones, 17 Features, 74 Tasks, 28 Executor Runs, and 10 Gate decisions. Every Feature retained its bounded Gate requirement; aliased wiki evidence retained only its display label.
-- The real ignored v3 artifact was 1,142,295 bytes with mode `0600` and digest `6dcb8b731ca3d970c4108e03a6f3be0df3938928410bdb670bfee98586e37abb`. It also retained 1,604 System Observatory assets, 1,447 relationships, and all 6 source-health domains.
+- The strict v3 dogfood projection reads exactly four allowlisted Dashboard governance documents and produced 5 Milestones, 17 Features, 74 Tasks, 28 Executor Runs, and 11 Gate decisions. Every Feature retained its bounded Gate requirement; aliased wiki evidence retained only its display label.
+- The final real ignored v3 artifact was 1,143,248 bytes with mode `0600` and digest `d56f97bfcd003a001c52be7bcd15adbf732be23ffc8444a8bb814f8d27e82a4b`. It also retained 1,604 System Observatory assets, 1,447 relationships, and all 6 source-health domains.
 - Strict schema, digest, relationship, source-domain and summary checks passed. Eight privacy categories—private paths, browser data, configuration/payload data, email, raw content, secret keys, secret values and session data—each reported zero findings.
-- Final local quality gate: 63 test files / 306 tests, lint, typecheck, production build and diff check passed. The production build confirmed `/dashboard` remains dynamically server-rendered and `/observatory` remains the static compatibility redirect.
+- Final local quality gate: 63 test files / 307 tests, lint, typecheck, production build and diff check passed. The production build confirmed `/dashboard` remains dynamically server-rendered and `/observatory` remains the static compatibility redirect.
 - No production Snapshot was published, no Vercel deployment was created, and no Supabase, Cron, LaunchAgent, Gateway or external user state was changed. Production release remains an explicit shared-`main` Gate.

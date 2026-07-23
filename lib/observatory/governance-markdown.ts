@@ -132,8 +132,8 @@ function statusCategory(label: string): GovernanceStatusCategory {
   if (/blocked|阻塞/i.test(label)) return "blocked";
   if (/partial|部分/i.test(label)) return "partial";
   if (/accepted/i.test(label)) return "accepted";
-  if (/done|passed|complete|closed|完成/i.test(label)) return "done";
   if (/active|progress|执行中/i.test(label)) return "active";
+  if (/done|passed|complete|closed|完成/i.test(label)) return "done";
   if (/planned|next|pending|计划/i.test(label)) return "planned";
   return "unknown";
 }
