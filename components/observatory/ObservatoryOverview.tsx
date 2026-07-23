@@ -7,6 +7,7 @@ import { FreshnessSummary } from "@/components/observatory/FreshnessSummary";
 import { SystemInventory } from "@/components/observatory/SystemInventory";
 import { SystemTopology } from "@/components/observatory/SystemTopology";
 import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
+import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 
 export type ObservatoryOverviewState =
@@ -307,7 +308,10 @@ export function ObservatoryOverview({
       </section>
 
       {"delivery_governance" in state.snapshot ? (
-        <ProjectCockpit governance={state.snapshot.delivery_governance} />
+        <>
+          <ProjectCockpit governance={state.snapshot.delivery_governance} />
+          <DeliveryRoadmap governance={state.snapshot.delivery_governance} />
+        </>
       ) : (
         <section
           className="observatory-v1-notice"
