@@ -1,0 +1,124 @@
+import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  currentAdmin: {
+    user_id: "22222222-2222-4222-8222-222222222222",
+    username: "glaucon",
+    display_name: "Glaucon",
+    is_admin: true as const,
+  } as {
+    user_id: string;
+    username: string;
+    display_name: string;
+    is_admin: true;
+  } | null,
+  getWorkItem: vi.fn(),
+  listWorkItemEvidence: vi.fn(),
+  listWorkItemEvents: vi.fn(),
+  redirect: vi.fn((path: string) => {
+    throw new Error(`redirect:${path}`);
+  }),
+  notFound: vi.fn(() => {
+    throw new Error("not-found");
+  }),
+}));
+
+vi.mock("next/navigation", () => ({
+  redirect: mocks.redirect,
+  notFound: mocks.notFound,
+}));
+vi.mock("@/lib/observatory/admin-auth", () => ({
+  getCurrentObservatoryAdmin: async () => mocks.currentAdmin,
+}));
+vi.mock("@/lib/supabase/server", () => ({
+  createSupabaseServerClient: async () => ({ from: vi.fn(), rpc: vi.fn() }),
+}));
+vi.mock("@/lib/observatory/repository", () => ({
+  createObservatoryRepository: () => ({
+    getWorkItem: mocks.getWorkItem,
+    listWorkItemEvidence: mocks.listWorkItemEvidence,
+    listWorkItemEvents: mocks.listWorkItemEvents,
+  }),
+}));
+
+import WorkItemPage from "@/app/dashboard/work-items/[id]/page";
+
+const item = {
+  id: "11111111-1111-4111-8111-111111111111",
+  type: "feature",
+  title: "Manual Work Tracker",
+  description: "",
+  state: "triage",
+  priority: null,
+  owner_id: null,
+  acceptance_criteria: "",
+  project_ref: null,
+  milestone_ref: null,
+  idempotency_key: "capture-1",
+  version: 1,
+  created_by: "22222222-2222-4222-8222-222222222222",
+  created_at: "2026-07-23T20:00:00.000Z",
+  updated_at: "2026-07-23T20:00:00.000Z",
+};
+
+describe("WorkItemPage", () => {
+  beforeEach(() => {
+    mocks.currentAdmin = {
+      user_id: "22222222-2222-4222-8222-222222222222",
+      username: "glaucon",
+      display_name: "Glaucon",
+      is_admin: true,
+    };
+    mocks.getWorkItem.mockReset();
+    mocks.getWorkItem.mockResolvedValue(item);
+    mocks.listWorkItemEvidence.mockReset();
+    mocks.listWorkItemEvidence.mockResolvedValue([]);
+    mocks.listWorkItemEvents.mockReset();
+    mocks.listWorkItemEvents.mockResolvedValue([]);
+  });
+
+  it("redirects unauthorized visitors before reading the item", async () => {
+    mocks.currentAdmin = null;
+
+    await expect(
+      WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
+    ).rejects.toThrow(
+      `redirect:/auth?redirectTo=/dashboard/work-items/${item.id}`,
+    );
+    expect(mocks.getWorkItem).not.toHaveBeenCalled();
+  });
+
+  it("renders an authorized item with detail data", async () => {
+    render(
+      await WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Manual Work Tracker" }),
+    ).toBeInTheDocument();
+    expect(mocks.listWorkItemEvidence).toHaveBeenCalledWith(item.id);
+    expect(mocks.listWorkItemEvents).toHaveBeenCalledWith(item.id);
+  });
+
+  it("uses the not-found boundary for a missing item", async () => {
+    mocks.getWorkItem.mockResolvedValue(null);
+
+    await expect(
+      WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
+    ).rejects.toThrow("not-found");
+  });
+
+  it("renders a bounded unavailable state on dependency failure", async () => {
+    mocks.getWorkItem.mockRejectedValue(new Error("private database detail"));
+
+    render(
+      await WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /work item is temporarily unavailable/i,
+    );
+    expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
+  });
+});

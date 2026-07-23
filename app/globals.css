@@ -121,6 +121,125 @@
   border-left: 3px solid var(--warning);
 }
 
+.work-item-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.work-item-detail > section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.work-item-detail-header h1 {
+  margin: 8px 0;
+  color: var(--strong);
+  font-size: clamp(28px, 5vw, 44px);
+}
+
+.work-item-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.work-item-edit-form label,
+.work-item-evidence-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.work-item-edit-form input,
+.work-item-edit-form select,
+.work-item-edit-form textarea,
+.work-item-evidence-form input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 9px 10px;
+}
+
+.work-item-wide-field,
+.work-item-edit-form > button {
+  grid-column: 1 / -1;
+}
+
+.work-item-transition-actions,
+.work-item-evidence-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.work-item-transition-actions button,
+.work-item-evidence-form button,
+.work-item-evidence-list button {
+  min-height: 38px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  padding: 7px 11px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.work-item-evidence-list,
+.work-item-history {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+}
+
+.work-item-evidence-list li,
+.work-item-history li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 10px;
+}
+
+.work-item-evidence-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.work-item-history time {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.work-item-ready-gate {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 10px 12px;
+}
+
+@media (max-width: 720px) {
+  .work-item-edit-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work-item-wide-field,
+  .work-item-edit-form > button {
+    grid-column: auto;
+  }
+
+  .work-item-evidence-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Dashboard command surface */
 
 .operator-link {
