@@ -1,6 +1,13 @@
 import "server-only";
 
 import type {
+  ObservatoryAgentClaimCancellationInput,
+  ObservatoryAgentClaimPolicyInput,
+  ObservatoryAgentActionClass,
+  ObservatoryAgentClaimStatus,
+  ObservatoryAgentRiskLevel,
+} from "@/lib/observatory/agent-claims";
+import type {
   ObservatoryEvidenceInput,
   ObservatoryEvidenceRemovalInput,
   ObservatoryQuickCaptureInput,
@@ -39,6 +46,12 @@ export interface ObservatoryWorkItemRow {
   created_by: string;
   created_at: string;
   updated_at: string;
+  risk_level: ObservatoryAgentRiskLevel;
+  agent_claim_enabled: boolean;
+  authorized_paths: string[];
+  allowed_action_classes: ObservatoryAgentActionClass[];
+  claim_approved_by: string | null;
+  claim_approved_at: string | null;
 }
 
 export interface ObservatoryWorkItemEventRow {
@@ -50,7 +63,8 @@ export interface ObservatoryWorkItemEventRow {
     | "state_transitioned"
     | "evidence_added"
     | "evidence_removed";
-  actor_id: string;
+  actor_id: string | null;
+  agent_id: string | null;
   data: Record<string, unknown>;
   created_at: string;
 }
@@ -60,10 +74,27 @@ export interface ObservatoryWorkItemEvidenceRow {
   work_item_id: string;
   label: string;
   url: string;
-  created_by: string;
+  created_by: string | null;
+  created_by_agent: string | null;
   created_at: string;
   removed_at: string | null;
   removed_by: string | null;
+}
+
+export interface ObservatoryWorkItemClaimRow {
+  id: string;
+  work_item_id: string;
+  agent_id: string;
+  status: ObservatoryAgentClaimStatus;
+  claim_version: number;
+  started_at: string;
+  last_heartbeat_at: string;
+  lease_expires_at: string;
+  ended_at: string | null;
+  completion_summary: string | null;
+  result_evidence_url: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ObservatoryDatabaseError {
@@ -114,7 +145,8 @@ export interface ObservatoryRepositoryClient {
     table:
       | "observatory_work_items"
       | "observatory_work_item_events"
-      | "observatory_work_item_evidence",
+      | "observatory_work_item_evidence"
+      | "observatory_work_item_claims",
   ): ObservatoryWorkTrackerQuery;
   rpc(
     functionName:
@@ -122,7 +154,9 @@ export interface ObservatoryRepositoryClient {
       | "update_observatory_work_item"
       | "transition_observatory_work_item"
       | "add_observatory_work_item_evidence"
-      | "remove_observatory_work_item_evidence",
+      | "remove_observatory_work_item_evidence"
+      | "configure_observatory_agent_claim_policy"
+      | "cancel_observatory_work_item_claim",
     arguments_: Record<string, unknown>,
   ): PromiseLike<{
     data: ObservatoryWorkItemRow | null;
@@ -141,7 +175,10 @@ export type ObservatoryRepositoryErrorCode =
   | "WORK_ITEM_NOT_FOUND"
   | "INVALID_TRANSITION"
   | "READY_GATE_FAILED"
-  | "EVIDENCE_NOT_FOUND";
+  | "EVIDENCE_NOT_FOUND"
+  | "CLAIM_ACTIVE"
+  | "CLAIM_POLICY_INVALID"
+  | "CLAIM_VERSION_CONFLICT";
 
 export class ObservatoryRepositoryError extends Error {
   readonly code: ObservatoryRepositoryErrorCode;
@@ -157,40 +194,47 @@ function mutationError(
   operation: "create" | "update",
   error: ObservatoryDatabaseError,
 ) {
+  const marker = error.message.toUpperCase();
   if (error.code === "42501") {
     return new ObservatoryRepositoryError(
       "FORBIDDEN",
       "Administrator access is required.",
     );
   }
-  if (error.message.includes("OBSERVATORY_IDEMPOTENCY_CONFLICT")) {
+  if (marker.includes("OBSERVATORY_IDEMPOTENCY_CONFLICT")) {
     return new ObservatoryRepositoryError(
       "IDEMPOTENCY_CONFLICT",
       "The idempotency key was already used for different content.",
     );
   }
+  if (marker.includes("OBSERVATORY_CLAIM_VERSION_CONFLICT")) {
+    return new ObservatoryRepositoryError(
+      "CLAIM_VERSION_CONFLICT",
+      "The agent claim changed after it was loaded.",
+    );
+  }
   if (
     error.code === "40001" ||
-    error.message.includes("OBSERVATORY_VERSION_CONFLICT")
+    marker.includes("OBSERVATORY_VERSION_CONFLICT")
   ) {
     return new ObservatoryRepositoryError(
       "VERSION_CONFLICT",
       "The work item changed after it was loaded.",
     );
   }
-  if (error.message.includes("OBSERVATORY_INVALID_TRANSITION")) {
+  if (marker.includes("OBSERVATORY_INVALID_TRANSITION")) {
     return new ObservatoryRepositoryError(
       "INVALID_TRANSITION",
       "That state transition is not allowed.",
     );
   }
-  if (error.message.includes("OBSERVATORY_READY_GATE_FAILED")) {
+  if (marker.includes("OBSERVATORY_READY_GATE_FAILED")) {
     return new ObservatoryRepositoryError(
       "READY_GATE_FAILED",
       "Acceptance criteria, priority, and owner are required.",
     );
   }
-  if (error.message.includes("OBSERVATORY_EVIDENCE_NOT_FOUND")) {
+  if (marker.includes("OBSERVATORY_EVIDENCE_NOT_FOUND")) {
     return new ObservatoryRepositoryError(
       "EVIDENCE_NOT_FOUND",
       "The evidence link is no longer active.",
@@ -198,11 +242,23 @@ function mutationError(
   }
   if (
     error.code === "P0002" ||
-    error.message.includes("OBSERVATORY_WORK_ITEM_NOT_FOUND")
+    marker.includes("OBSERVATORY_WORK_ITEM_NOT_FOUND")
   ) {
     return new ObservatoryRepositoryError(
       "WORK_ITEM_NOT_FOUND",
       "The work item no longer exists.",
+    );
+  }
+  if (marker.includes("OBSERVATORY_CLAIM_ACTIVE")) {
+    return new ObservatoryRepositoryError(
+      "CLAIM_ACTIVE",
+      "The work item has an active agent claim.",
+    );
+  }
+  if (marker.includes("OBSERVATORY_CLAIM_POLICY_INVALID")) {
+    return new ObservatoryRepositoryError(
+      "CLAIM_POLICY_INVALID",
+      "The Agent Claim policy is invalid.",
     );
   }
 
@@ -272,7 +328,7 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_items")
           .select(
-            "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at",
+            "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
           )
           .order("updated_at", { ascending: false }),
       );
@@ -282,7 +338,7 @@ export function createObservatoryRepository(
       const { data, error } = await client
         .from("observatory_work_items")
         .select(
-          "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at",
+          "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -303,7 +359,9 @@ export function createObservatoryRepository(
       return readRows<ObservatoryWorkItemEventRow>(
         client
           .from("observatory_work_item_events")
-          .select("id,work_item_id,event_type,actor_id,data,created_at")
+          .select(
+            "id,work_item_id,event_type,actor_id,agent_id,data,created_at",
+          )
           .eq("work_item_id", workItemId)
           .order("created_at", { ascending: true }),
       );
@@ -316,10 +374,24 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_item_evidence")
           .select(
-            "id,work_item_id,label,url,created_by,created_at,removed_at,removed_by",
+            "id,work_item_id,label,url,created_by,created_by_agent,created_at,removed_at,removed_by",
           )
           .eq("work_item_id", workItemId)
           .is("removed_at", null)
+          .order("created_at", { ascending: true }),
+      );
+    },
+
+    async listWorkItemClaims(
+      workItemId: string,
+    ): Promise<ObservatoryWorkItemClaimRow[]> {
+      return readRows<ObservatoryWorkItemClaimRow>(
+        client
+          .from("observatory_work_item_claims")
+          .select(
+            "id,work_item_id,agent_id,status,claim_version,started_at,last_heartbeat_at,lease_expires_at,ended_at,completion_summary,result_evidence_url,created_at,updated_at",
+          )
+          .eq("work_item_id", workItemId)
           .order("created_at", { ascending: true }),
       );
     },
@@ -441,6 +513,51 @@ export function createObservatoryRepository(
         throw new ObservatoryRepositoryError(
           "WORK_ITEM_UPDATE_FAILED",
           "The evidence link could not be removed.",
+        );
+      }
+      return data;
+    },
+
+    async configureAgentClaimPolicy(
+      input: ObservatoryAgentClaimPolicyInput,
+    ): Promise<ObservatoryWorkItemRow> {
+      const { data, error } = await client.rpc(
+        "configure_observatory_agent_claim_policy",
+        {
+          p_work_item_id: input.workItemId,
+          p_expected_version: input.expectedVersion,
+          p_risk_level: input.riskLevel,
+          p_enabled: input.enabled,
+          p_authorized_paths: input.authorizedPaths,
+          p_allowed_action_classes: input.allowedActionClasses,
+        },
+      );
+      if (error) throw mutationError("update", error);
+      if (!data) {
+        throw new ObservatoryRepositoryError(
+          "WORK_ITEM_UPDATE_FAILED",
+          "The Agent Claim policy could not be updated.",
+        );
+      }
+      return data;
+    },
+
+    async cancelAgentClaim(
+      input: ObservatoryAgentClaimCancellationInput,
+    ): Promise<unknown> {
+      const { data, error } = await client.rpc(
+        "cancel_observatory_work_item_claim",
+        {
+          p_claim_id: input.claimId,
+          p_expected_claim_version: input.expectedClaimVersion,
+          p_expected_work_item_version: input.expectedWorkItemVersion,
+        },
+      );
+      if (error) throw mutationError("update", error);
+      if (!data) {
+        throw new ObservatoryRepositoryError(
+          "WORK_ITEM_UPDATE_FAILED",
+          "The agent claim could not be cancelled.",
         );
       }
       return data;

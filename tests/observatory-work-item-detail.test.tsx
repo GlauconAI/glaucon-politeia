@@ -24,6 +24,12 @@ const item: ObservatoryWorkItemRow = {
   created_by: "22222222-2222-4222-8222-222222222222",
   created_at: "2026-07-23T20:00:00.000Z",
   updated_at: "2026-07-23T20:05:00.000Z",
+  risk_level: "unclassified",
+  agent_claim_enabled: false,
+  authorized_paths: [],
+  allowed_action_classes: [],
+  claim_approved_by: null,
+  claim_approved_at: null,
 };
 
 const evidence: ObservatoryWorkItemEvidenceRow[] = [
@@ -33,6 +39,7 @@ const evidence: ObservatoryWorkItemEvidenceRow[] = [
     label: "Production dashboard",
     url: "https://402v.com/dashboard",
     created_by: item.created_by,
+    created_by_agent: null,
     created_at: "2026-07-23T20:04:00.000Z",
     removed_at: null,
     removed_by: null,
@@ -45,6 +52,7 @@ const events: ObservatoryWorkItemEventRow[] = [
     work_item_id: item.id,
     event_type: "created",
     actor_id: item.created_by,
+    agent_id: null,
     data: { title: item.title, state: "inbox" },
     created_at: "2026-07-23T20:00:00.000Z",
   },
@@ -53,6 +61,7 @@ const events: ObservatoryWorkItemEventRow[] = [
     work_item_id: item.id,
     event_type: "state_transitioned",
     actor_id: item.created_by,
+    agent_id: null,
     data: { from: "inbox", to: "triage" },
     created_at: "2026-07-23T20:02:00.000Z",
   },

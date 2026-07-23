@@ -20,6 +20,12 @@ const item: ObservatoryWorkItemRow = {
   created_by: "22222222-2222-4222-8222-222222222222",
   created_at: "2026-07-23T20:00:00.000Z",
   updated_at: "2026-07-23T20:05:00.000Z",
+  risk_level: "unclassified",
+  agent_claim_enabled: false,
+  authorized_paths: [],
+  allowed_action_classes: [],
+  claim_approved_by: null,
+  claim_approved_at: null,
 };
 
 describe("WorkTrackerBoard", () => {

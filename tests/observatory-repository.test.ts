@@ -534,10 +534,18 @@ describe("Observatory repository", () => {
       work_item_id: item.id,
       removed_at: null,
     };
+    const claim = {
+      id: "claim-1",
+      work_item_id: item.id,
+      agent_id: "codex-runner",
+      status: "expired",
+      claim_version: 2,
+    };
     const boundary = workTrackerClient({
       observatory_work_items: [item],
       observatory_work_item_events: [event],
       observatory_work_item_evidence: [evidence],
+      observatory_work_item_claims: [claim],
     });
     const repository = createObservatoryRepository(boundary.client);
 
@@ -549,6 +557,9 @@ describe("Observatory repository", () => {
     await expect(repository.listWorkItemEvidence(item.id)).resolves.toEqual([
       evidence,
     ]);
+    await expect(repository.listWorkItemClaims(item.id)).resolves.toEqual([
+      claim,
+    ]);
     expect(boundary.from).toHaveBeenCalledWith("observatory_work_items");
     expect(boundary.from).toHaveBeenCalledWith(
       "observatory_work_item_events",
@@ -556,9 +567,78 @@ describe("Observatory repository", () => {
     expect(boundary.from).toHaveBeenCalledWith(
       "observatory_work_item_evidence",
     );
+    expect(boundary.from).toHaveBeenCalledWith(
+      "observatory_work_item_claims",
+    );
     expect(
       boundary.queries.observatory_work_item_evidence.is,
     ).toHaveBeenCalledWith("removed_at", null);
+  });
+
+  it("configures policy and cancels claims only through audited admin RPCs", async () => {
+    const boundary = repositoryClient({
+      rpcData: { id: "item-1", version: 5 },
+    });
+    const repository = createObservatoryRepository(boundary.client);
+
+    await repository.configureAgentClaimPolicy({
+      workItemId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 4,
+      riskLevel: "low",
+      enabled: true,
+      authorizedPaths: ["components/observatory", "tests"],
+      allowedActionClasses: ["code_edit", "test"],
+    });
+    await repository.cancelAgentClaim({
+      claimId: "22222222-2222-4222-8222-222222222222",
+      expectedClaimVersion: 2,
+      expectedWorkItemVersion: 5,
+    });
+
+    expect(boundary.rpc.mock.calls).toEqual([
+      [
+        "configure_observatory_agent_claim_policy",
+        {
+          p_work_item_id: "11111111-1111-4111-8111-111111111111",
+          p_expected_version: 4,
+          p_risk_level: "low",
+          p_enabled: true,
+          p_authorized_paths: ["components/observatory", "tests"],
+          p_allowed_action_classes: ["code_edit", "test"],
+        },
+      ],
+      [
+        "cancel_observatory_work_item_claim",
+        {
+          p_claim_id: "22222222-2222-4222-8222-222222222222",
+          p_expected_claim_version: 2,
+          p_expected_work_item_version: 5,
+        },
+      ],
+    ]);
+  });
+
+  it.each([
+    ["OBSERVATORY_CLAIM_ACTIVE", "CLAIM_ACTIVE"],
+    ["OBSERVATORY_CLAIM_POLICY_INVALID", "CLAIM_POLICY_INVALID"],
+    ["OBSERVATORY_CLAIM_VERSION_CONFLICT", "CLAIM_VERSION_CONFLICT"],
+  ] as const)("maps %s to %s", async (message, code) => {
+    const repository = createObservatoryRepository(
+      repositoryClient({
+        rpcError: { code: "22023", message },
+      }).client,
+    );
+
+    await expect(
+      repository.configureAgentClaimPolicy({
+        workItemId: "11111111-1111-4111-8111-111111111111",
+        expectedVersion: 4,
+        riskLevel: "low",
+        enabled: true,
+        authorizedPaths: ["components/observatory"],
+        allowedActionClasses: ["code_edit"],
+      }),
+    ).rejects.toMatchObject({ code });
   });
 
   it.each([
