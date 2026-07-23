@@ -7,6 +7,10 @@ import {
   type ObservatoryOverviewState,
 } from "@/components/observatory/ObservatoryOverview";
 import { QuickCapture } from "@/components/observatory/QuickCapture";
+import {
+  WorkTrackerBoard,
+  type WorkTrackerBoardState,
+} from "@/components/observatory/WorkTrackerBoard";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
 import {
@@ -46,6 +50,21 @@ async function loadOverviewState(): Promise<ObservatoryOverviewState> {
   }
 }
 
+async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const repository = createObservatoryRepository(
+      supabase as unknown as ObservatoryRepositoryClient,
+    );
+    return { status: "ready", items: await repository.listWorkItems() };
+  } catch {
+    return {
+      status: "error",
+      message: "Work Tracker is temporarily unavailable. Try again.",
+    };
+  }
+}
+
 export default async function DashboardPage() {
   const currentAdmin = await getCurrentObservatoryAdmin();
 
@@ -53,7 +72,10 @@ export default async function DashboardPage() {
     redirect("/auth?redirectTo=/dashboard");
   }
 
-  const overviewState = await loadOverviewState();
+  const [overviewState, workTrackerState] = await Promise.all([
+    loadOverviewState(),
+    loadWorkTrackerState(),
+  ]);
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
 
   return (
@@ -67,7 +89,7 @@ export default async function DashboardPage() {
         <div className="shell-status-line" aria-label="Dashboard access">
           <span>mode: admin</span>
           <span>source: read-only</span>
-          <span>capture: audited inbox</span>
+          <span>work tracker: audited write</span>
         </div>
       </header>
 
@@ -77,6 +99,7 @@ export default async function DashboardPage() {
           <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
         </aside>
       </div>
+      <WorkTrackerBoard state={workTrackerState} />
     </section>
   );
 }

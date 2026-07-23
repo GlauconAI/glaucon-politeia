@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     is_admin: true;
   } | null,
   getLatestSuccessfulSnapshot: vi.fn(),
+  listWorkItems: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -32,6 +33,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/observatory/repository", () => ({
   createObservatoryRepository: () => ({
     getLatestSuccessfulSnapshot: mocks.getLatestSuccessfulSnapshot,
+    listWorkItems: mocks.listWorkItems,
   }),
 }));
 
@@ -116,6 +118,8 @@ describe("DashboardPage", () => {
     mocks.redirect.mockClear();
     mocks.getLatestSuccessfulSnapshot.mockReset();
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(snapshotRow());
+    mocks.listWorkItems.mockReset();
+    mocks.listWorkItems.mockResolvedValue([]);
   });
 
   it("forces request-time authorization and snapshot freshness", () => {
@@ -143,6 +147,9 @@ describe("DashboardPage", () => {
     expect(screen.getByLabelText(/dashboard access/i)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /work tracker/i }),
+    ).toBeInTheDocument();
   });
 
   it("generates a distinct cryptographically random capture key per page request", async () => {
@@ -201,6 +208,20 @@ describe("DashboardPage", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       /latest snapshot could not be loaded/i,
+    );
+    expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps observatory views available when Work Tracker loading fails", async () => {
+    mocks.listWorkItems.mockRejectedValue(
+      new Error("private database detail"),
+    );
+
+    render(await DashboardPage());
+
+    expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /work tracker is temporarily unavailable/i,
     );
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
   });
