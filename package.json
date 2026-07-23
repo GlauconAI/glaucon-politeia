@@ -6,6 +6,7 @@
     "#observatory-schema": "./lib/observatory/schema.ts",
     "#observatory-registry": "./lib/observatory/registry.ts",
     "#observatory-collection-schema": "./lib/observatory/collection-schema.ts",
+    "#observatory-governance-schema": "./lib/observatory/governance-schema.ts",
     "#observatory-asset-schema": "./lib/observatory/asset-schema.ts",
     "#observatory-freshness": "./lib/observatory/freshness.ts",
     "#observatory-system-assets": "./lib/observatory/system-assets.ts",

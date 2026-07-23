@@ -1,14 +1,17 @@
 import { z } from "zod";
 
 import { ObservatoryAssetInventorySchema } from "#observatory-asset-schema";
+import { DeliveryGovernanceSchema } from "#observatory-governance-schema";
 import { ObservatoryRegistrySnapshotSchema } from "#observatory-schema";
 
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1 = "1.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2 = "2.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION =
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V2 = "2.0.0" as const;
+export const OBSERVATORY_COLLECTOR_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_AGENT_MAX_COUNT = 256;
 export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
@@ -135,9 +138,37 @@ export const ObservatoryCollectionEnvelopeV2Schema = z
     }
   });
 
+export const ObservatoryCollectionEnvelopeV3Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION_V3),
+    ...CollectionEnvelopeBaseShape,
+    ...ObservatoryAssetInventorySchema.shape,
+    delivery_governance: DeliveryGovernanceSchema,
+  })
+  .superRefine((snapshot, context) => {
+    validateSummary(snapshot, context);
+    const inventoryResult = ObservatoryAssetInventorySchema.safeParse({
+      assets: snapshot.assets,
+      core_endpoint_ids: snapshot.core_endpoint_ids,
+      relationships: snapshot.relationships,
+      source_health: snapshot.source_health,
+    });
+    if (!inventoryResult.success) {
+      inventoryResult.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        }),
+      );
+    }
+  });
+
 export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
+  ObservatoryCollectionEnvelopeV3Schema,
 ]);
 
 export type ObservatoryCollectionEnvelope = z.infer<
@@ -148,6 +179,9 @@ export type ObservatoryCollectionEnvelopeV1 = z.infer<
 >;
 export type ObservatoryCollectionEnvelopeV2 = z.infer<
   typeof ObservatoryCollectionEnvelopeV2Schema
+>;
+export type ObservatoryCollectionEnvelopeV3 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV3Schema
 >;
 export type ObservatoryAgent = z.infer<typeof ObservatoryAgentSchema>;
 export type ObservatoryRuntime = z.infer<typeof ObservatoryRuntimeSchema>;
