@@ -33,6 +33,7 @@ describe("ProjectCockpit", () => {
       within(cockpit).getByText(/OBS-T1061 · Define cockpit read model/i),
     ).toBeInTheDocument();
     expect(within(cockpit).getAllByText("IMPLEMENT").length).toBeGreaterThan(0);
+    expect(within(cockpit).getByText("Production Gate")).toBeInTheDocument();
     expect(within(cockpit).getAllByText("Not recorded").length).toBeGreaterThan(0);
   });
 

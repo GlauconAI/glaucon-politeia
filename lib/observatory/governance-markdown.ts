@@ -106,7 +106,10 @@ function requireTable(
 }
 
 function safeText(input: string, max = GOVERNANCE_MAX_TEXT_LENGTH): string {
-  const withoutWiki = input.replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, "$2$1");
+  const withoutWiki = input.replace(
+    /\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g,
+    (_match, target: string, label: string | undefined) => label || target,
+  );
   const withoutLinks = withoutWiki.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
   const withoutCode = withoutLinks.replace(/`([^`]+)`/g, "$1");
   const withoutPrivate = withoutCode
@@ -209,6 +212,27 @@ function field(markdown: string, name: string): string | undefined {
   return bullet ? safeText(bullet) : undefined;
 }
 
+function featureGateRequirements(markdown: string): Map<string, string> {
+  const result = new Map<string, string>();
+  let featureId: string | undefined;
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = line.match(/^####\s+(OBS-F\d+)(?:｜.+)?\s*$/);
+    if (heading) {
+      featureId = heading[1];
+      continue;
+    }
+    if (!featureId) continue;
+    const gate = line.match(/^Gate(?:\s+requirement)?[：:]\s*(.+)$/i);
+    if (gate) {
+      result.set(featureId, safeText(gate[1]));
+      featureId = undefined;
+    }
+  }
+
+  return result;
+}
+
 export function projectDashboardGovernance(
   sources: DashboardGovernanceSources,
   options: { collectedAt: string },
@@ -247,6 +271,7 @@ export function projectDashboardGovernance(
     "Finish",
     "Active Time",
   ]);
+  const gateRequirements = featureGateRequirements(sources.baseline);
 
   const featureRows = featureTable.rows.map((row) => {
     const [id, name] = idAndName(row.Feature);
@@ -265,7 +290,7 @@ export function projectDashboardGovernance(
       baseline_finish: dateFact(row["Baseline Finish"]),
       forecast_finish: dateFact(row["Forecast Finish"]),
       actual_finish: "not_recorded" as const,
-      gate_requirement: "",
+      gate_requirement: gateRequirements.get(id) || "",
       source: "dashboard/development-baseline.md" as const,
     };
   });

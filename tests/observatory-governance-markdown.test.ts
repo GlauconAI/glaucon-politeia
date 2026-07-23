@@ -50,6 +50,7 @@ describe("projectDashboardGovernance", () => {
       milestone_id: "M2",
       contract_type: "IMPLEMENT",
       forecast_finish: "not_recorded",
+      gate_requirement: "Production Gate",
     });
     expect(result.tasks[0]).toMatchObject({
       id: "OBS-T1061",
@@ -96,6 +97,23 @@ describe("projectDashboardGovernance", () => {
     expect(JSON.stringify(first)).not.toMatch(
       /https?:|token|\/Users\/|private@example/u,
     );
+  });
+
+  it("keeps only the display label from aliased wiki links", () => {
+    const input = sources();
+    input.baseline = input.baseline.replace(
+      "[[design]]",
+      "[[private/source-contract|approved design evidence]]",
+    );
+
+    const result = projectDashboardGovernance(input, {
+      collectedAt: "2026-07-23T04:30:00.000Z",
+    });
+
+    expect(result.tasks[0].evidence_refs).toEqual([
+      "approved design evidence",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("private/source-contract");
   });
 
   it("fails closed on duplicate ids, dangling parents, and format drift", () => {

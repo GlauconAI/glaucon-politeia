@@ -234,6 +234,10 @@ export function ProjectCockpit({
                         label="Actual finish"
                         value={displayDate(feature.actual_finish)}
                       />
+                      <Meta
+                        label="Gate requirement"
+                        value={feature.gate_requirement || "Not recorded"}
+                      />
                     </dl>
                     {tasks.length ? (
                       <ul className="cockpit-task-list">

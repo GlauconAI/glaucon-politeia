@@ -110,8 +110,8 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module <<'VERIF
 import { readFile } from "node:fs/promises";
 import {
   ObservatoryCollectionEnvelopeSchema,
-  OBSERVATORY_COLLECTION_SCHEMA_VERSION,
-  OBSERVATORY_COLLECTOR_VERSION,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
+  OBSERVATORY_COLLECTOR_VERSION_V3,
 } from "./lib/observatory/collection-schema.ts";
 import {
   OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
@@ -157,10 +157,17 @@ const counts = {
   execution_flows: snapshot.registry.execution_flows.length,
   agents: snapshot.agents.length,
   bindings: snapshot.agents.reduce((n, agent) => n + agent.binding_count, 0),
+  assets: snapshot.assets.length,
+  relationships: snapshot.relationships.length,
+  milestones: snapshot.delivery_governance.summary.milestone_count,
+  features: snapshot.delivery_governance.summary.feature_count,
+  tasks: snapshot.delivery_governance.summary.task_count,
+  executor_runs: snapshot.delivery_governance.summary.run_count,
+  gates: snapshot.delivery_governance.summary.gate_count,
 };
 const checks = {
-  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION,
-  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION,
+  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
+  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION_V3,
   snapshot_schema: snapshot.registry.schema_version === OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   registry_schema: snapshot.registry.registry_schema_version === ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
   source_reference: snapshot.registry.source.logical_reference === ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
@@ -175,6 +182,7 @@ const checks = {
   binding_summary: counts.bindings === snapshot.summary.binding_count,
   runtime_summary: snapshot.runtime.configured_agent_count === snapshot.summary.configured_agent_count && JSON.stringify(snapshot.runtime.task_totals) === JSON.stringify(snapshot.summary.task_totals),
   canonical_counts: counts.projects === 62 && counts.primary_scenes === 37 && counts.secondary_scenes === 10,
+  governance_counts: counts.milestones === 5 && counts.features === 17 && counts.tasks === 74 && counts.executor_runs === 28 && counts.gates === 10,
 };
 console.log(JSON.stringify({ schema: "pass", counts, checks, privacy_category_counts: violations }, null, 2));
 if (Object.values(checks).some((value) => !value) || Object.values(violations).some((value) => value !== 0)) process.exitCode = 1;
