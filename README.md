@@ -112,6 +112,10 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
 - Vercel production deployment configuration.
 - Custom domain `402v.com` with `www.402v.com` redirect.
 - Knowledge Nodes favicon served from `/icon.svg`.
+- Admin-only Dashboard with production System Observatory, Project Cockpit,
+  Three-track Roadmap, Flow Analytics / Forecast, and Governance Reports /
+  Review. These governance surfaces consume a strict sanitized read model and
+  never write back to their authority sources.
 - Planned 402v Publishing System direction for public/private HTML artifact publishing.
 
 ## Core Commands

@@ -334,3 +334,18 @@ The owner must explicitly approve each of these gates, in order:
 - Strict schema, digest, relationship, source-domain and summary checks passed. Eight privacy categories—private paths, browser data, configuration/payload data, email, raw content, secret keys, secret values and session data—each reported zero findings.
 - Final local quality gate: 63 test files / 307 tests, lint, typecheck, production build and diff check passed. The production build confirmed `/dashboard` remains dynamically server-rendered and `/observatory` remains the static compatibility redirect.
 - No production Snapshot was published, no Vercel deployment was created, and no Supabase, Cron, LaunchAgent, Gateway or external user state was changed. Production release remains an explicit shared-`main` Gate.
+
+## M2 Delivery Governance completion local release evidence (2026-07-23)
+
+- Base: production `main` at `83d972d66cc5347b6e8b45684239a4e54aba01ad`; implementation remained isolated on `feature-dashboard-m2-delivery-governance-complete`. The unrelated anonymous-engagement changes in the main worktree were not copied into this branch.
+- The strict v3 read model remains backward compatible. It now projects bounded `DIR-*` plan revision history and optional Actual date columns while accepting older v3 Snapshots that do not contain `plan_revisions`.
+- Three read-only M2 views were added after Project Cockpit:
+  - native Three-track Roadmap for Original Baseline / Current Approved Plan / Actual, variance, first slip, plan revisions, semantic table fallback, and deterministic Baseline Review;
+  - Flow Analytics / Forecast for WIP, Throughput, Age, Cycle Time, P85 SLE, Rework, baseline variance, prediction error, forecast interval/confidence, provenance, and explicit insufficient-evidence states;
+  - Governance Reports / Review for formal status, weekly/monthly reports, data quality, source-linked issues, explicit delay attribution, revision/Gate history, and bounded sanitized JSON export.
+- Blocked and Waiting duration are never inferred from labels. Forecasting requires at least three completed Tasks across two completion dates; SLE requires at least five completed Task cycle-time samples. Missing evidence remains `Not recorded` or `Insufficient evidence`.
+- Fresh full local quality gate: 69 test files / 325 tests, lint, typecheck, and production build passed. The build confirmed `/dashboard` remains dynamically server-rendered and `/observatory` remains the static compatibility route.
+- Fresh real ignored candidate: schema `3.0.0`, digest `5ca90e7aa5cb0589f33dab90cd92e16a610b9f021d47acb23a3dece412bf6836`, 1,145,318 bytes, mode `0600`; 1,604 assets / 1,447 relationships / 6 source-health domains plus 5 Milestones / 17 Features / 74 Tasks / 28 Executor Runs / 12 Gates / 3 Plan Revisions.
+- The committed verifier passed mode, digest, success, six-domain, relationship-integrity, and privacy checks. All eight privacy categories reported zero findings.
+- The initial sandboxed collector and Turbopack build were blocked by host process/runtime restrictions; the exact bounded commands passed with approved host execution. No source or implementation change was made to bypass either restriction.
+- No production Snapshot was published, no Vercel deployment was created, and no Supabase, Cron, LaunchAgent, Gateway or external user state was changed by this local Gate. Production release uses the existing shared-main / Vercel / natural-refresh / authenticated-smoke Gate.
