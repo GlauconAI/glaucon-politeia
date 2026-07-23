@@ -15,6 +15,7 @@ import {
   collectAndWriteObservatorySnapshot,
   collectObservatorySnapshot,
   upgradeObservatorySnapshotToV2,
+  upgradeObservatorySnapshotToV3,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
@@ -23,6 +24,7 @@ import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
+import { collectDashboardGovernance } from "#observatory-governance-collector";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
       { registryPath },
       commonDependencies,
     );
-    snapshot = upgradeObservatorySnapshotToV2(
+    const systemSnapshot = upgradeObservatorySnapshotToV2(
       coreSnapshot,
       await collectSystemInventory(
           {
@@ -158,6 +160,17 @@ async function main(): Promise<void> {
             }),
           },
           { runCommand, now: () => new Date() },
+      ),
+    );
+    snapshot = upgradeObservatorySnapshotToV3(
+      systemSnapshot,
+      await collectDashboardGovernance(
+        { vaultRoot: resolve(options.systemRoots.vaultRoot) },
+        {
+          realpath,
+          readTextFile: readTextFileBounded,
+          now: () => new Date(),
+        },
       ),
     );
     await writeObservatorySnapshotWithSourceProtection(

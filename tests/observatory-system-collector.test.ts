@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,13 +9,16 @@ import {
 } from "@/lib/observatory/system-collector";
 import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
   ObservatoryCollectionEnvelopeSchema,
 } from "@/lib/observatory/collection-schema";
 import {
   computeObservatorySnapshotDigest,
   upgradeObservatorySnapshotToV2,
+  upgradeObservatorySnapshotToV3,
   type CommandInvocation,
 } from "@/lib/observatory/collector";
+import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
 
 const generatedAt = "2026-07-22T22:00:00.000Z";
 
@@ -189,5 +195,47 @@ describe("v2 collection envelope", () => {
     expect(ObservatoryCollectionEnvelopeSchema.parse(upgraded)).toEqual(upgraded);
     expect(upgraded.source_digest).toBe(computeObservatorySnapshotDigest(upgraded));
     expect(upgraded.registry.source.digest).toBe(upgraded.source_digest);
+  });
+
+  it("upgrades a valid v2 snapshot with governance and recomputes the digest", async () => {
+    const inventory = await collectSystemInventory(
+      { agents: coreSnapshot.agents, metadata: [] },
+      {
+        now: () => new Date(generatedAt),
+        runCommand: async (invocation) => {
+          if (invocation.args[0] === "skills") return { exitCode: 0, stdout: JSON.stringify({ skills: [] }) };
+          if (invocation.args[0] === "plugins") return { exitCode: 0, stdout: JSON.stringify({ plugins: [] }) };
+          if (invocation.args[0] === "cron") return { exitCode: 0, stdout: JSON.stringify({ jobs: [] }) };
+          return { exitCode: 0, stdout: JSON.stringify({ service: { runtime: { status: "running" } }, rpc: { ok: true } }) };
+        },
+      },
+    );
+    const fixtureRoot = join(
+      process.cwd(),
+      "tests/fixtures/observatory-governance",
+    );
+    const governance = projectDashboardGovernance(
+      {
+        readme: readFileSync(join(fixtureRoot, "README.md"), "utf8"),
+        baseline: readFileSync(
+          join(fixtureRoot, "development-baseline.md"),
+          "utf8",
+        ),
+        tracker: readFileSync(join(fixtureRoot, "edad-tracker.md"), "utf8"),
+        calibration: readFileSync(
+          join(fixtureRoot, "estimate-calibration.md"),
+          "utf8",
+        ),
+      },
+      { collectedAt: generatedAt },
+    );
+    const v2 = upgradeObservatorySnapshotToV2(coreSnapshot, inventory);
+    const upgraded = upgradeObservatorySnapshotToV3(v2, governance);
+
+    expect(upgraded.schema_version).toBe(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3);
+    expect(upgraded.delivery_governance.project.id).toBe("dashboard");
+    expect(upgraded.source_digest).toBe(computeObservatorySnapshotDigest(upgraded));
+    expect(upgraded.registry.source.digest).toBe(upgraded.source_digest);
+    expect(ObservatoryCollectionEnvelopeSchema.parse(upgraded)).toEqual(upgraded);
   });
 });

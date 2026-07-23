@@ -5,21 +5,29 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION,
   OBSERVATORY_COLLECTOR_VERSION,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
   OBSERVATORY_COLLECTOR_VERSION_V2,
+  OBSERVATORY_COLLECTOR_VERSION_V3,
   ObservatoryAgentSchema,
   ObservatoryCollectionEnvelopeSchema,
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
+  ObservatoryCollectionEnvelopeV3Schema,
   ObservatoryRuntimeSchema,
   type ObservatoryAgent,
   type ObservatoryCollectionEnvelope,
   type ObservatoryCollectionEnvelopeV2,
+  type ObservatoryCollectionEnvelopeV3,
   type ObservatoryRuntime,
 } from "#observatory-collection-schema";
 import {
   ObservatoryAssetInventorySchema,
   type ObservatoryAssetInventory,
 } from "#observatory-asset-schema";
+import {
+  DeliveryGovernanceSchema,
+  type DeliveryGovernance,
+} from "#observatory-governance-schema";
 import { parseOrchestrationRegistryHtml } from "#observatory-registry";
 
 export const OBSERVATORY_CLI_STDOUT_MAX_BYTES = 5 * 1024 * 1024;
@@ -400,11 +408,54 @@ function observatoryDigestMaterial(
   } = registry.source;
   return {
     ...stableEnvelope,
+    ...("delivery_governance" in stableEnvelope
+      ? {
+          delivery_governance: {
+            ...stableEnvelope.delivery_governance,
+            source: {
+              ...stableEnvelope.delivery_governance.source,
+              collected_at: undefined,
+            },
+          },
+        }
+      : {}),
     registry: {
       ...registry,
       source: stableSource,
     },
   };
+}
+
+export function upgradeObservatorySnapshotToV3(
+  systemSnapshotInput: unknown,
+  governanceInput: unknown,
+): ObservatoryCollectionEnvelopeV3 {
+  const systemSnapshot = ObservatoryCollectionEnvelopeV2Schema.parse(
+    systemSnapshotInput,
+  );
+  const governance: DeliveryGovernance =
+    DeliveryGovernanceSchema.parse(governanceInput);
+  const placeholderDigest = "0".repeat(64);
+  const draft = ObservatoryCollectionEnvelopeV3Schema.parse({
+    ...systemSnapshot,
+    schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
+    collector_version: OBSERVATORY_COLLECTOR_VERSION_V3,
+    source_digest: placeholderDigest,
+    registry: {
+      ...systemSnapshot.registry,
+      source: { ...systemSnapshot.registry.source, digest: placeholderDigest },
+    },
+    delivery_governance: governance,
+  });
+  const digest = computeObservatorySnapshotDigest(draft);
+  return ObservatoryCollectionEnvelopeV3Schema.parse({
+    ...draft,
+    source_digest: digest,
+    registry: {
+      ...draft.registry,
+      source: { ...draft.registry.source, digest },
+    },
+  });
 }
 
 export function computeObservatorySnapshotDigest(

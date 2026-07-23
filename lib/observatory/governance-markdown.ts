@@ -30,12 +30,36 @@ export class GovernanceProjectionError extends Error {
 }
 
 function splitRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((value) => value.trim());
+  const value = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells: string[] = [];
+  let cell = "";
+  let inCode = false;
+  let wikiDepth = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const next = value[index + 1];
+    if (char === "`") inCode = !inCode;
+    if (!inCode && char === "[" && next === "[") {
+      wikiDepth += 1;
+      cell += "[[";
+      index += 1;
+      continue;
+    }
+    if (!inCode && char === "]" && next === "]" && wikiDepth > 0) {
+      wikiDepth -= 1;
+      cell += "]]";
+      index += 1;
+      continue;
+    }
+    if (char === "|" && !inCode && wikiDepth === 0) {
+      cells.push(cell.trim());
+      cell = "";
+      continue;
+    }
+    cell += char;
+  }
+  cells.push(cell.trim());
+  return cells;
 }
 
 function isSeparator(line: string): boolean {
