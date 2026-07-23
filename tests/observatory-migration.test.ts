@@ -10,6 +10,10 @@ const workTrackerMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260723000100_work_tracker_core.sql",
 );
+const agentClaimMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260723000200_observatory_agent_claim_engine.sql",
+);
 
 function readMigration(): string {
   return existsSync(migrationPath)
@@ -370,5 +374,158 @@ describe("M3 Work Tracker core migration", () => {
     ]) {
       expect(verifier).toContain(contract);
     }
+  });
+});
+
+describe("M3 Low-risk Agent Claim Engine migration", () => {
+  const sql = () =>
+    existsSync(agentClaimMigrationPath)
+      ? readFileSync(agentClaimMigrationPath, "utf8")
+          .toLowerCase()
+          .replace(/\s+/gu, " ")
+      : "";
+
+  it("adds bounded policy fields and principal-aware audit columns", () => {
+    const source = sql();
+    for (const field of [
+      "risk_level text not null default 'unclassified'",
+      "agent_claim_enabled boolean not null default false",
+      "authorized_paths text[] not null default '{}'",
+      "allowed_action_classes text[] not null default '{}'",
+      "claim_approved_by uuid",
+      "claim_approved_at timestamptz",
+      "agent_id text",
+      "created_by_agent text",
+    ]) {
+      expect(source).toContain(field);
+    }
+    expect(source).toContain(
+      "risk_level in ('unclassified', 'low', 'high')",
+    );
+    expect(source).toContain(
+      "allowed_action_classes <@ array['code_edit', 'test', 'documentation']::text[]",
+    );
+    expect(source).toContain("num_nonnulls(actor_id, agent_id) = 1");
+    expect(source).toContain(
+      "num_nonnulls(created_by, created_by_agent) = 1",
+    );
+  });
+
+  it("creates a protected lease table with active and idempotency uniqueness", () => {
+    const source = sql();
+    expect(source).toContain(
+      "create table public.observatory_work_item_claims",
+    );
+    expect(source).toContain(
+      "status in ('active', 'completed', 'released', 'expired', 'cancelled')",
+    );
+    expect(source).toContain("check (claim_version > 0)");
+    expect(source).toContain("unique (agent_id, idempotency_key)");
+    expect(source).toContain(
+      "create unique index observatory_work_item_claims_one_active_idx",
+    );
+    expect(source).toContain("where status = 'active'");
+    expect(source).toContain(
+      "alter table public.observatory_work_item_claims enable row level security",
+    );
+    expect(source).toContain(
+      "revoke all privileges on table public.observatory_work_item_claims from public, anon, authenticated, service_role",
+    );
+    expect(source).toContain(
+      "grant select on table public.observatory_work_item_claims to authenticated",
+    );
+    expect(source).toContain(
+      "create policy observatory_work_item_claims_select_admin",
+    );
+    expect(source).not.toMatch(
+      /grant (?:insert|update|delete|truncate).*observatory_work_item_claims/u,
+    );
+  });
+
+  it.each([
+    "claim_observatory_work_item",
+    "renew_observatory_work_item_claim",
+    "release_observatory_work_item_claim",
+    "complete_observatory_work_item_claim",
+    "sweep_observatory_work_item_claims",
+  ])("keeps runner RPC %s service-role-only and auditable", (name) => {
+    const source = sql();
+    const start = source.indexOf(`create or replace function public.${name}`);
+    const end = source.indexOf("revoke all privileges on function", start);
+    const contract = source.slice(start, end);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(contract).toContain("security definer");
+    expect(contract).toContain("set search_path = pg_catalog");
+    expect(contract).toContain("auth.role() <> 'service_role'");
+    expect(contract).toContain(
+      "insert into public.observatory_work_item_events",
+    );
+    expect(source).toMatch(
+      new RegExp(
+        `grant execute on function public\\.${name}\\([^)]*\\) to service_role`,
+        "u",
+      ),
+    );
+    expect(source).not.toMatch(
+      new RegExp(
+        `grant execute on function public\\.${name}\\([^)]*\\) to authenticated`,
+        "u",
+      ),
+    );
+  });
+
+  it.each([
+    "configure_observatory_agent_claim_policy",
+    "cancel_observatory_work_item_claim",
+  ])("keeps administrator RPC %s human-only", (name) => {
+    const source = sql();
+    const start = source.indexOf(`create or replace function public.${name}`);
+    const end = source.indexOf("revoke all privileges on function", start);
+    const contract = source.slice(start, end);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(contract).toContain("public.is_current_user_admin()");
+    expect(source).toMatch(
+      new RegExp(
+        `grant execute on function public\\.${name}\\([^)]+\\) to authenticated`,
+        "u",
+      ),
+    );
+    expect(source).not.toMatch(
+      new RegExp(
+        `grant execute on function public\\.${name}\\([^)]+\\) to service_role`,
+        "u",
+      ),
+    );
+  });
+
+  it("encodes low-risk eligibility, bounded leases, skip-locked concurrency, and human Review Gate", () => {
+    const source = sql();
+    for (const contract of [
+      "observatory_claim_not_eligible",
+      "observatory_claim_idempotency_conflict",
+      "observatory_claim_version_conflict",
+      "observatory_claim_expired",
+      "observatory_claim_owner_mismatch",
+      "observatory_claim_active",
+      "risk_level = 'low'",
+      "agent_claim_enabled = true",
+      "state = 'ready'",
+      "type in ('feature', 'bug')",
+      "for update skip locked",
+      "p_lease_seconds between 300 and 3600",
+      "set state = 'in_progress'",
+      "set state = 'review'",
+      "'claim_started'",
+      "'claim_renewed'",
+      "'claim_released'",
+      "'claim_expired'",
+      "'claim_completed'",
+      "'claim_cancelled'",
+    ]) {
+      expect(source).toContain(contract);
+    }
+    expect(source).not.toMatch(
+      /complete_observatory_work_item_claim[\s\S]*set state = 'done'/u,
+    );
   });
 });
