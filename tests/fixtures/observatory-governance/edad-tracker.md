@@ -22,4 +22,5 @@
 
 | Version | 日期 | 类型 | 变更 | 批准 |
 |---|---|---|---|---|
+| DIR-0003 | 2026-07-22 | Plan revision | Three product modules approved | Approved |
 | GATE-M1 | 2026-07-22 | Production Gate | M1 accepted | Passed |

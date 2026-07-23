@@ -50,11 +50,14 @@ describe("projectDashboardGovernance", () => {
       milestone_id: "M2",
       contract_type: "IMPLEMENT",
       forecast_finish: "not_recorded",
+      actual_finish: "2026-07-23",
       gate_requirement: "Production Gate",
     });
     expect(result.tasks[0]).toMatchObject({
       id: "OBS-T1061",
       feature_id: "OBS-F106",
+      actual_start: "2026-07-22",
+      actual_finish: "2026-07-23",
       evidence_refs: ["design"],
     });
     expect(result.executor_runs[0]).toMatchObject({
@@ -63,6 +66,11 @@ describe("projectDashboardGovernance", () => {
       rework: false,
     });
     expect(result.gates[0]).toMatchObject({ id: "GATE-M1", status: "Passed" });
+    expect(result.plan_revisions[0]).toMatchObject({
+      id: "DIR-0003",
+      date: "2026-07-22",
+      approval: "Approved",
+    });
     expect(result.risks[0].id).toBe("R1");
     expect(result.dependencies[0]).toMatchObject({
       id: "DEP-001",

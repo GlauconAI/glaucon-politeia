@@ -289,7 +289,7 @@ export function projectDashboardGovernance(
       confidence: safeText(row.Confidence) as "Low" | "Medium" | "High",
       baseline_finish: dateFact(row["Baseline Finish"]),
       forecast_finish: dateFact(row["Forecast Finish"]),
-      actual_finish: "not_recorded" as const,
+      actual_finish: dateFact(row["Actual Finish"] || ""),
       gate_requirement: gateRequirements.get(id) || "",
       source: "dashboard/development-baseline.md" as const,
     };
@@ -316,8 +316,8 @@ export function projectDashboardGovernance(
         estimate_hours: hours(row.Estimate),
         confidence: safeText(row.Confidence) as "Low" | "Medium" | "High",
         forecast_finish: dateFact(row["Forecast Finish"]),
-        actual_start: "not_recorded" as const,
-        actual_finish: "not_recorded" as const,
+        actual_start: dateFact(row["Actual Start"] || ""),
+        actual_finish: dateFact(row["Actual Finish"] || ""),
         evidence_refs: evidenceRefs(row.Evidence),
         source: "dashboard/development-baseline.md" as const,
       };
@@ -370,6 +370,17 @@ export function projectDashboardGovernance(
       status: safeText(row["批准"]),
       evidence_summary: safeText(row["变更"], GOVERNANCE_MAX_EVIDENCE_LENGTH),
       reviewer_run_id: "not_recorded" as const,
+      source: "dashboard/edad-tracker.md" as const,
+    }));
+
+  const planRevisions = revisionTable.rows
+    .filter((row) => /^DIR-/i.test(row.Version))
+    .map((row) => ({
+      id: safeText(row.Version),
+      date: dateFact(row["日期"]),
+      type: safeText(row["类型"]),
+      summary: safeText(row["变更"], GOVERNANCE_MAX_EVIDENCE_LENGTH),
+      approval: safeText(row["批准"]),
       source: "dashboard/edad-tracker.md" as const,
     }));
 
@@ -448,6 +459,9 @@ export function projectDashboardGovernance(
         left.sequence - right.sequence || left.id.localeCompare(right.id),
     ),
     gates: gates.sort((left, right) => left.id.localeCompare(right.id)),
+    plan_revisions: planRevisions.sort((left, right) =>
+      left.id.localeCompare(right.id),
+    ),
     risks: risks.sort((left, right) => left.id.localeCompare(right.id)),
     dependencies,
     source: {

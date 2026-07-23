@@ -69,6 +69,7 @@ function governance(): DeliveryGovernance {
     ],
     executor_runs: [],
     gates: [],
+    plan_revisions: [],
     risks: [],
     dependencies: [],
     summary: {
@@ -103,6 +104,37 @@ function governance(): DeliveryGovernance {
 describe("DeliveryGovernanceSchema", () => {
   it("accepts a strict, internally consistent governance model", () => {
     expect(DeliveryGovernanceSchema.parse(governance())).toEqual(governance());
+  });
+
+  it("defaults revision history for older strict v3 payloads", () => {
+    const { plan_revisions: _revisions, ...legacy } = governance();
+    const parsed = DeliveryGovernanceSchema.parse(legacy);
+
+    expect(parsed.plan_revisions).toEqual([]);
+  });
+
+  it("accepts bounded revisions and rejects duplicate revision ids", () => {
+    const model = {
+      ...governance(),
+      plan_revisions: [
+        {
+          id: "DIR-0003",
+          date: "2026-07-22",
+          type: "Plan revision",
+          summary: "Three product modules approved",
+          approval: "Approved",
+          source: "dashboard/edad-tracker.md",
+        },
+      ],
+    };
+
+    expect(DeliveryGovernanceSchema.parse(model).plan_revisions).toHaveLength(1);
+    expect(
+      DeliveryGovernanceSchema.safeParse({
+        ...model,
+        plan_revisions: [...model.plan_revisions, model.plan_revisions[0]],
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects duplicate ids and dangling hierarchy references", () => {

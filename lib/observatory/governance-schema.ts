@@ -119,6 +119,15 @@ export const GovernanceGateSchema = z.strictObject({
   source: SourceLabel,
 });
 
+export const GovernancePlanRevisionSchema = z.strictObject({
+  id: Id.regex(/^DIR-/i),
+  date: DateFact,
+  type: Text,
+  summary: EvidenceText,
+  approval: Text,
+  source: SourceLabel,
+});
+
 export const GovernanceRiskSchema = z.strictObject({
   id: Id,
   description: Text,
@@ -236,6 +245,7 @@ export const DeliveryGovernanceSchema = z
     tasks: z.array(GovernanceTaskSchema).max(2_048),
     executor_runs: z.array(GovernanceExecutorRunSchema).max(1_024),
     gates: z.array(GovernanceGateSchema).max(256),
+    plan_revisions: z.array(GovernancePlanRevisionSchema).max(256).default([]),
     risks: z.array(GovernanceRiskSchema).max(256),
     dependencies: z.array(GovernanceDependencySchema).max(256),
     summary: GovernanceSummarySchema,
@@ -250,6 +260,7 @@ export const DeliveryGovernanceSchema = z
       ["tasks", model.tasks],
       ["executor_runs", model.executor_runs],
       ["gates", model.gates],
+      ["plan_revisions", model.plan_revisions],
       ["risks", model.risks],
       ["dependencies", model.dependencies],
     ];
