@@ -5,6 +5,8 @@ import { useActionState, useEffect, useReducer, useState } from "react";
 
 import {
   addObservatoryWorkItemEvidenceAction,
+  cancelObservatoryAgentClaimAction,
+  configureObservatoryAgentClaimPolicyAction,
   removeObservatoryWorkItemEvidenceAction,
   transitionObservatoryWorkItemAction,
   type ObservatoryWorkItemMutationActionState,
@@ -13,8 +15,14 @@ import {
 import type {
   ObservatoryWorkItemEventRow,
   ObservatoryWorkItemEvidenceRow,
+  ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
 } from "@/lib/observatory/repository";
+import {
+  OBSERVATORY_AGENT_ACTION_CLASSES,
+  OBSERVATORY_AGENT_RISK_LEVELS,
+  getAgentClaimEligibility,
+} from "@/lib/observatory/agent-claims";
 import {
   OBSERVATORY_WORK_ITEM_PRIORITIES,
   OBSERVATORY_WORK_ITEM_TYPES,
@@ -31,6 +39,7 @@ type WorkItemDetailProps = {
   item: ObservatoryWorkItemRow;
   evidence: ObservatoryWorkItemEvidenceRow[];
   events: ObservatoryWorkItemEventRow[];
+  claims?: ObservatoryWorkItemClaimRow[];
   currentAdmin: {
     user_id: string;
     username: string | null;
@@ -40,6 +49,9 @@ type WorkItemDetailProps = {
   transitionAction?: MutationAction;
   addEvidenceAction?: MutationAction;
   removeEvidenceAction?: MutationAction;
+  claimPolicyAction?: MutationAction;
+  cancelClaimAction?: MutationAction;
+  evaluatedAt?: string;
 };
 
 const stateLabels = {
@@ -103,18 +115,38 @@ function eventSummary(event: ObservatoryWorkItemEventRow) {
       typeof event.data.label === "string" ? event.data.label : "Evidence";
     return `${event.event_type === "evidence_added" ? "Added" : "Removed"} ${label}`;
   }
+  if (event.event_type.startsWith("claim_")) {
+    return event.event_type
+      .replace("claim_", "Claim ")
+      .replaceAll("_", " ");
+  }
   return event.event_type === "created" ? "Created" : "Fields updated";
 }
+
+const eligibilityLabels = {
+  unsupported_type: "Only Features and Bugs can be claimed.",
+  not_ready: "Move the item to Ready.",
+  ready_gate_incomplete: "Complete the Ready Gate.",
+  risk_not_low: "Set risk to Low.",
+  claim_not_approved: "Enable owner approval.",
+  authorized_paths_missing: "Add at least one authorized path.",
+  action_classes_missing: "Select at least one action class.",
+  active_claim_exists: "An active claim already exists.",
+} as const;
 
 export function WorkItemDetail({
   item,
   evidence,
   events,
+  claims = [],
   currentAdmin,
   updateAction = updateObservatoryWorkItemAction,
   transitionAction = transitionObservatoryWorkItemAction,
   addEvidenceAction = addObservatoryWorkItemEvidenceAction,
   removeEvidenceAction = removeObservatoryWorkItemEvidenceAction,
+  claimPolicyAction = configureObservatoryAgentClaimPolicyAction,
+  cancelClaimAction = cancelObservatoryAgentClaimAction,
+  evaluatedAt = item.updated_at,
 }: WorkItemDetailProps) {
   const [updateState, updateFormAction, updating] = useActionState(
     updateAction,
@@ -128,6 +160,14 @@ export function WorkItemDetail({
   );
   const [removalState, removalFormAction, removingEvidence] = useActionState(
     removeEvidenceAction,
+    idleState,
+  );
+  const [policyState, policyFormAction, updatingPolicy] = useActionState(
+    claimPolicyAction,
+    idleState,
+  );
+  const [cancelState, cancelFormAction, cancellingClaim] = useActionState(
+    cancelClaimAction,
     idleState,
   );
   const [priority, setPriority] = useState(item.priority ?? "");
@@ -145,6 +185,23 @@ export function WorkItemDetail({
   });
   const ownerLabel =
     currentAdmin.display_name ?? currentAdmin.username ?? "Current admin";
+  const activeClaim = claims.find(
+    (claim) =>
+      claim.status === "active" &&
+      claim.ended_at === null &&
+      new Date(claim.lease_expires_at).getTime() >
+        new Date(evaluatedAt).getTime(),
+  );
+  const eligibility = getAgentClaimEligibility({
+    type: item.type,
+    state: item.state,
+    readyGateComplete: readyFailures.length === 0,
+    riskLevel: item.risk_level,
+    enabled: item.agent_claim_enabled,
+    authorizedPaths: item.authorized_paths,
+    allowedActionClasses: item.allowed_action_classes,
+    activeClaim: Boolean(activeClaim),
+  });
 
   return (
     <article className="work-item-detail">
@@ -288,6 +345,119 @@ export function WorkItemDetail({
           ))}
         </div>
         <MutationFeedback state={transitionState} success="State moved." />
+      </section>
+
+      <section aria-labelledby="work-item-agent-claim-title">
+        <h2 id="work-item-agent-claim-title">Agent Claim</h2>
+        <p className="work-item-ready-gate">
+          Agent completion stops at Review. A human administrator owns the
+          final Done transition.
+        </p>
+        {activeClaim ? (
+          <div className="work-item-active-claim">
+            <p>
+              <strong>Claimed by {activeClaim.agent_id}</strong>
+            </p>
+            <p>
+              Heartbeat {new Date(activeClaim.last_heartbeat_at).toLocaleString("en-CA", { timeZone: "UTC" })} UTC
+              {" · "}lease ends {new Date(activeClaim.lease_expires_at).toLocaleString("en-CA", { timeZone: "UTC" })} UTC
+            </p>
+            <form action={cancelFormAction}>
+              <input type="hidden" name="workItemId" value={item.id} />
+              <input type="hidden" name="claimId" value={activeClaim.id} />
+              <input
+                type="hidden"
+                name="expectedClaimVersion"
+                value={activeClaim.claim_version}
+              />
+              <input
+                type="hidden"
+                name="expectedWorkItemVersion"
+                value={item.version}
+              />
+              <button type="submit" disabled={cancellingClaim}>
+                {cancellingClaim ? "Cancelling…" : "Cancel claim"}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <p>
+            {eligibility.eligible
+              ? "Agent eligible."
+              : eligibility.reasons.map((reason) => eligibilityLabels[reason]).join(" ")}
+          </p>
+        )}
+
+        <form action={policyFormAction} className="work-item-claim-policy-form">
+          <input type="hidden" name="workItemId" value={item.id} />
+          <input
+            type="hidden"
+            name="expectedVersion"
+            value={item.version}
+          />
+          <label>
+            <span>Risk level</span>
+            <select name="riskLevel" defaultValue={item.risk_level}>
+              {OBSERVATORY_AGENT_RISK_LEVELS.map((risk) => (
+                <option key={risk} value={risk}>
+                  {risk[0].toUpperCase() + risk.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="work-item-checkbox">
+            <input
+              type="checkbox"
+              name="enabled"
+              defaultChecked={item.agent_claim_enabled}
+            />
+            <span>Owner approves Agent Claim</span>
+          </label>
+          <label className="work-item-wide-field">
+            <span>Authorized paths (one repository-relative path per line)</span>
+            <textarea
+              name="authorizedPaths"
+              defaultValue={item.authorized_paths.join("\n")}
+              rows={4}
+              maxLength={3856}
+            />
+          </label>
+          <fieldset className="work-item-wide-field">
+            <legend>Allowed action classes</legend>
+            {OBSERVATORY_AGENT_ACTION_CLASSES.map((actionClass) => (
+              <label key={actionClass} className="work-item-checkbox">
+                <input
+                  type="checkbox"
+                  name="allowedActionClasses"
+                  value={actionClass}
+                  defaultChecked={item.allowed_action_classes.includes(actionClass)}
+                />
+                <span>{actionClass.replaceAll("_", " ")}</span>
+              </label>
+            ))}
+          </fieldset>
+          <button type="submit" disabled={updatingPolicy || Boolean(activeClaim)}>
+            {updatingPolicy ? "Saving…" : "Save claim policy"}
+          </button>
+        </form>
+        <MutationFeedback state={policyState} success="Claim policy saved." />
+        <MutationFeedback state={cancelState} success="Claim cancelled." />
+
+        <h3>Claim history</h3>
+        {claims.length === 0 ? (
+          <p>No Agent Claim history.</p>
+        ) : (
+          <ol className="work-item-claim-history">
+            {claims.map((claim) => (
+              <li key={claim.id}>
+                <strong>
+                  {claim.status} · {claim.agent_id}
+                </strong>
+                <span>claim version {claim.claim_version}</span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <section aria-labelledby="work-item-evidence-title">

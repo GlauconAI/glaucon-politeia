@@ -6,6 +6,7 @@ import type {
   ObservatoryWorkItemEventRow,
   ObservatoryWorkItemEvidenceRow,
   ObservatoryWorkItemRow,
+  ObservatoryWorkItemClaimRow,
 } from "@/lib/observatory/repository";
 
 const item: ObservatoryWorkItemRow = {
@@ -70,6 +71,22 @@ const events: ObservatoryWorkItemEventRow[] = [
 const successAction = vi
   .fn()
   .mockResolvedValue({ status: "success", version: 4 });
+
+const activeClaim: ObservatoryWorkItemClaimRow = {
+  id: "44444444-4444-4444-8444-444444444444",
+  work_item_id: item.id,
+  agent_id: "plato-pilot",
+  status: "active",
+  claim_version: 2,
+  started_at: "2026-07-23T20:06:00.000Z",
+  last_heartbeat_at: "2026-07-23T20:07:00.000Z",
+  lease_expires_at: "2099-07-23T20:22:00.000Z",
+  ended_at: null,
+  completion_summary: null,
+  result_evidence_url: null,
+  created_at: "2026-07-23T20:06:00.000Z",
+  updated_at: "2026-07-23T20:07:00.000Z",
+};
 
 describe("WorkItemDetail", () => {
   it("renders editable fields, Ready Gate guidance, and allowed transitions", () => {
@@ -138,7 +155,9 @@ describe("WorkItemDetail", () => {
     expect(
       screen.getByRole("button", { name: /remove production dashboard/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /history/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /^history$/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/created/i)).toBeInTheDocument();
     expect(screen.getByText(/inbox → triage/i)).toBeInTheDocument();
     expect(screen.queryByText(/actor_id/i)).not.toBeInTheDocument();
@@ -200,5 +219,71 @@ describe("WorkItemDetail", () => {
     );
     expect(priority).toHaveValue("high");
     expect(owner).toHaveValue(item.created_by);
+  });
+
+  it("renders policy eligibility, active lease history, and admin cancellation", () => {
+    render(
+      <WorkItemDetail
+        item={{
+          ...item,
+          state: "in_progress",
+          risk_level: "low",
+          agent_claim_enabled: true,
+          authorized_paths: ["components/observatory"],
+          allowed_action_classes: ["code_edit", "test"],
+        }}
+        evidence={[]}
+        events={[]}
+        claims={[activeClaim]}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={successAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+        claimPolicyAction={successAction}
+        cancelClaimAction={successAction}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: /agent claim/i })).toBeInTheDocument();
+    expect(screen.getByText(/claimed by plato-pilot/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent completion stops at review/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel claim/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/risk level/i)).toHaveValue("low");
+  });
+
+  it("never treats an ended claim as active even when its historical expiry is future", () => {
+    render(
+      <WorkItemDetail
+        item={item}
+        evidence={[]}
+        events={[]}
+        claims={[
+          {
+            ...activeClaim,
+            status: "expired",
+            ended_at: "2026-07-23T20:08:00.000Z",
+          },
+        ]}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={successAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+        claimPolicyAction={successAction}
+        cancelClaimAction={successAction}
+      />,
+    );
+
+    expect(screen.getByText(/expired · plato-pilot/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cancel claim/i })).not.toBeInTheDocument();
   });
 });

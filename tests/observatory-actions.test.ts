@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   transitionWorkItem: vi.fn(),
   addWorkItemEvidence: vi.fn(),
   removeWorkItemEvidence: vi.fn(),
+  configureAgentClaimPolicy: vi.fn(),
+  cancelAgentClaim: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -40,6 +42,8 @@ vi.mock("@/lib/observatory/repository", async (importOriginal) => {
       transitionWorkItem: mocks.transitionWorkItem,
       addWorkItemEvidence: mocks.addWorkItemEvidence,
       removeWorkItemEvidence: mocks.removeWorkItemEvidence,
+      configureAgentClaimPolicy: mocks.configureAgentClaimPolicy,
+      cancelAgentClaim: mocks.cancelAgentClaim,
     }),
   };
 });
@@ -48,6 +52,8 @@ import {
   addObservatoryWorkItemEvidenceAction,
   captureObservatoryWorkItemAction,
   removeObservatoryWorkItemEvidenceAction,
+  cancelObservatoryAgentClaimAction,
+  configureObservatoryAgentClaimPolicyAction,
   transitionObservatoryWorkItemAction,
   type ObservatoryQuickCaptureActionState,
   updateObservatoryWorkItemAction,
@@ -204,11 +210,15 @@ describe("Work Tracker mutation actions", () => {
     mocks.transitionWorkItem.mockReset();
     mocks.addWorkItemEvidence.mockReset();
     mocks.removeWorkItemEvidence.mockReset();
+    mocks.configureAgentClaimPolicy.mockReset();
+    mocks.cancelAgentClaim.mockReset();
     for (const mutation of [
       mocks.updateWorkItem,
       mocks.transitionWorkItem,
       mocks.addWorkItemEvidence,
       mocks.removeWorkItemEvidence,
+      mocks.configureAgentClaimPolicy,
+      mocks.cancelAgentClaim,
     ]) {
       mutation.mockResolvedValue({ id: workItemId, version: 4 });
     }
@@ -337,6 +347,75 @@ describe("Work Tracker mutation actions", () => {
     ).resolves.toEqual({
       status: "error",
       formError: "This item changed. Refresh before trying again.",
+    });
+  });
+
+  it("normalizes and applies an administrator-approved low-risk policy", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("riskLevel", "low");
+    formData.set("enabled", "on");
+    formData.set(
+      "authorizedPaths",
+      " components/observatory/WorkTrackerBoard.tsx \n tests/observatory-work-tracker-board.test.tsx ",
+    );
+    formData.append("allowedActionClasses", "code_edit");
+    formData.append("allowedActionClasses", "test");
+
+    await expect(
+      configureObservatoryAgentClaimPolicyAction(
+        { status: "idle" },
+        formData,
+      ),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.configureAgentClaimPolicy).toHaveBeenCalledWith({
+      workItemId,
+      expectedVersion: 3,
+      riskLevel: "low",
+      enabled: true,
+      authorizedPaths: [
+        "components/observatory/WorkTrackerBoard.tsx",
+        "tests/observatory-work-tracker-board.test.tsx",
+      ],
+      allowedActionClasses: ["code_edit", "test"],
+    });
+  });
+
+  it("rejects an enabled high-risk policy before calling the RPC", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("riskLevel", "high");
+    formData.set("enabled", "on");
+    formData.set("authorizedPaths", "components/observatory");
+    formData.append("allowedActionClasses", "code_edit");
+
+    const result = await configureObservatoryAgentClaimPolicyAction(
+      { status: "idle" },
+      formData,
+    );
+    expect(result.status).toBe("error");
+    expect(mocks.configureAgentClaimPolicy).not.toHaveBeenCalled();
+  });
+
+  it("cancels an active claim with both expected versions", async () => {
+    mocks.cancelAgentClaim.mockResolvedValueOnce({
+      work_item: { id: workItemId, version: 5 },
+    });
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("claimId", "33333333-3333-4333-8333-333333333333");
+    formData.set("expectedClaimVersion", "2");
+    formData.set("expectedWorkItemVersion", "4");
+
+    await expect(
+      cancelObservatoryAgentClaimAction({ status: "idle" }, formData),
+    ).resolves.toEqual({ status: "success", version: 5 });
+    expect(mocks.cancelAgentClaim).toHaveBeenCalledWith({
+      claimId: "33333333-3333-4333-8333-333333333333",
+      expectedClaimVersion: 2,
+      expectedWorkItemVersion: 4,
     });
   });
 });

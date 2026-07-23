@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getWorkItem: vi.fn(),
   listWorkItemEvidence: vi.fn(),
   listWorkItemEvents: vi.fn(),
+  listWorkItemClaims: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -39,6 +40,7 @@ vi.mock("@/lib/observatory/repository", () => ({
     getWorkItem: mocks.getWorkItem,
     listWorkItemEvidence: mocks.listWorkItemEvidence,
     listWorkItemEvents: mocks.listWorkItemEvents,
+    listWorkItemClaims: mocks.listWorkItemClaims,
   }),
 }));
 
@@ -60,6 +62,12 @@ const item = {
   created_by: "22222222-2222-4222-8222-222222222222",
   created_at: "2026-07-23T20:00:00.000Z",
   updated_at: "2026-07-23T20:00:00.000Z",
+  risk_level: "unclassified",
+  agent_claim_enabled: false,
+  authorized_paths: [],
+  allowed_action_classes: [],
+  claim_approved_by: null,
+  claim_approved_at: null,
 };
 
 describe("WorkItemPage", () => {
@@ -76,6 +84,8 @@ describe("WorkItemPage", () => {
     mocks.listWorkItemEvidence.mockResolvedValue([]);
     mocks.listWorkItemEvents.mockReset();
     mocks.listWorkItemEvents.mockResolvedValue([]);
+    mocks.listWorkItemClaims.mockReset();
+    mocks.listWorkItemClaims.mockResolvedValue([]);
   });
 
   it("redirects unauthorized visitors before reading the item", async () => {
@@ -99,6 +109,7 @@ describe("WorkItemPage", () => {
     ).toBeInTheDocument();
     expect(mocks.listWorkItemEvidence).toHaveBeenCalledWith(item.id);
     expect(mocks.listWorkItemEvents).toHaveBeenCalledWith(item.id);
+    expect(mocks.listWorkItemClaims).toHaveBeenCalledWith(item.id);
   });
 
   it("uses the not-found boundary for a missing item", async () => {

@@ -57,10 +57,12 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
 
   let evidence;
   let events;
+  let claims;
   try {
-    [evidence, events] = await Promise.all([
+    [evidence, events, claims] = await Promise.all([
       repository.listWorkItemEvidence(id),
       repository.listWorkItemEvents(id),
+      repository.listWorkItemClaims(id),
     ]);
   } catch {
     return unavailableState();
@@ -71,6 +73,8 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
       item={item}
       evidence={evidence}
       events={events}
+      claims={claims}
+      evaluatedAt={new Date().toISOString()}
       currentAdmin={currentAdmin}
     />
   );

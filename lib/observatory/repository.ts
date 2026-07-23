@@ -62,7 +62,14 @@ export interface ObservatoryWorkItemEventRow {
     | "updated"
     | "state_transitioned"
     | "evidence_added"
-    | "evidence_removed";
+    | "evidence_removed"
+    | "claim_policy_updated"
+    | "claim_started"
+    | "claim_renewed"
+    | "claim_released"
+    | "claim_expired"
+    | "claim_completed"
+    | "claim_cancelled";
   actor_id: string | null;
   agent_id: string | null;
   data: Record<string, unknown>;

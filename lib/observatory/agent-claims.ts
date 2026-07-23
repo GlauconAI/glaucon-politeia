@@ -103,9 +103,9 @@ export function normalizeAuthorizedPaths(paths: readonly string[]): string[] {
 
 const AuthorizedPathsSchema = z
   .array(z.string())
-  .min(1)
   .max(OBSERVATORY_AUTHORIZED_PATH_MAX_COUNT)
   .transform((paths, context) => {
+    if (paths.length === 0) return [];
     try {
       return normalizeAuthorizedPaths(paths);
     } catch (error) {
@@ -128,9 +128,31 @@ export const AgentClaimPolicyInputSchema = z.strictObject({
   authorizedPaths: AuthorizedPathsSchema,
   allowedActionClasses: z
     .array(z.enum(OBSERVATORY_AGENT_ACTION_CLASSES))
-    .min(1)
     .max(OBSERVATORY_AGENT_ACTION_CLASSES.length)
     .transform((values) => [...new Set(values)]),
+}).superRefine((value, context) => {
+  if (!value.enabled) return;
+  if (value.riskLevel !== "low") {
+    context.addIssue({
+      code: "custom",
+      path: ["riskLevel"],
+      message: "Only Low-risk work can be enabled for Agent Claim.",
+    });
+  }
+  if (value.authorizedPaths.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["authorizedPaths"],
+      message: "Add at least one authorized path.",
+    });
+  }
+  if (value.allowedActionClasses.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["allowedActionClasses"],
+      message: "Select at least one allowed action class.",
+    });
+  }
 });
 
 export const AgentClaimRequestSchema = z.strictObject({

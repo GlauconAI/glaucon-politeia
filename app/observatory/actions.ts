@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import {
+  AgentClaimCancellationInputSchema,
+  AgentClaimPolicyInputSchema,
+} from "@/lib/observatory/agent-claims";
+import {
   createObservatoryRepository,
   ObservatoryRepositoryError,
   type ObservatoryRepositoryClient,
@@ -125,6 +129,12 @@ function mutationFormError(error: unknown): string {
       return "Add acceptance criteria, priority, and owner before Ready.";
     case "EVIDENCE_NOT_FOUND":
       return "That evidence link is no longer active. Refresh and try again.";
+    case "CLAIM_ACTIVE":
+      return "Cancel or wait for the active Agent Claim before changing this item.";
+    case "CLAIM_POLICY_INVALID":
+      return "Only owner-approved Low-risk Features or Bugs with bounded paths can be claimed.";
+    case "CLAIM_VERSION_CONFLICT":
+      return "This Agent Claim changed. Refresh before trying again.";
     default:
       return "The work item could not be changed. Try again.";
   }
@@ -334,6 +344,84 @@ export async function removeObservatoryWorkItemEvidenceAction(
     );
     revalidateWorkItem(item.id);
     return { status: "success", version: item.version };
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+}
+
+export async function configureObservatoryAgentClaimPolicyAction(
+  previousState: ObservatoryWorkItemMutationActionState,
+  formData: FormData,
+): Promise<ObservatoryWorkItemMutationActionState> {
+  void previousState;
+  const boundary = await authorizedRepository();
+  if (!boundary.ok) return boundary.error;
+
+  const rawPaths = formData.get("authorizedPaths");
+  const validation = AgentClaimPolicyInputSchema.safeParse({
+    workItemId: formData.get("workItemId"),
+    expectedVersion: versionValue(formData),
+    riskLevel: formData.get("riskLevel"),
+    enabled: formData.get("enabled") === "on",
+    authorizedPaths:
+      typeof rawPaths === "string"
+        ? rawPaths
+            .split(/\r?\n/u)
+            .map((path) => path.trim())
+            .filter(Boolean)
+        : [],
+    allowedActionClasses: formData.getAll("allowedActionClasses"),
+  });
+  if (!validation.success) {
+    return fieldErrorState(validation.error.flatten().fieldErrors);
+  }
+
+  try {
+    const item = await boundary.repository.configureAgentClaimPolicy(
+      validation.data,
+    );
+    revalidateWorkItem(item.id);
+    return { status: "success", version: item.version };
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+}
+
+export async function cancelObservatoryAgentClaimAction(
+  previousState: ObservatoryWorkItemMutationActionState,
+  formData: FormData,
+): Promise<ObservatoryWorkItemMutationActionState> {
+  void previousState;
+  const boundary = await authorizedRepository();
+  if (!boundary.ok) return boundary.error;
+
+  const validation = AgentClaimCancellationInputSchema.safeParse({
+    claimId: formData.get("claimId"),
+    expectedClaimVersion: Number(formData.get("expectedClaimVersion")),
+    expectedWorkItemVersion: Number(formData.get("expectedWorkItemVersion")),
+  });
+  const workItemId = formData.get("workItemId");
+  if (
+    !validation.success ||
+    typeof workItemId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      workItemId,
+    )
+  ) {
+    return fieldErrorState(
+      validation.success
+        ? { workItemId: ["Use a valid work item ID."] }
+        : validation.error.flatten().fieldErrors,
+    );
+  }
+
+  try {
+    await boundary.repository.cancelAgentClaim(validation.data);
+    revalidateWorkItem(workItemId);
+    return {
+      status: "success",
+      version: validation.data.expectedWorkItemVersion + 1,
+    };
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
   }
