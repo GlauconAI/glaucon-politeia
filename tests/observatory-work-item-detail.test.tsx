@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkItemDetail } from "@/components/observatory/WorkItemDetail";
@@ -156,5 +156,40 @@ describe("WorkItemDetail", () => {
     expect(screen.getByText(/no evidence links yet/i)).toBeInTheDocument();
     expect(screen.getByText(/missing acceptance criteria, priority, owner/i)).toBeInTheDocument();
     expect(screen.getByText(/no history events/i)).toBeInTheDocument();
+  });
+
+  it("keeps newly selected Ready Gate values through a successful server action", async () => {
+    const updateAction = vi
+      .fn()
+      .mockResolvedValue({ status: "success", version: 4 });
+
+    render(
+      <WorkItemDetail
+        item={{ ...item, priority: null, owner_id: null }}
+        evidence={[]}
+        events={[]}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={updateAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+
+    const priority = screen.getByLabelText(/^priority$/i);
+    const owner = screen.getByLabelText(/^owner$/i);
+    fireEvent.change(priority, { target: { value: "high" } });
+    fireEvent.change(owner, { target: { value: item.created_by } });
+    fireEvent.submit(screen.getByRole("button", { name: /save fields/i }).closest("form")!);
+
+    await waitFor(() =>
+      expect(screen.getByText(/fields saved\. version 4/i)).toBeInTheDocument(),
+    );
+    expect(priority).toHaveValue("high");
+    expect(owner).toHaveValue(item.created_by);
   });
 });

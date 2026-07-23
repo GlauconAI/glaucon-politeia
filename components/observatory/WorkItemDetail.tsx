@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useReducer, useState } from "react";
 
 import {
   addObservatoryWorkItemEvidenceAction,
@@ -130,6 +130,14 @@ export function WorkItemDetail({
     removeEvidenceAction,
     idleState,
   );
+  const [priority, setPriority] = useState(item.priority ?? "");
+  const [ownerId, setOwnerId] = useState(item.owner_id ?? "");
+  const [, syncControlledFields] = useReducer((version: number) => version + 1, 0);
+  useEffect(() => {
+    if (updateState.status !== "idle") {
+      syncControlledFields();
+    }
+  }, [updateState]);
   const readyFailures = getObservatoryReadyGateFailures({
     acceptanceCriteria: item.acceptance_criteria,
     priority: item.priority,
@@ -214,7 +222,11 @@ export function WorkItemDetail({
           </label>
           <label>
             <span>Priority</span>
-            <select name="priority" defaultValue={item.priority ?? ""}>
+            <select
+              name="priority"
+              value={priority}
+              onChange={(event) => setPriority(event.target.value)}
+            >
               <option value="">Unassigned</option>
               {OBSERVATORY_WORK_ITEM_PRIORITIES.map((priority) => (
                 <option key={priority} value={priority}>
@@ -225,7 +237,11 @@ export function WorkItemDetail({
           </label>
           <label>
             <span>Owner</span>
-            <select name="ownerId" defaultValue={item.owner_id ?? ""}>
+            <select
+              name="ownerId"
+              value={ownerId}
+              onChange={(event) => setOwnerId(event.target.value)}
+            >
               <option value="">Unassigned</option>
               <option value={currentAdmin.user_id}>{ownerLabel}</option>
             </select>
