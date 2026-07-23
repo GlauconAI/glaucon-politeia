@@ -3,8 +3,8 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import {
   GovernanceProjectionError,
   projectDashboardGovernance,
-} from "./governance-markdown";
-import type { DeliveryGovernance } from "./governance-schema";
+} from "#observatory-governance-markdown";
+import type { DeliveryGovernance } from "#observatory-governance-schema";
 
 export const GOVERNANCE_FILE_MAX_BYTES = 2 * 1024 * 1024;
 export const GOVERNANCE_TOTAL_MAX_BYTES = 6 * 1024 * 1024;
@@ -22,12 +22,15 @@ export type GovernanceCollectionErrorCode =
   | "RESOURCE_LIMIT_EXCEEDED";
 
 export class GovernanceCollectionError extends Error {
+  readonly code: GovernanceCollectionErrorCode;
+
   constructor(
-    readonly code: GovernanceCollectionErrorCode,
+    code: GovernanceCollectionErrorCode,
     message: string,
   ) {
     super(message);
     this.name = "GovernanceCollectionError";
+    this.code = code;
   }
 }
 

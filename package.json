@@ -8,6 +8,7 @@
     "#observatory-collection-schema": "./lib/observatory/collection-schema.ts",
     "#observatory-governance-schema": "./lib/observatory/governance-schema.ts",
     "#observatory-governance-collector": "./lib/observatory/governance-collector.ts",
+    "#observatory-governance-markdown": "./lib/observatory/governance-markdown.ts",
     "#observatory-asset-schema": "./lib/observatory/asset-schema.ts",
     "#observatory-freshness": "./lib/observatory/freshness.ts",
     "#observatory-system-assets": "./lib/observatory/system-assets.ts",

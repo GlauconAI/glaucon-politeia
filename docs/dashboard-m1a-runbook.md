@@ -2,7 +2,7 @@
 
 > Dashboard is the current external project name and `/dashboard` is the canonical route. Internal `observatory_*` identifiers and historical release evidence are intentionally preserved for compatibility.
 
-This runbook retains the M1A release evidence and adds the completed System Observatory workflow: collect a strict v2 asset inventory, publish the last-known-good Snapshot, prune bounded history, and operate automatic refresh without any Gateway lifecycle action. Collection is read-only. Migration, publication, deployment, and scheduling remain distinct release gates.
+This runbook retains the M1A release evidence and adds the completed System Observatory and first Delivery Governance workflow: collect a strict v3 Snapshot containing the v2 asset inventory plus a bounded Project Cockpit read model, publish the last-known-good Snapshot, prune bounded history, and operate automatic refresh without any Gateway lifecycle action. Collection is read-only. Migration, publication, deployment, and scheduling remain distinct release gates.
 
 ## Safety boundary
 
@@ -61,7 +61,7 @@ supabase stop --no-backup
 docker network rm observatory-local-loopback
 ```
 
-### 3. Collect the real local v2 snapshot
+### 3. Collect the real local v3 snapshot
 
 ```bash
 umask 077
@@ -91,13 +91,13 @@ openclaw agents list --json
 openclaw status --json
 ```
 
-The v2 collector extends that committed read-only allowlist with per-agent skill availability plus global plugin/tool, Cron, Gateway, and runtime summaries. Raw command objects, Cron payloads, delivery destinations, session keys, config values, file contents, and absolute roots are never serialized.
+The v3 collector extends that committed read-only allowlist with per-agent skill availability plus global plugin/tool, Cron, Gateway, and runtime summaries. It also projects only four exact Dashboard governance documents—README, Development Baseline, EDAD Tracker, and estimate calibration—into the strict Project Cockpit read model. Raw command objects, raw Markdown, Cron payloads, delivery destinations, session keys, config values, file contents, and absolute roots are never serialized.
 
 If either input, command, schema validation, digesting, or atomic write fails, stop. Do not publish. The destination is replaced only after a complete validated write; an existing local last-known-good file remains intact on collection/rename failure.
 
 ### 4. Validate provenance, consistency, and privacy
 
-Run the committed v2 verifier first. It reports only schema/count/check results and privacy category counts; it never prints matched values.
+Run the committed v3 verifier first. It reports only schema/count/check results, Project Cockpit counts, and privacy category counts; it never prints matched values.
 
 ```bash
 npm run observatory:verify-snapshot -- .observatory/observatory-snapshot.json
