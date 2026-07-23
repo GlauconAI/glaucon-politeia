@@ -78,6 +78,56 @@ function repositoryClient(input?: {
   };
 }
 
+function workTrackerClient(rows: Record<string, unknown[]>) {
+  const queries: Record<
+    string,
+    {
+      select: ReturnType<typeof vi.fn>;
+      eq: ReturnType<typeof vi.fn>;
+      is: ReturnType<typeof vi.fn>;
+      order: ReturnType<typeof vi.fn>;
+      maybeSingle: ReturnType<typeof vi.fn>;
+    }
+  > = {};
+  const from = vi.fn((table: string) => {
+    const result = rows[table] ?? [];
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      order: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: result[0] ?? null,
+        error: null,
+      }),
+      then: (
+        resolve: (value: { data: unknown[]; error: null }) => unknown,
+      ) => Promise.resolve(resolve({ data: result, error: null })),
+    };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    query.is.mockReturnValue(query);
+    query.order.mockReturnValue(query);
+    queries[table] = {
+      select: query.select,
+      eq: query.eq,
+      is: query.is,
+      order: query.order,
+      maybeSingle: query.maybeSingle,
+    };
+    return query;
+  });
+
+  return {
+    client: {
+      from,
+      rpc: vi.fn(),
+    } as unknown as ObservatoryRepositoryClient,
+    from,
+    queries,
+  };
+}
+
 describe("getCurrentObservatoryAdmin", () => {
   it("returns null without creating clients when server configuration is absent", async () => {
     const createServerClient = vi.fn();
@@ -354,6 +404,11 @@ describe("Observatory repository", () => {
         type: "feature",
         title: "Refresh runtime health",
         description: "Keep it current.",
+        acceptanceCriteria: "The refresh is visible.",
+        priority: "high",
+        ownerId: "22222222-2222-4222-8222-222222222222",
+        projectRef: "dashboard",
+        milestoneRef: "OBS-M3",
       }),
     ).rejects.toMatchObject({
       code: "VERSION_CONFLICT",
@@ -366,6 +421,11 @@ describe("Observatory repository", () => {
         p_type: "feature",
         p_title: "Refresh runtime health",
         p_description: "Keep it current.",
+        p_acceptance_criteria: "The refresh is visible.",
+        p_priority: "high",
+        p_owner_id: "22222222-2222-4222-8222-222222222222",
+        p_project_ref: "dashboard",
+        p_milestone_ref: "OBS-M3",
       },
     );
   });
@@ -387,6 +447,11 @@ describe("Observatory repository", () => {
         type: "bug",
         title: "Missing",
         description: "",
+        acceptanceCriteria: "",
+        priority: null,
+        ownerId: null,
+        projectRef: null,
+        milestoneRef: null,
       }),
     ).rejects.toMatchObject({ code: "WORK_ITEM_NOT_FOUND" });
   });
@@ -415,6 +480,11 @@ describe("Observatory repository", () => {
               type: "idea",
               title: "Update",
               description: "",
+              acceptanceCriteria: "",
+              priority: null,
+              ownerId: null,
+              projectRef: null,
+              milestoneRef: null,
             });
 
       await expect(promise).rejects.toMatchObject({
@@ -446,5 +516,151 @@ describe("Observatory repository", () => {
         "Administrator access is required.",
       ),
     );
+  });
+
+  it("reads board items and a detail timeline through admin-readable tables", async () => {
+    const item = {
+      id: "11111111-1111-4111-8111-111111111111",
+      state: "triage",
+      title: "Triage the board",
+    };
+    const event = {
+      id: "event-1",
+      work_item_id: item.id,
+      event_type: "created",
+    };
+    const evidence = {
+      id: "evidence-1",
+      work_item_id: item.id,
+      removed_at: null,
+    };
+    const boundary = workTrackerClient({
+      observatory_work_items: [item],
+      observatory_work_item_events: [event],
+      observatory_work_item_evidence: [evidence],
+    });
+    const repository = createObservatoryRepository(boundary.client);
+
+    await expect(repository.listWorkItems()).resolves.toEqual([item]);
+    await expect(repository.getWorkItem(item.id)).resolves.toEqual(item);
+    await expect(repository.listWorkItemEvents(item.id)).resolves.toEqual([
+      event,
+    ]);
+    await expect(repository.listWorkItemEvidence(item.id)).resolves.toEqual([
+      evidence,
+    ]);
+    expect(boundary.from).toHaveBeenCalledWith("observatory_work_items");
+    expect(boundary.from).toHaveBeenCalledWith(
+      "observatory_work_item_events",
+    );
+    expect(boundary.from).toHaveBeenCalledWith(
+      "observatory_work_item_evidence",
+    );
+    expect(
+      boundary.queries.observatory_work_item_evidence.is,
+    ).toHaveBeenCalledWith("removed_at", null);
+  });
+
+  it.each([
+    {
+      method: "transitionWorkItem",
+      functionName: "transition_observatory_work_item",
+      input: {
+        workItemId: "11111111-1111-4111-8111-111111111111",
+        expectedVersion: 2,
+        targetState: "ready",
+      },
+      arguments: {
+        p_work_item_id: "11111111-1111-4111-8111-111111111111",
+        p_expected_version: 2,
+        p_target_state: "ready",
+      },
+    },
+    {
+      method: "addWorkItemEvidence",
+      functionName: "add_observatory_work_item_evidence",
+      input: {
+        workItemId: "11111111-1111-4111-8111-111111111111",
+        expectedVersion: 2,
+        label: "Gate evidence",
+        url: "https://402v.com/dashboard",
+      },
+      arguments: {
+        p_work_item_id: "11111111-1111-4111-8111-111111111111",
+        p_expected_version: 2,
+        p_label: "Gate evidence",
+        p_url: "https://402v.com/dashboard",
+      },
+    },
+    {
+      method: "removeWorkItemEvidence",
+      functionName: "remove_observatory_work_item_evidence",
+      input: {
+        workItemId: "11111111-1111-4111-8111-111111111111",
+        evidenceId: "33333333-3333-4333-8333-333333333333",
+        expectedVersion: 2,
+      },
+      arguments: {
+        p_work_item_id: "11111111-1111-4111-8111-111111111111",
+        p_evidence_id: "33333333-3333-4333-8333-333333333333",
+        p_expected_version: 2,
+      },
+    },
+  ])("calls $functionName atomically", async (scenario) => {
+    const boundary = repositoryClient({
+      rpcData: { id: scenario.input.workItemId, version: 3 },
+    });
+    const repository = createObservatoryRepository(boundary.client);
+
+    await expect(
+      (
+        repository[
+          scenario.method as
+            | "transitionWorkItem"
+            | "addWorkItemEvidence"
+            | "removeWorkItemEvidence"
+        ] as (input: typeof scenario.input) => Promise<unknown>
+      )(scenario.input),
+    ).resolves.toMatchObject({ version: 3 });
+    expect(boundary.rpc).toHaveBeenCalledWith(
+      scenario.functionName,
+      scenario.arguments,
+    );
+  });
+
+  it.each([
+    {
+      error: {
+        code: "22023",
+        message: "OBSERVATORY_INVALID_TRANSITION",
+      },
+      code: "INVALID_TRANSITION",
+    },
+    {
+      error: {
+        code: "23514",
+        message: "OBSERVATORY_READY_GATE_FAILED",
+      },
+      code: "READY_GATE_FAILED",
+    },
+    {
+      error: {
+        code: "P0002",
+        message: "OBSERVATORY_EVIDENCE_NOT_FOUND",
+      },
+      code: "EVIDENCE_NOT_FOUND",
+    },
+  ])("maps $code without leaking database details", async ({ error, code }) => {
+    const repository = createObservatoryRepository(
+      repositoryClient({ rpcError: error }).client,
+    );
+
+    await expect(
+      repository.transitionWorkItem({
+        workItemId: "11111111-1111-4111-8111-111111111111",
+        expectedVersion: 2,
+        targetState: "done",
+      }),
+    ).rejects.toMatchObject({ code });
   });
 });

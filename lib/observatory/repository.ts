@@ -1,8 +1,14 @@
 import "server-only";
 
 import type {
+  ObservatoryEvidenceInput,
+  ObservatoryEvidenceRemovalInput,
   ObservatoryQuickCaptureInput,
+  ObservatoryWorkItemPriority,
+  ObservatoryWorkItemState,
+  ObservatoryWorkItemTransitionInput,
   ObservatoryWorkItemType,
+  ObservatoryWorkItemUpdateInput,
 } from "@/lib/observatory/work-items";
 
 export interface ObservatorySnapshotRow {
@@ -22,7 +28,12 @@ export interface ObservatoryWorkItemRow {
   type: ObservatoryWorkItemType;
   title: string;
   description: string;
-  state: "inbox";
+  state: ObservatoryWorkItemState;
+  priority: ObservatoryWorkItemPriority | null;
+  owner_id: string | null;
+  acceptance_criteria: string;
+  project_ref: string | null;
+  milestone_ref: string | null;
   idempotency_key: string;
   version: number;
   created_by: string;
@@ -30,12 +41,29 @@ export interface ObservatoryWorkItemRow {
   updated_at: string;
 }
 
-export interface ObservatoryWorkItemUpdateInput {
-  workItemId: string;
-  expectedVersion: number;
-  type: ObservatoryWorkItemType;
-  title: string;
-  description: string;
+export interface ObservatoryWorkItemEventRow {
+  id: string;
+  work_item_id: string;
+  event_type:
+    | "created"
+    | "updated"
+    | "state_transitioned"
+    | "evidence_added"
+    | "evidence_removed";
+  actor_id: string;
+  data: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ObservatoryWorkItemEvidenceRow {
+  id: string;
+  work_item_id: string;
+  label: string;
+  url: string;
+  created_by: string;
+  created_at: string;
+  removed_at: string | null;
+  removed_by: string | null;
 }
 
 interface ObservatoryDatabaseError {
@@ -62,12 +90,39 @@ interface ObservatorySnapshotQuery {
   };
 }
 
+interface ObservatoryWorkTrackerQuery
+  extends PromiseLike<{
+    data: unknown[] | null;
+    error: ObservatoryDatabaseError | null;
+  }> {
+  select(columns: string): ObservatoryWorkTrackerQuery;
+  eq(column: string, value: string): ObservatoryWorkTrackerQuery;
+  is(column: "removed_at", value: null): ObservatoryWorkTrackerQuery;
+  order(
+    column: "created_at" | "updated_at",
+    options: { ascending: boolean },
+  ): ObservatoryWorkTrackerQuery;
+  maybeSingle(): PromiseLike<{
+    data: unknown | null;
+    error: ObservatoryDatabaseError | null;
+  }>;
+}
+
 export interface ObservatoryRepositoryClient {
   from(table: "observatory_snapshots"): ObservatorySnapshotQuery;
+  from(
+    table:
+      | "observatory_work_items"
+      | "observatory_work_item_events"
+      | "observatory_work_item_evidence",
+  ): ObservatoryWorkTrackerQuery;
   rpc(
     functionName:
       | "create_observatory_work_item"
-      | "update_observatory_work_item",
+      | "update_observatory_work_item"
+      | "transition_observatory_work_item"
+      | "add_observatory_work_item_evidence"
+      | "remove_observatory_work_item_evidence",
     arguments_: Record<string, unknown>,
   ): PromiseLike<{
     data: ObservatoryWorkItemRow | null;
@@ -79,10 +134,14 @@ export type ObservatoryRepositoryErrorCode =
   | "FORBIDDEN"
   | "SNAPSHOT_READ_FAILED"
   | "WORK_ITEM_CREATE_FAILED"
+  | "WORK_ITEM_READ_FAILED"
   | "WORK_ITEM_UPDATE_FAILED"
   | "IDEMPOTENCY_CONFLICT"
   | "VERSION_CONFLICT"
-  | "WORK_ITEM_NOT_FOUND";
+  | "WORK_ITEM_NOT_FOUND"
+  | "INVALID_TRANSITION"
+  | "READY_GATE_FAILED"
+  | "EVIDENCE_NOT_FOUND";
 
 export class ObservatoryRepositoryError extends Error {
   readonly code: ObservatoryRepositoryErrorCode;
@@ -119,6 +178,24 @@ function mutationError(
       "The work item changed after it was loaded.",
     );
   }
+  if (error.message.includes("OBSERVATORY_INVALID_TRANSITION")) {
+    return new ObservatoryRepositoryError(
+      "INVALID_TRANSITION",
+      "That state transition is not allowed.",
+    );
+  }
+  if (error.message.includes("OBSERVATORY_READY_GATE_FAILED")) {
+    return new ObservatoryRepositoryError(
+      "READY_GATE_FAILED",
+      "Acceptance criteria, priority, and owner are required.",
+    );
+  }
+  if (error.message.includes("OBSERVATORY_EVIDENCE_NOT_FOUND")) {
+    return new ObservatoryRepositoryError(
+      "EVIDENCE_NOT_FOUND",
+      "The evidence link is no longer active.",
+    );
+  }
   if (
     error.code === "P0002" ||
     error.message.includes("OBSERVATORY_WORK_ITEM_NOT_FOUND")
@@ -143,6 +220,24 @@ function mutationError(
 export function createObservatoryRepository(
   client: ObservatoryRepositoryClient,
 ) {
+  async function readRows<T>(
+    query: PromiseLike<{
+      data: unknown[] | null;
+      error: ObservatoryDatabaseError | null;
+    }>,
+  ): Promise<T[]> {
+    const { data, error } = await query;
+    if (error) {
+      throw new ObservatoryRepositoryError(
+        error.code === "42501" ? "FORBIDDEN" : "WORK_ITEM_READ_FAILED",
+        error.code === "42501"
+          ? "Administrator access is required."
+          : "Work Tracker data could not be loaded.",
+      );
+    }
+    return (data ?? []) as T[];
+  }
+
   return {
     async getLatestSuccessfulSnapshot(): Promise<ObservatorySnapshotRow | null> {
       const { data, error } = await client
@@ -170,6 +265,63 @@ export function createObservatoryRepository(
       }
 
       return data;
+    },
+
+    async listWorkItems(): Promise<ObservatoryWorkItemRow[]> {
+      return readRows<ObservatoryWorkItemRow>(
+        client
+          .from("observatory_work_items")
+          .select(
+            "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at",
+          )
+          .order("updated_at", { ascending: false }),
+      );
+    },
+
+    async getWorkItem(id: string): Promise<ObservatoryWorkItemRow | null> {
+      const { data, error } = await client
+        .from("observatory_work_items")
+        .select(
+          "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (error) {
+        throw new ObservatoryRepositoryError(
+          error.code === "42501" ? "FORBIDDEN" : "WORK_ITEM_READ_FAILED",
+          error.code === "42501"
+            ? "Administrator access is required."
+            : "The work item could not be loaded.",
+        );
+      }
+      return data as ObservatoryWorkItemRow | null;
+    },
+
+    async listWorkItemEvents(
+      workItemId: string,
+    ): Promise<ObservatoryWorkItemEventRow[]> {
+      return readRows<ObservatoryWorkItemEventRow>(
+        client
+          .from("observatory_work_item_events")
+          .select("id,work_item_id,event_type,actor_id,data,created_at")
+          .eq("work_item_id", workItemId)
+          .order("created_at", { ascending: true }),
+      );
+    },
+
+    async listWorkItemEvidence(
+      workItemId: string,
+    ): Promise<ObservatoryWorkItemEvidenceRow[]> {
+      return readRows<ObservatoryWorkItemEvidenceRow>(
+        client
+          .from("observatory_work_item_evidence")
+          .select(
+            "id,work_item_id,label,url,created_by,created_at,removed_at,removed_by",
+          )
+          .eq("work_item_id", workItemId)
+          .is("removed_at", null)
+          .order("created_at", { ascending: true }),
+      );
     },
 
     async createQuickCapture(
@@ -209,6 +361,11 @@ export function createObservatoryRepository(
           p_type: input.type,
           p_title: input.title,
           p_description: input.description,
+          p_acceptance_criteria: input.acceptanceCriteria,
+          p_priority: input.priority,
+          p_owner_id: input.ownerId,
+          p_project_ref: input.projectRef,
+          p_milestone_ref: input.milestoneRef,
         },
       );
 
@@ -222,6 +379,70 @@ export function createObservatoryRepository(
         );
       }
 
+      return data;
+    },
+
+    async transitionWorkItem(
+      input: ObservatoryWorkItemTransitionInput,
+    ): Promise<ObservatoryWorkItemRow> {
+      const { data, error } = await client.rpc(
+        "transition_observatory_work_item",
+        {
+          p_work_item_id: input.workItemId,
+          p_expected_version: input.expectedVersion,
+          p_target_state: input.targetState,
+        },
+      );
+      if (error) throw mutationError("update", error);
+      if (!data) {
+        throw new ObservatoryRepositoryError(
+          "WORK_ITEM_UPDATE_FAILED",
+          "The work item could not be moved.",
+        );
+      }
+      return data;
+    },
+
+    async addWorkItemEvidence(
+      input: ObservatoryEvidenceInput,
+    ): Promise<ObservatoryWorkItemRow> {
+      const { data, error } = await client.rpc(
+        "add_observatory_work_item_evidence",
+        {
+          p_work_item_id: input.workItemId,
+          p_expected_version: input.expectedVersion,
+          p_label: input.label,
+          p_url: input.url,
+        },
+      );
+      if (error) throw mutationError("update", error);
+      if (!data) {
+        throw new ObservatoryRepositoryError(
+          "WORK_ITEM_UPDATE_FAILED",
+          "The evidence link could not be added.",
+        );
+      }
+      return data;
+    },
+
+    async removeWorkItemEvidence(
+      input: ObservatoryEvidenceRemovalInput,
+    ): Promise<ObservatoryWorkItemRow> {
+      const { data, error } = await client.rpc(
+        "remove_observatory_work_item_evidence",
+        {
+          p_work_item_id: input.workItemId,
+          p_evidence_id: input.evidenceId,
+          p_expected_version: input.expectedVersion,
+        },
+      );
+      if (error) throw mutationError("update", error);
+      if (!data) {
+        throw new ObservatoryRepositoryError(
+          "WORK_ITEM_UPDATE_FAILED",
+          "The evidence link could not be removed.",
+        );
+      }
       return data;
     },
   };
