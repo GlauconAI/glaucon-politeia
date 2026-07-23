@@ -9,6 +9,7 @@ import {
   type ObservatoryOverviewState,
 } from "@/components/observatory/ObservatoryOverview";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
+import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
 
 const snapshot: ObservatoryCollectionEnvelope = {
   schema_version: "1.0.0",
@@ -162,6 +163,26 @@ const snapshot: ObservatoryCollectionEnvelope = {
   },
 };
 
+const governanceFixtureRoot = join(
+  process.cwd(),
+  "tests/fixtures/observatory-governance",
+);
+const governance = projectDashboardGovernance(
+  {
+    readme: readFileSync(join(governanceFixtureRoot, "README.md"), "utf8"),
+    baseline: readFileSync(
+      join(governanceFixtureRoot, "development-baseline.md"),
+      "utf8",
+    ),
+    tracker: readFileSync(join(governanceFixtureRoot, "edad-tracker.md"), "utf8"),
+    calibration: readFileSync(
+      join(governanceFixtureRoot, "estimate-calibration.md"),
+      "utf8",
+    ),
+  },
+  { collectedAt: "2026-07-23T04:30:00.000Z" },
+);
+
 function readyState(
   value: ObservatoryCollectionEnvelope = snapshot,
 ): ObservatoryOverviewState {
@@ -169,6 +190,28 @@ function readyState(
 }
 
 describe("ObservatoryOverview", () => {
+  it("shows a bounded compatibility notice before the first v3 refresh", () => {
+    render(<ObservatoryOverview state={readyState()} />);
+
+    expect(
+      screen.getByRole("region", { name: /delivery governance status/i }),
+    ).toHaveTextContent(/not yet available/i);
+  });
+
+  it("mounts the Project Cockpit when a validated v3 model is present", () => {
+    const v3 = {
+      ...snapshot,
+      schema_version: "3.0.0",
+      collector_version: "3.0.0",
+      delivery_governance: governance,
+    } as unknown as ObservatoryCollectionEnvelope;
+    render(<ObservatoryOverview state={readyState(v3)} />);
+
+    expect(
+      screen.getByRole("region", { name: /project cockpit/i }),
+    ).toBeInTheDocument();
+  });
+
   it("renders operational summary cards from the validated snapshot", () => {
     render(<ObservatoryOverview state={readyState()} />);
 

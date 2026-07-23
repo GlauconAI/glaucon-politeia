@@ -6,6 +6,7 @@ import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { FreshnessSummary } from "@/components/observatory/FreshnessSummary";
 import { SystemInventory } from "@/components/observatory/SystemInventory";
 import { SystemTopology } from "@/components/observatory/SystemTopology";
+import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 
 export type ObservatoryOverviewState =
@@ -304,6 +305,20 @@ export function ObservatoryOverview({
           />
         </div>
       </section>
+
+      {"delivery_governance" in state.snapshot ? (
+        <ProjectCockpit governance={state.snapshot.delivery_governance} />
+      ) : (
+        <section
+          className="observatory-v1-notice"
+          aria-label="Delivery governance status"
+        >
+          <p>
+            Delivery governance data is not yet available. The Project Cockpit
+            will appear after the first validated v3 refresh.
+          </p>
+        </section>
+      )}
     </div>
   );
 }
