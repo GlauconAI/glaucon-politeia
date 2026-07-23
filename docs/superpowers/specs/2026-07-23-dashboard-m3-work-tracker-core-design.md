@@ -80,3 +80,18 @@ Table grants remain read-only. Anonymous and non-admin callers cannot read or mu
 - Component/page tests cover Board columns, accessible move controls, drag fallback, detail forms, evidence, history, empty/error states, and admin redirect.
 - A disposable local Supabase Gate proves live authorization, transitions, Ready Gate, conflicts, audit/event immutability, evidence lifecycle, and direct-write denial.
 - Final Gate runs the full tests, lint, typecheck, production build, diff/privacy checks, and regressions for System Observatory and Delivery Governance.
+
+## Local release Gate
+
+Passed on 2026-07-23 from production base
+`417501e234ac7e0325d34b0539f8d15857aaa44c`:
+
+- 72 test files / 365 tests, lint, typecheck, and production build passed.
+- A clean disposable migration reset passed through
+  `20260723000100_work_tracker_core.sql`.
+- The live database verifier passed 32 checks, including invalid evidence URL
+  rejection, exact grants/RLS, Ready Gate, state graph, concurrency, rollback,
+  evidence soft removal, append-only events, immutability, and retention.
+- The disposable stack and loopback listeners were removed after validation.
+- Production migration, shared-main push, deployment, and retained production
+  mutation remain explicit owner-authorized release actions.

@@ -116,6 +116,12 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
   Three-track Roadmap, Flow Analytics / Forecast, and Governance Reports /
   Review. These governance surfaces consume a strict sanitized read model and
   never write back to their authority sources.
+- M3 manual Work Tracker production candidate: Quick Capture feeds an
+  admin-only nine-state Board and item detail surface. Server-authoritative
+  RPCs enforce allowed transitions, the Ready Gate, optimistic versions,
+  evidence lifecycle, and append-only history. The migration and application
+  have passed the complete local release Gate; production migration and
+  deployment remain separately authorized actions.
 - Planned 402v Publishing System direction for public/private HTML artifact publishing.
 
 ## Core Commands
@@ -136,6 +142,19 @@ npm run typecheck
 npm run build
 npm audit --omit=dev
 ```
+
+M3 Work Tracker database Gate:
+
+```bash
+supabase start
+supabase db reset --local --no-seed
+npm run observatory:verify-local-db
+supabase stop --no-backup
+```
+
+The verifier targets only the disposable loopback database and currently
+requires 32 passing authorization, concurrency, workflow, evidence, audit,
+immutability, and retention checks. Never point it at a remote database.
 
 Supabase ops:
 

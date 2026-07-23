@@ -349,3 +349,21 @@ The owner must explicitly approve each of these gates, in order:
 - The committed verifier passed mode, digest, success, six-domain, relationship-integrity, and privacy checks. All eight privacy categories reported zero findings.
 - The initial sandboxed collector and Turbopack build were blocked by host process/runtime restrictions; the exact bounded commands passed with approved host execution. No source or implementation change was made to bypass either restriction.
 - No production Snapshot was published, no Vercel deployment was created, and no Supabase, Cron, LaunchAgent, Gateway or external user state was changed by this local Gate. Production release uses the existing shared-main / Vercel / natural-refresh / authenticated-smoke Gate.
+
+## M3 manual Work Tracker core local release evidence (2026-07-23)
+
+- Base: production `main` at `417501e234ac7e0325d34b0539f8d15857aaa44c`; implementation remained isolated on `feature-m3-work-tracker-core`. The unrelated anonymous-engagement changes in the main worktree were not copied into this branch.
+- The admin-only write surface now includes the complete manual workflow: Inbox, Triage, Ready, In Progress, Review, Done, Blocked, Waiting, and Reopened. The database rejects every transition outside the committed graph.
+- Entering Ready, or moving directly from Reopened to In Progress, requires non-empty acceptance criteria, a priority, and an owner. Every field edit, transition, evidence addition, and evidence soft removal uses a row lock plus `expected_version`, increments the work-item version, and writes an append-only event in the same transaction.
+- Direct table writes remain denied. Evidence accepts bounded HTTP(S) links, is admin-readable only, and is soft-removed so its audit history remains intact. Anonymous and non-admin callers cannot read Work Tracker tables or execute mutation RPCs.
+- `/dashboard` now renders the accessible Work Tracker Board beneath the existing read-only governance surfaces. Native drag is optional; every allowed move is also exposed through a labeled keyboard-operable form. `/dashboard/work-items/[id]` provides bounded fields, Ready Gate guidance, transitions, evidence controls, and chronological history.
+- A clean `supabase db reset --local --no-seed` applied every migration through `20260723000100_work_tracker_core.sql`. The live verifier passed 32 checks covering exact grants, RLS, anonymous/non-admin/admin access, direct-write denial, idempotency, concurrent create/update, optimistic conflicts, Ready Gate, legal and illegal transitions, invalid evidence URL rejection, evidence audit/soft removal, RPC rollback, immutability, retention, append-only events, and `TRUNCATE` denial.
+- Fresh local quality Gate: 72 test files / 365 tests, lint, typecheck, and production build passed. The build confirmed `/dashboard` and `/dashboard/work-items/[id]` are dynamically server-rendered while `/observatory` remains the compatibility route.
+- The disposable Supabase stack was removed with `supabase stop --no-backup`; loopback ports `54321` and `54322` were closed and OrbStack was returned to its original stopped state.
+- No production database migration, shared-main push, Vercel deployment, Cron, Gateway action, or retained production Work Item was performed. Production release requires explicit approval for the M3 migration, shared-main push/deployment, and the first retained admin workflow smoke.
+
+### M3 rollback
+
+- Before production, discard or revert the feature commits; the production database and application are unchanged.
+- After production migration, roll back the application first by redeploying the previously approved build. Do not drop Work Tracker tables, delete evidence/history, or weaken RLS/append-only protections during an incident.
+- Any schema correction or RPC rollback must be a reviewed forward migration with a backup/recovery decision and explicit production approval.
