@@ -6,6 +6,10 @@ const migrationPath = join(
   process.cwd(),
   "supabase/migrations/20260721000100_openclaw_observatory_m1a.sql",
 );
+const workTrackerMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260723000100_work_tracker_core.sql",
+);
 
 function readMigration(): string {
   return existsSync(migrationPath)
@@ -243,6 +247,108 @@ describe("OpenClaw Observatory M1A migration", () => {
     );
     expect(sql).toContain(
       "grant execute on function public.update_observatory_work_item(uuid, integer, text, text, text) to authenticated",
+    );
+  });
+});
+
+describe("M3 Work Tracker core migration", () => {
+  const sql = () =>
+    existsSync(workTrackerMigrationPath)
+      ? readFileSync(workTrackerMigrationPath, "utf8")
+          .toLowerCase()
+          .replace(/\s+/gu, " ")
+      : "";
+
+  it("adds the workflow fields, evidence table, and complete state/event constraints", () => {
+    const source = sql();
+    for (const field of [
+      "priority text",
+      "owner_id uuid",
+      "acceptance_criteria text",
+      "project_ref text",
+      "milestone_ref text",
+    ]) {
+      expect(source).toContain(field);
+    }
+    expect(source).toMatch(
+      /state in \( ?'inbox', 'triage', 'ready', 'in_progress', 'review', 'done', 'blocked', 'waiting', 'reopened' ?\)/u,
+    );
+    expect(source).toMatch(
+      /event_type in \( ?'created', 'updated', 'state_transitioned', 'evidence_added', 'evidence_removed' ?\)/u,
+    );
+    expect(source).toContain(
+      "create table public.observatory_work_item_evidence",
+    );
+    expect(source).toContain("removed_at timestamptz");
+    expect(source).toContain("removed_by uuid");
+  });
+
+  it("keeps evidence admin-readable and direct writes unavailable", () => {
+    const source = sql();
+    expect(source).toContain(
+      "alter table public.observatory_work_item_evidence enable row level security",
+    );
+    expect(source).toContain(
+      "revoke all privileges on table public.observatory_work_item_evidence from public, anon, authenticated, service_role",
+    );
+    expect(source).toContain(
+      "grant select on table public.observatory_work_item_evidence to authenticated",
+    );
+    expect(source).toContain(
+      "create policy observatory_work_item_evidence_select_admin",
+    );
+    expect(source).toContain("using (public.is_current_user_admin())");
+  });
+
+  it.each([
+    "update_observatory_work_item",
+    "transition_observatory_work_item",
+    "add_observatory_work_item_evidence",
+    "remove_observatory_work_item_evidence",
+  ])("guards %s with admin auth, a row lock, and optimistic versioning", (name) => {
+    const source = sql();
+    const start = source.indexOf(`create or replace function public.${name}`);
+    const end = source.indexOf("revoke all privileges on function", start);
+    const contract = source.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(contract).toContain("security definer");
+    expect(contract).toContain("set search_path = pg_catalog");
+    expect(contract).toContain("public.is_current_user_admin()");
+    expect(contract).toContain("for update");
+    expect(contract).toContain("p_expected_version");
+    expect(contract).toContain("observatory_version_conflict");
+    expect(contract).toContain(
+      "insert into public.observatory_work_item_events",
+    );
+  });
+
+  it("encodes the transition graph and Ready Gate in the database", () => {
+    const source = sql();
+    expect(source).toContain("observatory_invalid_transition");
+    expect(source).toContain("observatory_ready_gate_failed");
+    expect(source).toContain(
+      "current_item.acceptance_criteria = '' or current_item.priority is null or current_item.owner_id is null",
+    );
+    for (const edge of [
+      "current_item.state = 'inbox' and target_state = 'triage'",
+      "current_item.state = 'triage' and target_state in ('inbox', 'ready')",
+      "current_item.state = 'done' and target_state = 'reopened'",
+      "current_item.state = 'reopened' and target_state in ('ready', 'in_progress')",
+    ]) {
+      expect(source).toContain(edge);
+    }
+  });
+
+  it("soft-removes evidence and keeps the event table append-only", () => {
+    const source = sql();
+    expect(source).toContain("observatory_evidence_not_found");
+    expect(source).toContain("set removed_at = now(), removed_by = calling_user");
+    expect(source).not.toContain(
+      "delete from public.observatory_work_item_evidence",
+    );
+    expect(normalizedMigration()).toContain(
+      "prevent_observatory_work_item_event_mutation",
     );
   });
 });
