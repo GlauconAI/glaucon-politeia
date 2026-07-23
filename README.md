@@ -116,12 +116,12 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
   Three-track Roadmap, Flow Analytics / Forecast, and Governance Reports /
   Review. These governance surfaces consume a strict sanitized read model and
   never write back to their authority sources.
-- M3 manual Work Tracker production candidate: Quick Capture feeds an
+- M3 manual Work Tracker core is Production Accepted: Quick Capture feeds an
   admin-only nine-state Board and item detail surface. Server-authoritative
   RPCs enforce allowed transitions, the Ready Gate, optimistic versions,
-  evidence lifecycle, and append-only history. The migration and application
-  have passed the complete local release Gate; production migration and
-  deployment remain separately authorized actions.
+  evidence lifecycle, and append-only history. The production migration,
+  retained full-state workflow smoke, authenticated UI checks, and anonymous
+  route protection Gate have passed.
 - Planned 402v Publishing System direction for public/private HTML artifact publishing.
 
 ## Core Commands
