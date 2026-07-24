@@ -5,7 +5,11 @@ import {
   copyResponseCookies,
   createProxyCookieAdapter,
 } from "@/lib/supabase/proxy";
-import { resolvePostRequest } from "@/proxy";
+import {
+  config,
+  resolveDashboardRequest,
+  resolvePostRequest,
+} from "@/proxy";
 
 describe("standalone HTML proxy", () => {
   it("returns exact HTML for a visible HTML post", async () => {
@@ -68,5 +72,25 @@ describe("standalone HTML proxy", () => {
     expect(continuation.headers.get("cache-control")).toBe(
       "private, no-store",
     );
+  });
+});
+
+describe("Dashboard proxy context", () => {
+  it("forwards the exact Dashboard pathname and query to the shared layout", () => {
+    const response = resolveDashboardRequest(
+      new NextRequest("https://402v.com/dashboard/skills?q=weather"),
+    );
+
+    expect(
+      response.headers.get("x-middleware-request-x-dashboard-path"),
+    ).toBe("/dashboard/skills?q=weather");
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("matches both standalone posts and all Dashboard routes", () => {
+    expect(config.matcher).toEqual([
+      "/posts/:slug",
+      "/dashboard/:path*",
+    ]);
   });
 });

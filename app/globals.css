@@ -4716,6 +4716,90 @@ body {
 
 /* Dashboard navigation index and directories */
 
+.dashboard-route-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-route-nav {
+  display: flex;
+  position: sticky;
+  top: 68px;
+  z-index: 21;
+  width: fit-content;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  background: rgba(13, 14, 16, 0.92);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.22);
+  padding: 6px;
+  backdrop-filter: blur(16px);
+}
+
+.dashboard-route-nav a {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  padding: 7px 11px;
+  font-family:
+    "SFMono-Regular",
+    "Cascadia Code",
+    "Roboto Mono",
+    ui-monospace,
+    monospace;
+  font-size: 12px;
+}
+
+.dashboard-route-nav a:hover,
+.dashboard-route-nav a:focus-visible {
+  border-color: rgba(124, 58, 237, 0.45);
+  color: var(--strong);
+}
+
+.dashboard-route-nav a[aria-current="page"] {
+  border-color: rgba(67, 211, 139, 0.5);
+  background: rgba(67, 211, 139, 0.12);
+  color: var(--success);
+}
+
+.dashboard-route-loading {
+  min-height: 52vh;
+}
+
+.dashboard-route-loading h1 {
+  margin: 8px 0 20px;
+}
+
+.dashboard-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-loading-grid span {
+  min-height: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.025) 20%,
+      rgba(124, 58, 237, 0.12) 45%,
+      rgba(255, 255, 255, 0.025) 70%
+    );
+  background-size: 240% 100%;
+  animation: dashboard-loading-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes dashboard-loading-pulse {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
 .dashboard-section-nav {
   position: sticky;
   top: var(--dashboard-nav-top);
@@ -4988,6 +5072,20 @@ body {
 }
 
 @media (max-width: 720px) {
+  .dashboard-route-nav {
+    top: 62px;
+    width: 100%;
+  }
+
+  .dashboard-route-nav a {
+    flex: 1 1 0;
+    text-align: center;
+  }
+
+  .dashboard-loading-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .dashboard-section-nav {
     margin-inline: -2px;
   }

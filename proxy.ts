@@ -63,8 +63,22 @@ export async function resolvePostRequest(
   return standalone;
 }
 
+export function resolveDashboardRequest(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(
+    "x-dashboard-path",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    return resolveDashboardRequest(request);
+  }
   return resolvePostRequest(request);
 }
 
-export const config = { matcher: ["/posts/:slug"] };
+export const config = {
+  matcher: ["/posts/:slug", "/dashboard/:path*"],
+};

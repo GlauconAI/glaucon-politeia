@@ -17,15 +17,11 @@ const mocks = vi.hoisted(() => ({
     is_admin: true;
   } | null,
   overviewState: null as ObservatoryOverviewState | null,
-  redirect: vi.fn((path: string) => {
-    throw new Error(`redirect:${path}`);
-  }),
+  getCurrentAdmin: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-
 vi.mock("@/lib/observatory/admin-auth", () => ({
-  getCurrentObservatoryAdmin: async () => mocks.currentAdmin,
+  getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
 }));
 
 vi.mock("@/lib/observatory/dashboard-state", async (importOriginal) => {
@@ -92,7 +88,8 @@ describe("Dashboard directory pages", () => {
       is_admin: true,
     };
     mocks.overviewState = { status: "ready", snapshot };
-    mocks.redirect.mockClear();
+    mocks.getCurrentAdmin.mockReset();
+    mocks.getCurrentAdmin.mockResolvedValue(mocks.currentAdmin);
     window.history.replaceState(null, "", "/");
   });
 
@@ -101,22 +98,11 @@ describe("Dashboard directory pages", () => {
     expect(skillsDynamic).toBe("force-dynamic");
   });
 
-  it.each([
-    [
-      "Projects",
-      () => ProjectsPage({ searchParams: Promise.resolve({}) }),
-      "/auth?redirectTo=/dashboard/projects",
-    ],
-    [
-      "Skills",
-      () => SkillsPage({ searchParams: Promise.resolve({}) }),
-      "/auth?redirectTo=/dashboard/skills",
-    ],
-  ])("redirects anonymous visitors before loading %s", async (_, renderPage, target) => {
-    mocks.currentAdmin = null;
+  it("delegates authorization to the shared Dashboard layout", async () => {
+    await ProjectsPage({ searchParams: Promise.resolve({}) });
+    await SkillsPage({ searchParams: Promise.resolve({}) });
 
-    await expect(renderPage()).rejects.toThrow(`redirect:${target}`);
-    expect(mocks.redirect).toHaveBeenCalledWith(target);
+    expect(mocks.getCurrentAdmin).not.toHaveBeenCalled();
   });
 
   it("renders Projects with URL-derived filters", async () => {

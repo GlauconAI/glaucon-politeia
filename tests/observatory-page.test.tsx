@@ -16,15 +16,11 @@ const mocks = vi.hoisted(() => ({
   getLatestSuccessfulSnapshot: vi.fn(),
   listWorkItems: vi.fn(),
   listActiveWorkItemClaims: vi.fn(),
-  redirect: vi.fn((path: string) => {
-    throw new Error(`redirect:${path}`);
-  }),
+  getCurrentAdmin: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-
 vi.mock("@/lib/observatory/admin-auth", () => ({
-  getCurrentObservatoryAdmin: async () => mocks.currentAdmin,
+  getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -117,7 +113,8 @@ describe("DashboardPage", () => {
       display_name: "Plato",
       is_admin: true,
     };
-    mocks.redirect.mockClear();
+    mocks.getCurrentAdmin.mockReset();
+    mocks.getCurrentAdmin.mockResolvedValue(mocks.currentAdmin);
     mocks.getLatestSuccessfulSnapshot.mockReset();
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(snapshotRow());
     mocks.listWorkItems.mockReset();
@@ -130,16 +127,11 @@ describe("DashboardPage", () => {
     expect(dynamic).toBe("force-dynamic");
   });
 
-  it("redirects anonymous and non-admin visitors before reading snapshots", async () => {
-    mocks.currentAdmin = null;
+  it("delegates authorization to the shared Dashboard layout", async () => {
+    await DashboardPage();
 
-    await expect(DashboardPage()).rejects.toThrow(
-      "redirect:/auth?redirectTo=/dashboard",
-    );
-    expect(mocks.redirect).toHaveBeenCalledWith(
-      "/auth?redirectTo=/dashboard",
-    );
-    expect(mocks.getLatestSuccessfulSnapshot).not.toHaveBeenCalled();
+    expect(mocks.getCurrentAdmin).not.toHaveBeenCalled();
+    expect(mocks.getLatestSuccessfulSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("renders the admin overview and Quick Capture", async () => {
