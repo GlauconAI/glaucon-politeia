@@ -16,6 +16,7 @@ import {
   collectObservatorySnapshot,
   upgradeObservatorySnapshotToV2,
   upgradeObservatorySnapshotToV3,
+  upgradeObservatorySnapshotToV4,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
@@ -24,6 +25,7 @@ import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
+import { collectSourceRepositories } from "#observatory-source-repository-discovery";
 import {
   GovernanceCollectionError,
   collectDashboardGovernance,
@@ -165,7 +167,7 @@ async function main(): Promise<void> {
           { runCommand, now: () => new Date() },
       ),
     );
-    snapshot = upgradeObservatorySnapshotToV3(
+    const governanceSnapshot = upgradeObservatorySnapshotToV3(
       systemSnapshot,
       await collectDashboardGovernance(
         { vaultRoot: resolve(options.systemRoots.vaultRoot) },
@@ -174,6 +176,18 @@ async function main(): Promise<void> {
           readTextFile: readTextFileBounded,
           now: () => new Date(),
         },
+      ),
+    );
+    snapshot = upgradeObservatorySnapshotToV4(
+      governanceSnapshot,
+      await collectSourceRepositories(
+        {
+          workspaceRoot: resolve(options.systemRoots.workspaceRoot),
+          vaultRoot: resolve(options.systemRoots.vaultRoot),
+          agents: governanceSnapshot.agents,
+          projectGroups: governanceSnapshot.registry.project_groups,
+        },
+        { now: () => new Date() },
       ),
     );
     await writeObservatorySnapshotWithSourceProtection(

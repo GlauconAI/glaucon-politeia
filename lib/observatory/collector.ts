@@ -26,6 +26,8 @@ import {
 } from "#observatory-collection-schema";
 import {
   ObservatoryAssetInventorySchema,
+  ObservatoryAssetSchema,
+  ObservatoryRelationshipSchema,
   type ObservatoryAssetInventory,
 } from "#observatory-asset-schema";
 import {
@@ -476,6 +478,133 @@ export function upgradeObservatorySnapshotToV4(
   const repositoryInventory: ObservatorySourceRepositoryInventory =
     ObservatorySourceRepositoryInventorySchema.parse(repositoryInventoryInput);
   const placeholderDigest = "0".repeat(64);
+  const repositoryAssets = repositoryInventory.repositories.map(
+    (repository) =>
+      ObservatoryAssetSchema.parse({
+        id: repository.id,
+        kind: "repository",
+        name: repository.name,
+        owner:
+          repository.maintainer_agent_id ??
+          repository.knowledge_area ??
+          "unknown",
+        authority: "observed",
+        source: repository.source,
+        collected_at: repository.collected_at,
+        freshness: repositoryInventory.source_health.status,
+        health: repository.health,
+        summary: [
+          repository.github
+            ? `${repository.github.owner}/${repository.github.repo}`
+            : "Local repository",
+          repository.current_branch ??
+            (repository.detached ? "detached HEAD" : "branch unknown"),
+          repository.working_tree,
+        ].join(" · "),
+        labels: [
+          { key: "scope", value: repository.scope },
+          { key: "local_ref", value: repository.local_ref },
+          ...(repository.github
+            ? [
+                {
+                  key: "github",
+                  value: `${repository.github.owner}/${repository.github.repo}`,
+                },
+              ]
+            : []),
+          ...(repository.current_branch
+            ? [{ key: "branch", value: repository.current_branch }]
+            : []),
+          ...(repository.head
+            ? [{ key: "head", value: repository.head.slice(0, 12) }]
+            : []),
+          { key: "working_tree", value: repository.working_tree },
+          { key: "activity", value: repository.activity },
+          { key: "archive_state", value: repository.archive_state },
+          {
+            key: "linked_projects",
+            value: String(repository.registry_project_keys.length),
+          },
+        ],
+      }),
+  );
+  const endpointIds = new Set([
+    ...governanceSnapshot.core_endpoint_ids,
+    ...governanceSnapshot.assets.map((asset) => asset.id),
+    ...repositoryAssets.map((asset) => asset.id),
+  ]);
+  const repositoryRelationships = repositoryInventory.repositories.flatMap(
+    (repository) => {
+      const candidates = [
+        ...(repository.maintainer_agent_id
+          ? [
+              {
+                from: `agent:${repository.maintainer_agent_id}`,
+                to: repository.id,
+                kind: "maintains",
+                authority: "observed" as const,
+                source: repository.source,
+              },
+            ]
+          : []),
+        ...(repository.knowledge_area
+          ? [
+              {
+                from: `knowledge:${repository.knowledge_area
+                  .normalize("NFKD")
+                  .toLocaleLowerCase()
+                  .replace(/[^a-z0-9._-]+/gu, "-")
+                  .replace(/^-+|-+$/gu, "")
+                  .slice(0, 160)}`,
+                to: repository.id,
+                kind: "contains",
+                authority: "observed" as const,
+                source: repository.source,
+              },
+            ]
+          : []),
+      ];
+      return candidates
+        .filter(
+          (relationship) =>
+            endpointIds.has(relationship.from) &&
+            endpointIds.has(relationship.to),
+        )
+        .map((relationship) =>
+          ObservatoryRelationshipSchema.parse(relationship),
+        );
+    },
+  );
+  const assets = [...governanceSnapshot.assets, ...repositoryAssets].sort(
+    (left, right) =>
+      left.kind === right.kind
+        ? left.id.localeCompare(right.id)
+        : left.kind.localeCompare(right.kind),
+  );
+  const relationships = [
+    ...governanceSnapshot.relationships,
+    ...repositoryRelationships,
+  ].sort((left, right) =>
+    `${left.from}:${left.to}:${left.kind}`.localeCompare(
+      `${right.from}:${right.to}:${right.kind}`,
+    ),
+  );
+  const sourceHealth = [
+    ...governanceSnapshot.source_health.filter(
+      (source) => source.domain !== "source_repositories",
+    ),
+    {
+      domain: "source_repositories" as const,
+      status: repositoryInventory.source_health.status,
+      health: repositoryInventory.source_health.health,
+      collected_at: repositoryInventory.source_health.collected_at,
+      last_success_at: repositoryInventory.source_health.last_success_at,
+      asset_count: repositoryInventory.source_health.repository_count,
+      ...(repositoryInventory.source_health.error_code
+        ? { error_code: repositoryInventory.source_health.error_code }
+        : {}),
+    },
+  ];
   const draft = ObservatoryCollectionEnvelopeV4Schema.parse({
     ...governanceSnapshot,
     schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
@@ -488,6 +617,9 @@ export function upgradeObservatorySnapshotToV4(
         digest: placeholderDigest,
       },
     },
+    assets,
+    relationships,
+    source_health: sourceHealth,
     source_repositories: repositoryInventory,
   });
   const digest = computeObservatorySnapshotDigest(draft);

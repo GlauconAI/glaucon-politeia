@@ -317,6 +317,33 @@ describe("v2 collection envelope", () => {
     expect(upgraded.schema_version).toBe(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4);
     expect(upgraded.collector_version).toBe("4.0.0");
     expect(upgraded.source_repositories.repositories).toHaveLength(1);
+    expect(upgraded.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "repository:0123456789abcdef",
+          kind: "repository",
+          owner: "plato",
+          source: "local-git/workspace",
+        }),
+      ]),
+    );
+    expect(upgraded.relationships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "agent:plato",
+          to: "repository:0123456789abcdef",
+          kind: "maintains",
+        }),
+      ]),
+    );
+    expect(upgraded.source_health).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          domain: "source_repositories",
+          asset_count: 1,
+        }),
+      ]),
+    );
     expect(upgraded.source_digest).toBe(computeObservatorySnapshotDigest(upgraded));
     expect(upgraded.registry.source.digest).toBe(upgraded.source_digest);
     expect(ObservatoryCollectionEnvelopeSchema.parse(upgraded)).toEqual(upgraded);
