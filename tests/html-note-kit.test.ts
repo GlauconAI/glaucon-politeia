@@ -88,7 +88,15 @@ B -->|revise| A
       const html = readFileSync(output, "utf8");
       expect(html).toMatch(/^<!doctype html>/i);
       expect(html).toContain("<title>Agent Memory System</title>");
-      expect(html).toContain("--note-bg: #f7f7f4");
+      expect(html).toContain("--note-bg: #0d0e10");
+      expect(html).toContain("--note-panel: #15171b");
+      expect(html).toContain("--note-accent: #7c3aed");
+      expect(html).toContain("--note-success: #43d38b");
+      expect(html).toContain('class="artifact-topbar"');
+      expect(html).toContain('class="artifact-layout"');
+      expect(html).toContain('class="artifact-main-panel"');
+      expect(html).toContain("402v");
+      expect(html).not.toContain("Georgia");
       expect(html).toContain("<table>");
       expect(html).toContain('type="checkbox"');
       expect(html).toContain('class="callout callout-note"');

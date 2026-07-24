@@ -20,6 +20,22 @@ The output is `/tmp/agent-memory-system/note.html`.
 
 Use `--output <path>` to choose another output file. Existing files are protected; add `--force` only when replacement is intentional.
 
+## 402v Theme And Layout Contract
+
+Generated notes use the same base contract as the live 402v publishing system:
+
+- dark grid background and `#15171b` panel surfaces;
+- purple action accent, green ready/success state, and warm warning state;
+- monospace brand, paths, status badges, metadata, and code;
+- system sans-serif body copy for longer reading;
+- `1200px` outer container, `8px` panels, and `10px` gaps;
+- sticky 402v top bar;
+- one hero/status panel;
+- one content grid with a primary reading panel and a `240–280px` information rail;
+- single-column responsive collapse below tablet width.
+
+These rules make locally opened notes and top-level `/posts/<slug>` HTML artifacts feel like the same product even though the published artifact owns the full browser viewport.
+
 ## Authoring Model
 
 - HTML is the primary reading, archive, and publishing artifact.
