@@ -42,6 +42,7 @@
     "observatory:pilot-local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/run-agent-claim-pilot.ts",
     "observatory:verify-local-publisher": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-publisher.ts",
     "observatory:verify-local-refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-refresh.ts",
+    "html:note": "node scripts/html-note-kit.mjs",
     "publish:html": "node scripts/publish-html.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
