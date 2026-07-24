@@ -461,7 +461,7 @@ npm test -- \
 
 Expected: PASS.
 
-- [ ] **Step 3: Run complete verification**
+- [x] **Step 3: Run complete verification**
 
 Run:
 
@@ -501,7 +501,7 @@ The stale canonical-registry path in this runbook was also corrected. No
 Critical or Important issue remains. Accepted boundary: archive state remains
 `unknown` without a separately approved trusted enrichment source.
 
-- [ ] **Step 6: Re-run final evidence and commit**
+- [x] **Step 6: Re-run final evidence and commit**
 
 After the review fixes and documentation:
 
@@ -515,5 +515,14 @@ git status --short
 ```
 
 Expected: all verification commands exit 0 and the feature worktree is clean.
+
+Final candidate evidence: 82 test files / 457 tests, lint, typecheck,
+production build, and committed-range whitespace checks passed. The real v4
+two-root collection discovered 6 unique repositories, all in the OpenClaw
+workspace and all GitHub-linked; the Vault currently contained no Git
+repository. Snapshot mode, digest, seven source domains, relationship
+integrity, and all eight privacy categories passed. Production publication was
+not performed because merge, publish, and deploy require explicit release
+authorization.
 
 Commit: `git commit -am "docs: record source repository production candidate"`.

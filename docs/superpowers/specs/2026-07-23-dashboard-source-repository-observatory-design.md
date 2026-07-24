@@ -1,7 +1,7 @@
 # Dashboard Source Repository Observatory Design
 
-**Status:** Approved for implementation by Glaucon on 2026-07-23  
-**Scope:** Add a read-only Source Repository Observatory slice to M1 System Observatory  
+**Status:** Approved for implementation by Glaucon on 2026-07-23
+**Scope:** Add a read-only Source Repository Observatory slice to M1 System Observatory
 **Out of scope:** Knowledge Base Observatory volume/type statistics, GitHub write operations, repository content indexing, CI/deployment inspection, and Agent Claim activation
 
 ## 1. Outcome
