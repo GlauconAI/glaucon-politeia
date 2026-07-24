@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { SourceStatus } from "@/components/observatory/SourceStatus";
@@ -11,6 +12,7 @@ import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
 import { FlowAnalytics } from "@/components/observatory/FlowAnalytics";
 import { GovernanceReview } from "@/components/observatory/GovernanceReview";
+import { buildSkillDirectory } from "@/lib/observatory/dashboard-directory";
 import type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 export type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
@@ -201,7 +203,15 @@ export function ObservatoryOverview({
   }, [state]);
 
   if (state.status !== "ready" || !lists) {
-    return <SourceStatus {...state} />;
+    return (
+      <div
+        id="dashboard-snapshot"
+        className="dashboard-section-anchor"
+        data-dashboard-section
+      >
+        <SourceStatus {...state} />
+      </div>
+    );
   }
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -211,55 +221,151 @@ export function ObservatoryOverview({
       : items;
   const summary = state.snapshot.summary;
   const gatewayOnline = summary.gateway_running && summary.gateway_reachable;
-  const summaryItems: ReadonlyArray<readonly [string, string | number]> = [
-    ["Projects", summary.project_count],
-    ["Primary scenes", summary.primary_scene_count],
-    ["Secondary scenes", summary.secondary_scene_count],
-    ["Execution flows", summary.execution_flow_count],
-    ["Agents", summary.agent_count],
-    ["Bindings", summary.binding_count],
-    ["Active tasks", summary.task_totals.active],
-    ["Failed tasks", summary.task_totals.failed],
-    ...("source_repositories" in state.snapshot
-      ? ([["Source repos", state.snapshot.source_repositories.repositories.length]] as const)
+  const summaryItems: ReadonlyArray<{
+    label: string;
+    value: string | number;
+    href: string;
+  }> = [
+    {
+      label: "Projects",
+      value: summary.project_count,
+      href: "/dashboard/projects",
+    },
+    ...("assets" in state.snapshot
+      ? [{
+          label: "Skills",
+          value: buildSkillDirectory(state.snapshot.assets).length,
+          href: "/dashboard/skills",
+        }]
       : []),
-    ["Gateway", gatewayOnline ? "Online" : "Offline"],
+    {
+      label: "Primary scenes",
+      value: summary.primary_scene_count,
+      href: "#dashboard-objects",
+    },
+    {
+      label: "Secondary scenes",
+      value: summary.secondary_scene_count,
+      href: "#dashboard-objects",
+    },
+    {
+      label: "Execution flows",
+      value: summary.execution_flow_count,
+      href: "#dashboard-objects",
+    },
+    {
+      label: "Agents",
+      value: summary.agent_count,
+      href: "#dashboard-objects",
+    },
+    {
+      label: "Bindings",
+      value: summary.binding_count,
+      href: "#dashboard-topology",
+    },
+    {
+      label: "Active tasks",
+      value: summary.task_totals.active,
+      href: "#dashboard-work",
+    },
+    {
+      label: "Failed tasks",
+      value: summary.task_totals.failed,
+      href: "#dashboard-work",
+    },
+    ...("source_repositories" in state.snapshot
+      ? [{
+          label: "Source repos",
+          value: state.snapshot.source_repositories.repositories.length,
+          href: "#dashboard-repositories",
+        }]
+      : []),
+    {
+      label: "Gateway",
+      value: gatewayOnline ? "Online" : "Offline",
+      href: "#dashboard-snapshot",
+    },
   ];
 
   return (
     <div className="observatory-overview">
-      <SourceStatus status="ready" snapshot={state.snapshot} />
+      <div
+        id="dashboard-snapshot"
+        className="dashboard-section-anchor"
+        data-dashboard-section
+      >
+        <SourceStatus status="ready" snapshot={state.snapshot} />
+      </div>
 
-      <section className="observatory-summary" aria-label="System summary">
-        {summaryItems.map(([label, value]) => (
-          <dl key={label} className="observatory-summary-card">
-            <div>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          </dl>
+      <section
+        id="dashboard-index"
+        className="observatory-summary dashboard-section-anchor"
+        aria-label="System summary"
+        data-dashboard-section
+      >
+        {summaryItems.map(({ label, value, href }) => (
+          <Link
+            key={label}
+            className="observatory-summary-card"
+            href={href}
+            aria-label={`View ${label}`}
+          >
+            <dl>
+              <div>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            </dl>
+            <span className="observatory-summary-arrow" aria-hidden="true">
+              ↗
+            </span>
+          </Link>
         ))}
       </section>
 
       {"assets" in state.snapshot ? (
         <>
-          <FreshnessSummary sources={state.snapshot.source_health} />
+          <div
+            id="dashboard-sources"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <FreshnessSummary sources={state.snapshot.source_health} />
+          </div>
           {"source_repositories" in state.snapshot ? (
-            <SourceRepositoryInventory
-              inventory={state.snapshot.source_repositories}
-            />
+            <div
+              id="dashboard-repositories"
+              className="dashboard-section-anchor"
+              data-dashboard-section
+            >
+              <SourceRepositoryInventory
+                inventory={state.snapshot.source_repositories}
+              />
+            </div>
           ) : null}
-          <SystemInventory assets={state.snapshot.assets} />
-          <SystemTopology
-            assets={state.snapshot.assets}
-            coreEndpointLabels={Object.fromEntries(
-              state.snapshot.agents.map((agent) => [
-                `agent:${agent.id}`,
-                agent.display_name || agent.id,
-              ]),
-            )}
-            relationships={state.snapshot.relationships}
-          />
+          <div
+            id="dashboard-inventory"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <SystemInventory assets={state.snapshot.assets} />
+          </div>
+          <div
+            id="dashboard-topology"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <SystemTopology
+              assets={state.snapshot.assets}
+              coreEndpointLabels={Object.fromEntries(
+                state.snapshot.agents.map((agent) => [
+                  `agent:${agent.id}`,
+                  agent.display_name || agent.id,
+                ]),
+              )}
+              relationships={state.snapshot.relationships}
+            />
+          </div>
         </>
       ) : (
         <section className="observatory-v1-notice" aria-label="System inventory status">
@@ -270,7 +376,12 @@ export function ObservatoryOverview({
         </section>
       )}
 
-      <section className="observatory-catalog" aria-labelledby="catalog-heading">
+      <section
+        id="dashboard-objects"
+        className="observatory-catalog dashboard-section-anchor"
+        aria-labelledby="catalog-heading"
+        data-dashboard-section
+      >
         <div className="observatory-panel-heading">
           <div>
             <p className="eyebrow">Validated system map</p>
@@ -317,10 +428,34 @@ export function ObservatoryOverview({
 
       {"delivery_governance" in state.snapshot ? (
         <>
-          <ProjectCockpit governance={state.snapshot.delivery_governance} />
-          <DeliveryRoadmap governance={state.snapshot.delivery_governance} />
-          <FlowAnalytics governance={state.snapshot.delivery_governance} />
-          <GovernanceReview governance={state.snapshot.delivery_governance} />
+          <div
+            id="dashboard-projects"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <ProjectCockpit governance={state.snapshot.delivery_governance} />
+          </div>
+          <div
+            id="dashboard-roadmap"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <DeliveryRoadmap governance={state.snapshot.delivery_governance} />
+          </div>
+          <div
+            id="dashboard-analytics"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <FlowAnalytics governance={state.snapshot.delivery_governance} />
+          </div>
+          <div
+            id="dashboard-review"
+            className="dashboard-section-anchor"
+            data-dashboard-section
+          >
+            <GovernanceReview governance={state.snapshot.delivery_governance} />
+          </div>
         </>
       ) : (
         <section

@@ -299,6 +299,71 @@ describe("ObservatoryOverview", () => {
     expect(within(summary).getByText("Gateway").parentElement).toHaveTextContent(
       "Online",
     );
+    expect(
+      within(summary).getByRole("link", { name: /view Projects/i }),
+    ).toHaveAttribute("href", "/dashboard/projects");
+    expect(
+      within(summary).getByRole("link", { name: /view Agents/i }),
+    ).toHaveAttribute("href", "#dashboard-objects");
+    expect(
+      within(summary).getByRole("link", { name: /view Active tasks/i }),
+    ).toHaveAttribute("href", "#dashboard-work");
+  });
+
+  it("adds a unique Skills index card when the validated snapshot has assets", () => {
+    const v2 = {
+      ...snapshot,
+      schema_version: "2.0.0",
+      collector_version: "2.0.0",
+      assets: [
+        {
+          id: "skill:plato:weather",
+          kind: "skill",
+          name: "weather",
+          owner: "plato",
+          authority: "observed",
+          source: "openclaw/skills-list",
+          collected_at: "2026-07-22T22:00:00.000Z",
+          freshness: "fresh",
+          health: "healthy",
+          summary: "Ready",
+          labels: [],
+        },
+        {
+          id: "skill:socrates:weather",
+          kind: "skill",
+          name: "Weather",
+          owner: "socrates",
+          authority: "observed",
+          source: "openclaw/skills-list",
+          collected_at: "2026-07-22T22:00:00.000Z",
+          freshness: "fresh",
+          health: "healthy",
+          summary: "Ready",
+          labels: [],
+        },
+      ],
+      core_endpoint_ids: [],
+      relationships: [],
+      source_health: [],
+    } as unknown as ObservatoryCollectionEnvelope;
+
+    render(<ObservatoryOverview state={readyState(v2)} />);
+
+    const summary = screen.getByRole("region", { name: /system summary/i });
+    expect(within(summary).getByText("Skills").parentElement)
+      .toHaveTextContent("1");
+    expect(
+      within(summary).getByRole("link", { name: /view Skills/i }),
+    ).toHaveAttribute("href", "/dashboard/skills");
+  });
+
+  it("exposes stable anchors for the homepage section index", () => {
+    render(<ObservatoryOverview state={readyState()} />);
+
+    expect(document.getElementById("dashboard-snapshot")).toBeInTheDocument();
+    expect(document.getElementById("dashboard-index")).toBeInTheDocument();
+    expect(document.getElementById("dashboard-objects")).toBeInTheDocument();
   });
 
   it("shows canonical source provenance and freshness", () => {
