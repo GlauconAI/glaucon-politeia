@@ -380,3 +380,27 @@ The owner must explicitly approve each of these gates, in order:
 - Its append-only history contains 1 created event, 4 field-update events, 13 state-transition events, 1 evidence-added event, and 1 evidence-removed event. The exact transition sequence covered Inbox, Triage, Ready, In Progress, Blocked, Waiting, Review, Done, Reopened, and returned to Done. Evidence soft removal left 1 historical row and 0 active links.
 - The authenticated Board shows the retained item in Done; the item detail shows the complete chronological history; browser page errors, application alerts, and console output are empty. Anonymous `/dashboard` and the work-item detail route return authentication redirects, while `/observatory` preserves its permanent redirect to `/dashboard`.
 - Rollback remains application-first. Database correction requires a reviewed forward migration; the retained work item and append-only history must not be deleted to simulate rollback.
+
+## M3 Agent Claim local Production Candidate Gate (2026-07-23)
+
+- Branch: `feature-m3-agent-claim-dogfood`, based on production `main`
+  `34f7db17f5587e5ccd77f2679ce4f9b198e90ebb`. The unrelated anonymous
+  engagement worktree changes were never copied into the isolated branch.
+- Migration `20260723000200_observatory_agent_claim_engine.sql` adds
+  administrator-approved Low-risk policy fields, principal-aware audit,
+  claims/leases, service-role-only runner RPCs, and human-only policy/cancel
+  RPCs. Direct claim writes remain denied.
+- A zero database reset applied every migration. The existing Work Tracker
+  verifier passed 32/32 and the Claim verifier passed 42/42.
+- The disposable API pilot passed one Feature and one Bug through claim,
+  heartbeat, completion to Review, and human Done. Both ended at work-item
+  version 8. Totals were 2 claims, 24 events, and 2 evidence rows.
+- A High-risk Ready control returned HTTP 204 without changing state or
+  version. Ended claims with historical future expiry never render Active
+  controls.
+- The Claim Engine coordinates work and returns an approved boundary; it does
+  not execute commands. External runners must enforce the returned paths and
+  action classes and compare their actual diff before completion.
+- Production migration, runner-token configuration, shared-main integration,
+  Vercel deployment, and any production claim require new explicit owner
+  approval.

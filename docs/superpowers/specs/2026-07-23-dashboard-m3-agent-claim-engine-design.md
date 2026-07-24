@@ -160,6 +160,16 @@ A disposable Supabase Gate must apply every migration from zero and verify real 
 
 Production migration, runner-token configuration, shared-main push, deployment, and production agent claims remain explicit release operations.
 
+### Accepted pilot clarification
+
+The 2026-07-23 disposable pilot confirmed that this service is a coordination
+and authorization boundary. It returns the exact approved paths and action
+classes, but does not execute or sandbox an external runner. Runner
+integration must compare the actual changed-file set with that boundary
+before calling completion. This clarification narrows no database protection:
+claims, versions, leases, state transitions, evidence, and audit remain
+PostgreSQL-authoritative.
+
 ## Rollback
 
 Before production, discard or revert the feature commits.

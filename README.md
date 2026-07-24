@@ -150,12 +150,17 @@ supabase start
 supabase db reset --local --no-seed
 npm run observatory:verify-local-db
 npm run observatory:verify-local-claims
+npm run observatory:pilot-local
 supabase stop --no-backup
 ```
 
-The verifier targets only the disposable loopback database and currently
-requires 32 passing authorization, concurrency, workflow, evidence, audit,
-immutability, and retention checks. Never point it at a remote database.
+The core verifier requires 32 passing checks. The Agent Claim verifier adds
+42 checks for exact grants/RLS, principals, eligibility, idempotency,
+concurrency, leases, recovery, completion, human approval, evidence, and
+append-only audit. The pilot also requires a loopback Next.js API configured
+with a fixture token. Every command fails closed unless its database/API
+target is disposable and loopback. Never point these tools at a remote
+database.
 
 Supabase ops:
 
