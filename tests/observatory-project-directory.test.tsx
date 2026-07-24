@@ -61,6 +61,20 @@ afterEach(() => {
 });
 
 describe("ProjectDirectory", () => {
+  it("uses responsive, dense directory grids", () => {
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+
+    expect(css).toMatch(
+      /\.dashboard-directory-controls\s*\{[^}]*display:\s*grid/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-directory-list\s*\{[^}]*grid-template-columns:/u,
+    );
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)[\s\S]*\.dashboard-directory-list[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/u,
+    );
+  });
+
   it("searches projects and persists non-default filters in the URL", () => {
     const replaceState = vi.spyOn(window.history, "replaceState");
     render(<ProjectDirectory projects={projects} initialFilters={defaults} />);
@@ -138,3 +152,5 @@ describe("ProjectDirectory", () => {
     expect(screen.getByText(/no projects match/i)).toBeInTheDocument();
   });
 });
+import { readFileSync } from "node:fs";
+import { join } from "node:path";

@@ -38,6 +38,23 @@ afterEach(() => {
 });
 
 describe("DashboardSectionNav", () => {
+  it("uses sticky, horizontally scrollable navigation and offset section anchors", () => {
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+
+    expect(css).toMatch(
+      /\.dashboard-section-nav\s*\{[^}]*position:\s*sticky[^}]*top:\s*var\(--dashboard-nav-top\)/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-section-nav\s+div\s*\{[^}]*overflow-x:\s*auto/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-section-anchor\s*\{[^}]*scroll-margin-top:/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-section-nav\s+a:focus-visible\s*\{[^}]*outline:/u,
+    );
+  });
+
   it("links every available section and marks clicks as current", () => {
     vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
     render(
@@ -98,3 +115,5 @@ describe("DashboardSectionNav", () => {
     );
   });
 });
+import { readFileSync } from "node:fs";
+import { join } from "node:path";

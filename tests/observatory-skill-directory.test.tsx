@@ -77,6 +77,17 @@ afterEach(() => {
 });
 
 describe("SkillDirectory", () => {
+  it("styles expandable Agent instances without introducing nested page overflow", () => {
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+
+    expect(css).toMatch(
+      /\.dashboard-skill-list\s+details\s*\{[^}]*border-top:/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-skill-list\s+details\s+ul\s*\{[^}]*list-style:\s*none/u,
+    );
+  });
+
   it("shows unique Skill and Agent-Skill instance counts", () => {
     render(<SkillDirectory skills={skills} initialFilters={defaults} />);
 
@@ -150,3 +161,5 @@ describe("SkillDirectory", () => {
     expect(screen.getAllByText(/view Agent instances/i)).toHaveLength(2);
   });
 });
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
