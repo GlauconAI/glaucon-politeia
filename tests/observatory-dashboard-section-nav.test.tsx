@@ -72,7 +72,7 @@ describe("DashboardSectionNav", () => {
   it("publishes measured header and route navigation heights to the shell", () => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
-      function getBoundingClientRect() {
+      function getBoundingClientRect(this: HTMLElement) {
         const height = this.classList.contains("site-header")
           ? 64
           : this.classList.contains("dashboard-route-nav")
