@@ -56,7 +56,16 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
     const repository = createObservatoryRepository(
       supabase as unknown as ObservatoryRepositoryClient,
     );
-    return { status: "ready", items: await repository.listWorkItems() };
+    const [items, activeClaims] = await Promise.all([
+      repository.listWorkItems(),
+      repository.listActiveWorkItemClaims(),
+    ]);
+    return {
+      status: "ready",
+      items,
+      activeClaims,
+      evaluatedAt: new Date().toISOString(),
+    };
   } catch {
     return {
       status: "error",

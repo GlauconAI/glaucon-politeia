@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   } | null,
   getLatestSuccessfulSnapshot: vi.fn(),
   listWorkItems: vi.fn(),
+  listActiveWorkItemClaims: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -34,6 +35,7 @@ vi.mock("@/lib/observatory/repository", () => ({
   createObservatoryRepository: () => ({
     getLatestSuccessfulSnapshot: mocks.getLatestSuccessfulSnapshot,
     listWorkItems: mocks.listWorkItems,
+    listActiveWorkItemClaims: mocks.listActiveWorkItemClaims,
   }),
 }));
 
@@ -120,6 +122,8 @@ describe("DashboardPage", () => {
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(snapshotRow());
     mocks.listWorkItems.mockReset();
     mocks.listWorkItems.mockResolvedValue([]);
+    mocks.listActiveWorkItemClaims.mockReset();
+    mocks.listActiveWorkItemClaims.mockResolvedValue([]);
   });
 
   it("forces request-time authorization and snapshot freshness", () => {

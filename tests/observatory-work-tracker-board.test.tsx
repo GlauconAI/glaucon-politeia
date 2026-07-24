@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
 import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
+import type { ObservatoryWorkItemClaimRow } from "@/lib/observatory/repository";
 
 const item: ObservatoryWorkItemRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -71,6 +72,57 @@ describe("WorkTrackerBoard", () => {
     expect(
       screen.queryByRole("option", { name: "Done" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("labels manual, eligible, and actively claimed work without drag-only semantics", () => {
+    const eligible = {
+      ...item,
+      id: "22222222-2222-4222-8222-222222222222",
+      title: "Eligible feature",
+      state: "ready" as const,
+      risk_level: "low" as const,
+      agent_claim_enabled: true,
+      authorized_paths: ["components/observatory"],
+      allowed_action_classes: ["code_edit" as const],
+    };
+    const claimed = {
+      ...eligible,
+      id: "33333333-3333-4333-8333-333333333333",
+      title: "Claimed feature",
+      state: "in_progress" as const,
+    };
+    const claim: ObservatoryWorkItemClaimRow = {
+      id: "44444444-4444-4444-8444-444444444444",
+      work_item_id: claimed.id,
+      agent_id: "plato-pilot",
+      status: "active",
+      claim_version: 1,
+      started_at: "2026-07-23T20:00:00.000Z",
+      last_heartbeat_at: "2026-07-23T20:01:00.000Z",
+      lease_expires_at: "2099-07-23T20:15:00.000Z",
+      ended_at: null,
+      completion_summary: null,
+      result_evidence_url: null,
+      created_at: "2026-07-23T20:00:00.000Z",
+      updated_at: "2026-07-23T20:01:00.000Z",
+    };
+
+    render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [item, eligible, claimed],
+          activeClaims: [claim],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Manual")).toBeInTheDocument();
+    expect(screen.getByText("Agent eligible")).toBeInTheDocument();
+    expect(screen.getByText("Claimed by plato-pilot")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/move claimed feature to/i),
+    ).toBeInTheDocument();
   });
 
   it("submits the keyboard-operable move form with expected version", async () => {

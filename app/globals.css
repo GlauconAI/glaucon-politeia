@@ -87,6 +87,15 @@
   text-transform: uppercase;
 }
 
+.work-tracker-claim-badge {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 2px 7px;
+  text-transform: none;
+}
+
 .work-tracker-card > a {
   color: var(--strong);
   font-weight: 700;

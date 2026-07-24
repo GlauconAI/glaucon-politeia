@@ -560,6 +560,9 @@ describe("Observatory repository", () => {
     await expect(repository.listWorkItemClaims(item.id)).resolves.toEqual([
       claim,
     ]);
+    await expect(repository.listActiveWorkItemClaims()).resolves.toEqual([
+      claim,
+    ]);
     expect(boundary.from).toHaveBeenCalledWith("observatory_work_items");
     expect(boundary.from).toHaveBeenCalledWith(
       "observatory_work_item_events",
@@ -573,6 +576,9 @@ describe("Observatory repository", () => {
     expect(
       boundary.queries.observatory_work_item_evidence.is,
     ).toHaveBeenCalledWith("removed_at", null);
+    expect(
+      boundary.queries.observatory_work_item_claims.eq,
+    ).toHaveBeenCalledWith("status", "active");
   });
 
   it("configures policy and cancels claims only through audited admin RPCs", async () => {

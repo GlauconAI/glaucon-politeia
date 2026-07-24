@@ -403,6 +403,18 @@ export function createObservatoryRepository(
       );
     },
 
+    async listActiveWorkItemClaims(): Promise<ObservatoryWorkItemClaimRow[]> {
+      return readRows<ObservatoryWorkItemClaimRow>(
+        client
+          .from("observatory_work_item_claims")
+          .select(
+            "id,work_item_id,agent_id,status,claim_version,started_at,last_heartbeat_at,lease_expires_at,ended_at,completion_summary,result_evidence_url,created_at,updated_at",
+          )
+          .eq("status", "active")
+          .order("created_at", { ascending: true }),
+      );
+    },
+
     async createQuickCapture(
       input: ObservatoryQuickCaptureInput,
     ): Promise<ObservatoryWorkItemRow> {

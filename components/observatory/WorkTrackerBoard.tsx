@@ -7,7 +7,13 @@ import {
   transitionObservatoryWorkItemAction,
   type ObservatoryWorkItemMutationActionState,
 } from "@/app/observatory/actions";
-import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
+import {
+  getAgentClaimEligibility,
+} from "@/lib/observatory/agent-claims";
+import type {
+  ObservatoryWorkItemClaimRow,
+  ObservatoryWorkItemRow,
+} from "@/lib/observatory/repository";
 import {
   OBSERVATORY_WORK_ITEM_STATES,
   allowedObservatoryWorkItemTransitions,
@@ -15,7 +21,12 @@ import {
 } from "@/lib/observatory/work-items";
 
 export type WorkTrackerBoardState =
-  | { status: "ready"; items: ObservatoryWorkItemRow[] }
+  | {
+      status: "ready";
+      items: ObservatoryWorkItemRow[];
+      activeClaims?: ObservatoryWorkItemClaimRow[];
+      evaluatedAt?: string;
+    }
   | { status: "error"; message: string };
 
 type TransitionAction = (
@@ -66,6 +77,17 @@ export function WorkTrackerBoard({
   }
 
   const itemsById = new Map(state.items.map((item) => [item.id, item]));
+  const evaluatedAt = new Date(state.evaluatedAt ?? "1970-01-01").getTime();
+  const activeClaims = new Map(
+    (state.activeClaims ?? [])
+      .filter(
+        (claim) =>
+          claim.status === "active" &&
+          claim.ended_at === null &&
+          new Date(claim.lease_expires_at).getTime() > evaluatedAt,
+      )
+      .map((claim) => [claim.work_item_id, claim]),
+  );
 
   function submitMove(item: ObservatoryWorkItemRow, targetState: string) {
     const formData = new FormData();
@@ -143,6 +165,27 @@ export function WorkTrackerBoard({
                   {items.map((item) => {
                     const targets =
                       allowedObservatoryWorkItemTransitions(item.state);
+                    const claim = activeClaims.get(item.id);
+                    const readyGateComplete = Boolean(
+                      item.acceptance_criteria.trim() &&
+                        item.priority &&
+                        item.owner_id,
+                    );
+                    const eligibility = getAgentClaimEligibility({
+                      type: item.type,
+                      state: item.state,
+                      readyGateComplete,
+                      riskLevel: item.risk_level,
+                      enabled: item.agent_claim_enabled,
+                      authorizedPaths: item.authorized_paths,
+                      allowedActionClasses: item.allowed_action_classes,
+                      activeClaim: Boolean(claim),
+                    });
+                    const claimLabel = claim
+                      ? `Claimed by ${claim.agent_id}`
+                      : eligibility.eligible
+                        ? "Agent eligible"
+                        : "Manual";
                     return (
                       <li
                         key={item.id}
@@ -158,6 +201,9 @@ export function WorkTrackerBoard({
                           <span>{item.type}</span>
                           <span>{item.priority ?? "No priority"}</span>
                           <span>v{item.version}</span>
+                          <span className="work-tracker-claim-badge">
+                            {claimLabel}
+                          </span>
                         </div>
                         <Link href={`/dashboard/work-items/${item.id}`}>
                           {item.title}
