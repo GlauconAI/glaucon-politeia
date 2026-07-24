@@ -45,6 +45,14 @@ function boolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function safeMetadataToken(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return /^[a-z0-9][a-z0-9._+-]{0,127}$/iu.test(normalized)
+    ? normalized
+    : undefined;
+}
+
 function asset(value: unknown): ObservatoryAsset {
   return ObservatoryAssetSchema.parse(value);
 }
@@ -68,6 +76,25 @@ export function projectSkillAssets(
       boolean(record?.ready) ??
       (safeText(record?.status, "").toLocaleLowerCase() === "ready");
     const disabled = boolean(record?.disabled) === true;
+    const description =
+      typeof record?.description === "string"
+        ? safeText(record.description, "")
+        : "";
+    const installSource = safeMetadataToken(record?.source);
+    const version = safeMetadataToken(record?.version);
+    const labels = [
+      {
+        key: "eligibility",
+        value: disabled ? "disabled" : eligible ? "ready" : "missing",
+      },
+      ...(description
+        ? [{ key: "description", value: description }]
+        : []),
+      ...(installSource
+        ? [{ key: "install_source", value: installSource }]
+        : []),
+      ...(version ? [{ key: "version", value: version }] : []),
+    ];
     return asset({
       id: `skill:${owner}:${id}`,
       kind: "skill",
@@ -78,13 +105,10 @@ export function projectSkillAssets(
       collected_at: collectedAt,
       freshness: "fresh",
       health: disabled ? "disabled" : eligible ? "healthy" : "degraded",
-      summary: disabled ? "Disabled" : eligible ? "Ready" : "Requirements missing",
-      labels: [
-        {
-          key: "eligibility",
-          value: disabled ? "disabled" : eligible ? "ready" : "missing",
-        },
-      ],
+      summary:
+        description ||
+        (disabled ? "Disabled" : eligible ? "Ready" : "Requirements missing"),
+      labels,
     });
   });
   assets.sort((left, right) => left.id.localeCompare(right.id));
