@@ -1,11 +1,14 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
+
 import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
 import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
+  type ObservatorySnapshotRow,
 } from "@/lib/observatory/repository";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 
 export type ObservatoryOverviewState =
@@ -13,13 +16,15 @@ export type ObservatoryOverviewState =
   | { status: "empty" }
   | { status: "error"; message: string };
 
-export async function loadObservatoryOverviewState(): Promise<ObservatoryOverviewState> {
+export interface ObservatoryOverviewDependencies {
+  getLatestSuccessfulSnapshot(): Promise<ObservatorySnapshotRow | null>;
+}
+
+export async function readObservatoryOverviewState(
+  dependencies: ObservatoryOverviewDependencies,
+): Promise<ObservatoryOverviewState> {
   try {
-    const supabase = await createSupabaseServerClient();
-    const repository = createObservatoryRepository(
-      supabase as unknown as ObservatoryRepositoryClient,
-    );
-    const row = await repository.getLatestSuccessfulSnapshot();
+    const row = await dependencies.getLatestSuccessfulSnapshot();
 
     if (!row) return { status: "empty" };
 
@@ -38,4 +43,24 @@ export async function loadObservatoryOverviewState(): Promise<ObservatoryOvervie
       message: "The latest snapshot could not be loaded. Try again later.",
     };
   }
+}
+
+async function readDefaultObservatoryOverviewState() {
+  const repository = createObservatoryRepository(
+    createSupabaseAdminClient() as unknown as ObservatoryRepositoryClient,
+  );
+  return readObservatoryOverviewState(repository);
+}
+
+const readCachedObservatoryOverviewState = unstable_cache(
+  readDefaultObservatoryOverviewState,
+  ["observatory-overview-v1"],
+  {
+    revalidate: 60,
+    tags: ["observatory-overview"],
+  },
+);
+
+export async function loadObservatoryOverviewState(): Promise<ObservatoryOverviewState> {
+  return readCachedObservatoryOverviewState();
 }

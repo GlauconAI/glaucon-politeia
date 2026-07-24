@@ -23,8 +23,16 @@ vi.mock("@/lib/observatory/admin-auth", () => ({
   getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
 }));
 
+vi.mock("next/cache", () => ({
+  unstable_cache: (callback: () => Promise<unknown>) => callback,
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({ from: vi.fn(), rpc: vi.fn() }),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: () => ({ from: vi.fn(), rpc: vi.fn() }),
 }));
 
 vi.mock("@/lib/observatory/repository", () => ({
