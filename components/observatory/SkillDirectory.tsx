@@ -45,6 +45,9 @@ export function SkillDirectory({
   initialFilters: SkillDirectoryFilters;
 }) {
   const [filters, setFilters] = useState<SkillDirectoryFilters>(initialFilters);
+  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(
+    () => new Set(),
+  );
   const options = useMemo(
     () => ({
       health: [...new Set(skills.map((skill) => skill.health))].sort(),
@@ -252,20 +255,35 @@ export function SkillDirectory({
                     </dd>
                   </div>
                 </dl>
-                <details>
+                <details
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setExpandedSkills((current) => {
+                      const next = new Set(current);
+                      if (open) {
+                        next.add(skill.key);
+                      } else {
+                        next.delete(skill.key);
+                      }
+                      return next;
+                    });
+                  }}
+                >
                   <summary>View Agent instances</summary>
-                  <ul>
-                    {skill.instances.map((instance) => (
-                      <li key={instance.id}>
-                        <strong>{instance.owner}</strong>
-                        <span>{instance.health}</span>
-                        <small>
-                          {instance.source}
-                          {instance.version ? ` · ${instance.version}` : ""}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
+                  {expandedSkills.has(skill.key) ? (
+                    <ul>
+                      {skill.instances.map((instance) => (
+                        <li key={instance.id}>
+                          <strong>{instance.owner}</strong>
+                          <span>{instance.health}</span>
+                          <small>
+                            {instance.source}
+                            {instance.version ? ` · ${instance.version}` : ""}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </details>
               </article>
             </li>

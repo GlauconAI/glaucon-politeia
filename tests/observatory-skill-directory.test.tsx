@@ -160,6 +160,31 @@ describe("SkillDirectory", () => {
     expect(screen.getByText(/2 Agents · 2 instances/i)).toBeInTheDocument();
     expect(screen.getAllByText(/view Agent instances/i)).toHaveLength(2);
   });
+
+  it("mounts Agent instance rows only after their Skill is opened", async () => {
+    render(<SkillDirectory skills={skills} initialFilters={defaults} />);
+
+    expect(
+      screen.queryByText("giskard", { selector: "strong" }),
+    ).not.toBeInTheDocument();
+
+    const weatherCard = screen
+      .getByRole("heading", { name: "weather" })
+      .closest("li");
+    expect(weatherCard).not.toBeNull();
+    fireEvent.click(
+      within(weatherCard!).getByText(/view Agent instances/i),
+    );
+
+    expect(
+      await within(weatherCard!).findByText("giskard", {
+        selector: "strong",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(weatherCard!).getByText("plato", { selector: "strong" }),
+    ).toBeInTheDocument();
+  });
 });
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
