@@ -4946,6 +4946,56 @@ body {
   font-size: 12px;
 }
 
+.dashboard-skill-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.dashboard-skill-category {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+}
+
+.dashboard-skill-category strong {
+  color: var(--strong);
+}
+
+.dashboard-skill-category span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dashboard-skill-category:hover,
+.dashboard-skill-category:focus-visible {
+  border-color: rgba(124, 58, 237, 0.58);
+}
+
+.dashboard-skill-category:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.dashboard-skill-category[aria-pressed="true"] {
+  border-color: rgba(67, 211, 139, 0.55);
+  background: rgba(67, 211, 139, 0.1);
+}
+
+.dashboard-skill-meta .dashboard-skill-override {
+  border-color: rgba(124, 58, 237, 0.48);
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--accent-strong);
+}
+
 .dashboard-directory-controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5146,5 +5196,15 @@ body {
   .dashboard-directory-search,
   .dashboard-directory-wide {
     grid-column: auto;
+  }
+
+  .dashboard-skill-categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .dashboard-skill-categories {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

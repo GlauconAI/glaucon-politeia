@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +20,8 @@ const skills: DashboardSkillEntry[] = [
     versions: [],
     agentCount: 2,
     instanceCount: 2,
-    scope: "shared",
+    category: "openclaw-built-in",
+    hasAgentOverride: true,
     instances: [
       {
         id: "skill:giskard:weather",
@@ -48,7 +51,8 @@ const skills: DashboardSkillEntry[] = [
     versions: ["1.0.0"],
     agentCount: 1,
     instanceCount: 1,
-    scope: "private",
+    category: "agent-scoped-custom",
+    hasAgentOverride: false,
     instances: [
       {
         id: "skill:plato:402v-html-workflow",
@@ -64,7 +68,7 @@ const skills: DashboardSkillEntry[] = [
 
 const defaults: SkillDirectoryFilters = {
   q: "",
-  scope: "all",
+  category: "all",
   health: "all",
   agent: "all",
   source: "all",
@@ -96,6 +100,51 @@ describe("SkillDirectory", () => {
     expect(screen.getByText("2 shown")).toBeInTheDocument();
   });
 
+  it("shows four category index cards and filters through their URL state", () => {
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    render(<SkillDirectory skills={skills} initialFilters={defaults} />);
+
+    expect(
+      screen.getByRole("button", {
+        name: /OpenClaw built-in.*1 Skill/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /System Web Skill.*0 Skills/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Shared custom.*0 Skills/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /Agent-scoped custom.*1 Skill/i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Agent override")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Agent-scoped custom.*1 Skill/i,
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "402v-html-workflow" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "weather" }),
+    ).not.toBeInTheDocument();
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "/dashboard/skills?category=agent-scoped-custom",
+    );
+  });
+
   it("searches and persists URL state", () => {
     const replaceState = vi.spyOn(window.history, "replaceState");
     render(<SkillDirectory skills={skills} initialFilters={defaults} />);
@@ -120,11 +169,11 @@ describe("SkillDirectory", () => {
     );
   });
 
-  it("filters by scope, health, Agent, and source", () => {
+  it("filters by category, health, Agent, and source", () => {
     render(<SkillDirectory skills={skills} initialFilters={defaults} />);
 
-    fireEvent.change(screen.getByRole("combobox", { name: /skill scope/i }), {
-      target: { value: "shared" },
+    fireEvent.change(screen.getByRole("combobox", { name: /category/i }), {
+      target: { value: "openclaw-built-in" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: /skill health/i }), {
       target: { value: "degraded" },
@@ -186,5 +235,3 @@ describe("SkillDirectory", () => {
     ).toBeInTheDocument();
   });
 });
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
