@@ -326,6 +326,8 @@
 .observatory-page,
 .observatory-overview {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 18px;
 }
@@ -385,6 +387,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 14px;
   align-items: start;
+}
+
+.observatory-layout > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .observatory-capture {
@@ -1524,7 +1531,6 @@
 
   .observatory-capture {
     position: static;
-    order: -1;
   }
 }
 
@@ -4726,6 +4732,8 @@ body {
   );
   --dashboard-anchor-offset: calc(var(--dashboard-section-nav-top) + 56px);
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   gap: 12px;
 }
 
@@ -4911,6 +4919,8 @@ body {
 }
 
 .dashboard-directory {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 8px;
   background: rgba(18, 20, 25, 0.88);
@@ -5207,6 +5217,10 @@ body {
 }
 
 @media (max-width: 520px) {
+  .observatory-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .dashboard-skill-categories {
     grid-template-columns: minmax(0, 1fr);
   }
