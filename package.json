@@ -37,6 +37,7 @@
     "observatory:verify-snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-snapshot.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "observatory:verify-local-claims": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-agent-claim-db.ts",
+    "observatory:pilot-local": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/run-agent-claim-pilot.ts",
     "observatory:verify-local-publisher": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-publisher.ts",
     "observatory:verify-local-refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-refresh.ts",
     "publish:html": "node scripts/publish-html.mjs",
