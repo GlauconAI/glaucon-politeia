@@ -2,17 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { redirect } from "next/navigation";
 
-import {
-  ObservatoryOverview,
-  type ObservatoryOverviewState,
-} from "@/components/observatory/ObservatoryOverview";
+import { ObservatoryOverview } from "@/components/observatory/ObservatoryOverview";
 import { QuickCapture } from "@/components/observatory/QuickCapture";
 import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
 } from "@/components/observatory/WorkTrackerBoard";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
-import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
@@ -20,35 +17,6 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-async function loadOverviewState(): Promise<ObservatoryOverviewState> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const repository = createObservatoryRepository(
-      supabase as unknown as ObservatoryRepositoryClient,
-    );
-    const row = await repository.getLatestSuccessfulSnapshot();
-
-    if (!row) {
-      return { status: "empty" };
-    }
-
-    const parsed = ObservatoryCollectionEnvelopeSchema.safeParse(row.payload);
-    if (!parsed.success) {
-      return {
-        status: "error",
-        message: "The latest snapshot failed validation and was not rendered.",
-      };
-    }
-
-    return { status: "ready", snapshot: parsed.data };
-  } catch {
-    return {
-      status: "error",
-      message: "The latest snapshot could not be loaded. Try again later.",
-    };
-  }
-}
 
 async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
   try {
@@ -82,7 +50,7 @@ export default async function DashboardPage() {
   }
 
   const [overviewState, workTrackerState] = await Promise.all([
-    loadOverviewState(),
+    loadObservatoryOverviewState(),
     loadWorkTrackerState(),
   ]);
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;

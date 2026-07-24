@@ -11,12 +11,9 @@ import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
 import { FlowAnalytics } from "@/components/observatory/FlowAnalytics";
 import { GovernanceReview } from "@/components/observatory/GovernanceReview";
-import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
+import type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
-export type ObservatoryOverviewState =
-  | { status: "ready"; snapshot: ObservatoryCollectionEnvelope }
-  | { status: "empty" }
-  | { status: "error"; message: string };
+export type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 type SearchItem = {
   id: string;
