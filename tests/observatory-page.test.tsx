@@ -17,7 +17,12 @@ const mocks = vi.hoisted(() => ({
   listWorkItems: vi.fn(),
   listActiveWorkItemClaims: vi.fn(),
   getCurrentAdmin: vi.fn(),
+  redirect: vi.fn((path: string) => {
+    throw new Error(`redirect:${path}`);
+  }),
 }));
+
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 vi.mock("@/lib/observatory/admin-auth", () => ({
   getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
@@ -123,6 +128,7 @@ describe("DashboardPage", () => {
     };
     mocks.getCurrentAdmin.mockReset();
     mocks.getCurrentAdmin.mockResolvedValue(mocks.currentAdmin);
+    mocks.redirect.mockClear();
     mocks.getLatestSuccessfulSnapshot.mockReset();
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(snapshotRow());
     mocks.listWorkItems.mockReset();
@@ -135,11 +141,16 @@ describe("DashboardPage", () => {
     expect(dynamic).toBe("force-dynamic");
   });
 
-  it("delegates authorization to the shared Dashboard layout", async () => {
-    await DashboardPage();
+  it("redirects anonymous visitors before reading the cached Snapshot", async () => {
+    mocks.getCurrentAdmin.mockResolvedValue(null);
 
-    expect(mocks.getCurrentAdmin).not.toHaveBeenCalled();
-    expect(mocks.getLatestSuccessfulSnapshot).toHaveBeenCalledTimes(1);
+    await expect(DashboardPage()).rejects.toThrow(
+      "redirect:/auth?redirectTo=/dashboard",
+    );
+    expect(mocks.redirect).toHaveBeenCalledWith(
+      "/auth?redirectTo=/dashboard",
+    );
+    expect(mocks.getLatestSuccessfulSnapshot).not.toHaveBeenCalled();
   });
 
   it("renders the admin overview and Quick Capture", async () => {

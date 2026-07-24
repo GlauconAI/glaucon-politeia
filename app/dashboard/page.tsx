@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { redirect } from "next/navigation";
+
 import { ObservatoryOverview } from "@/components/observatory/ObservatoryOverview";
 import {
   DashboardSectionNav,
@@ -10,6 +12,7 @@ import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
 } from "@/components/observatory/WorkTrackerBoard";
+import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 import {
   createObservatoryRepository,
@@ -82,6 +85,11 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
 }
 
 export default async function DashboardPage() {
+  const currentAdmin = await getCurrentObservatoryAdmin();
+  if (!currentAdmin) {
+    redirect("/auth?redirectTo=/dashboard");
+  }
+
   const [overviewState, workTrackerState] = await Promise.all([
     loadObservatoryOverviewState(),
     loadWorkTrackerState(),

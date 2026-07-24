@@ -44,19 +44,17 @@ reduces the observed DOM explosion. This is the selected approach.
 
 ## Architecture
 
-### Shared authorization layout
+### Persistent navigation layout
 
-`app/dashboard/layout.tsx` is the single authorization boundary for all
-Dashboard routes. It calls `getCurrentObservatoryAdmin()` before rendering any
-child route. Direct unauthenticated requests preserve the requested Dashboard
-path through a request header set by `proxy.ts`.
-
-The layout also renders stable Dashboard, Projects, and Skills navigation.
+`app/dashboard/layout.tsx` renders stable Dashboard, Projects, and Skills navigation.
 Because App Router layouts persist across client navigation, the authenticated
-shell does not repeat its profile lookup on each sibling route transition.
+shell remains mounted across sibling route transitions.
 
-Existing mutation endpoints and server actions keep their own authorization
-checks. The shared layout only replaces duplicate page-level read checks.
+Each page remains its own authorization boundary and calls
+`getCurrentObservatoryAdmin()` before reading the cached Snapshot. A shared
+layout is not used as the sole data authorization gate because App Router may
+reuse layouts during client navigation. Existing mutation endpoints and server
+actions keep their own authorization checks.
 
 ### Cached validated Snapshot
 
@@ -110,9 +108,9 @@ without hiding actual server work.
 
 Regression tests must prove:
 
-1. the shared layout redirects anonymous users before rendering children and
-   preserves the exact Dashboard return path;
-2. child pages no longer call administrator auth independently;
+1. each page redirects anonymous users before reading the cached Snapshot;
+2. the shared layout persists route navigation without becoming the sole data
+   authorization boundary;
 3. the Snapshot loader uses a cookie-free admin client and is wrapped in a
    60-second server cache;
 4. Inventory and Topology initially render bounded rows and reveal the

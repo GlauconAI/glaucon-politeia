@@ -28,10 +28,9 @@
 
 - [ ] **Step 1: Write failing layout and proxy tests**
 
-Test that the proxy places the exact Dashboard pathname and query in a trusted
-request header, the layout redirects anonymous requests using that value, the
-layout renders persistent route links for admins, and child page tests no longer
-own the authorization behavior.
+Test that the layout renders persistent route links and an accessible loading
+state while every child page continues to reject anonymous reads before loading
+Snapshot data.
 
 - [ ] **Step 2: Run tests and verify RED**
 
@@ -41,32 +40,15 @@ Run:
 npx vitest run tests/observatory-dashboard-layout.test.tsx tests/observatory-page.test.tsx tests/observatory-directory-pages.test.tsx tests/proxy.test.ts
 ```
 
-Expected: failures because the layout, route navigation, loading state, and
-Dashboard request header do not exist and child pages still authenticate.
+Expected: failures because the layout, route navigation, and loading state do
+not exist.
 
 - [ ] **Step 3: Implement the minimal shared boundary**
 
-Create an async layout that reads `x-dashboard-path`, validates that it starts
-with `/dashboard`, calls `getCurrentObservatoryAdmin()`, and redirects to:
-
-```ts
-redirect(`/auth?redirectTo=${encodeURIComponent(redirectPath)}`);
-```
-
-Add stable links to `/dashboard`, `/dashboard/projects`, and
-`/dashboard/skills`. Extend `proxy.ts` so Dashboard requests continue with:
-
-```ts
-const requestHeaders = new Headers(request.headers);
-requestHeaders.set(
-  "x-dashboard-path",
-  `${request.nextUrl.pathname}${request.nextUrl.search}`,
-);
-return NextResponse.next({ request: { headers: requestHeaders } });
-```
-
-Remove duplicate auth imports and redirects from the three child pages. Add an
-accessible `aria-busy="true"` loading skeleton.
+Create an async layout with stable links to `/dashboard`,
+`/dashboard/projects`, and `/dashboard/skills`. Keep page-level administrator
+checks so reused App Router layouts cannot become an authorization bypass. Add
+an accessible `aria-busy="true"` loading skeleton.
 
 - [ ] **Step 4: Run focused tests and verify GREEN**
 

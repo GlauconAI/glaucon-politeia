@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   SkillDirectory,
   type SkillDirectoryFilters,
 } from "@/components/observatory/SkillDirectory";
 import { SourceStatus } from "@/components/observatory/SourceStatus";
+import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import { buildSkillDirectory } from "@/lib/observatory/dashboard-directory";
 import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
@@ -51,6 +53,11 @@ export default async function SkillsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const currentAdmin = await getCurrentObservatoryAdmin();
+  if (!currentAdmin) {
+    redirect("/auth?redirectTo=/dashboard/skills");
+  }
+
   const [state, params] = await Promise.all([
     loadObservatoryOverviewState(),
     searchParams,
