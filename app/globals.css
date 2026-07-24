@@ -4717,6 +4717,14 @@ body {
 /* Dashboard navigation index and directories */
 
 .dashboard-route-shell {
+  --dashboard-header-height: 68px;
+  --dashboard-route-height: 48px;
+  --dashboard-nav-gap: 12px;
+  --dashboard-section-nav-top: calc(
+    var(--dashboard-header-height) + var(--dashboard-route-height) +
+      var(--dashboard-nav-gap)
+  );
+  --dashboard-anchor-offset: calc(var(--dashboard-section-nav-top) + 56px);
   display: grid;
   gap: 12px;
 }
@@ -4724,7 +4732,7 @@ body {
 .dashboard-route-nav {
   display: flex;
   position: sticky;
-  top: 68px;
+  top: var(--dashboard-header-height);
   z-index: 21;
   width: fit-content;
   gap: 5px;
@@ -4802,7 +4810,7 @@ body {
 
 .dashboard-section-nav {
   position: sticky;
-  top: var(--dashboard-nav-top);
+  top: var(--dashboard-section-nav-top);
   z-index: 19;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 8px;
@@ -4859,7 +4867,7 @@ body {
 
 .dashboard-section-anchor {
   min-width: 0;
-  scroll-margin-top: 132px;
+  scroll-margin-top: var(--dashboard-anchor-offset);
 }
 
 .observatory-summary-card {
@@ -5145,7 +5153,6 @@ body {
 
 @media (max-width: 720px) {
   .dashboard-route-nav {
-    top: 62px;
     width: 100%;
   }
 
@@ -5168,10 +5175,6 @@ body {
 
   .dashboard-section-nav a {
     scroll-snap-align: start;
-  }
-
-  .dashboard-section-anchor {
-    scroll-margin-top: 188px;
   }
 
   .observatory-summary {

@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type DashboardSectionLink = {
   id: string;
   label: string;
-};
-
-type SectionNavStyle = CSSProperties & {
-  "--dashboard-nav-top": string;
 };
 
 export function DashboardSectionNav({
@@ -17,13 +13,21 @@ export function DashboardSectionNav({
   sections: DashboardSectionLink[];
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
-  const [topOffset, setTopOffset] = useState(64);
+  const [topOffset, setTopOffset] = useState(188);
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const header = document.querySelector<HTMLElement>(".site-header");
-    if (!header) return;
+    const nav = navRef.current;
+    if (!nav) return;
+    const shell = nav.closest<HTMLElement>(".dashboard-route-shell");
+    const routeNav =
+      shell?.querySelector<HTMLElement>(".dashboard-route-nav") ?? null;
+    const measure = () => {
+      const stickyTop = Number.parseFloat(getComputedStyle(nav).top);
+      const safeTop = Number.isFinite(stickyTop) ? stickyTop : 132;
+      setTopOffset(Math.ceil(safeTop + nav.getBoundingClientRect().height));
+    };
 
-    const measure = () => setTopOffset(Math.ceil(header.getBoundingClientRect().height));
     measure();
     if (typeof ResizeObserver === "undefined") {
       window.addEventListener("resize", measure);
@@ -31,7 +35,8 @@ export function DashboardSectionNav({
     }
 
     const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(header);
+    resizeObserver.observe(nav);
+    if (routeNav) resizeObserver.observe(routeNav);
     return () => resizeObserver.disconnect();
   }, []);
 
@@ -60,15 +65,11 @@ export function DashboardSectionNav({
     return () => observer.disconnect();
   }, [sections, topOffset]);
 
-  const style: SectionNavStyle = {
-    "--dashboard-nav-top": `${topOffset}px`,
-  };
-
   return (
     <nav
+      ref={navRef}
       className="dashboard-section-nav"
       aria-label="Dashboard sections"
-      style={style}
     >
       <div>
         {sections.map((section) => (

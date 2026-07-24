@@ -5,6 +5,11 @@ import {
   DashboardSectionNav,
   type DashboardSectionLink,
 } from "@/components/observatory/DashboardSectionNav";
+import { DashboardRouteNav } from "@/components/observatory/DashboardRouteNav";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard",
+}));
 
 const sections: DashboardSectionLink[] = [
   { id: "dashboard-snapshot", label: "Snapshot" },
@@ -32,6 +37,12 @@ class MockIntersectionObserver {
   thresholds = [];
 }
 
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 afterEach(() => {
   observerCallback = undefined;
   vi.unstubAllGlobals();
@@ -42,17 +53,61 @@ describe("DashboardSectionNav", () => {
     const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
     expect(css).toMatch(
-      /\.dashboard-section-nav\s*\{[^}]*position:\s*sticky[^}]*top:\s*var\(--dashboard-nav-top\)/u,
+      /\.dashboard-route-nav\s*\{[^}]*top:\s*var\(--dashboard-header-height/u,
+    );
+    expect(css).toMatch(
+      /\.dashboard-section-nav\s*\{[^}]*position:\s*sticky[^}]*top:\s*var\(--dashboard-section-nav-top/u,
     );
     expect(css).toMatch(
       /\.dashboard-section-nav\s+div\s*\{[^}]*overflow-x:\s*auto/u,
     );
     expect(css).toMatch(
-      /\.dashboard-section-anchor\s*\{[^}]*scroll-margin-top:/u,
+      /\.dashboard-section-anchor\s*\{[^}]*scroll-margin-top:\s*var\(--dashboard-anchor-offset/u,
     );
     expect(css).toMatch(
       /\.dashboard-section-nav\s+a:focus-visible\s*\{[^}]*outline:/u,
     );
+  });
+
+  it("publishes measured header and route navigation heights to the shell", () => {
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function getBoundingClientRect() {
+        const height = this.classList.contains("site-header")
+          ? 64
+          : this.classList.contains("dashboard-route-nav")
+            ? 48
+            : 0;
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          right: 0,
+          bottom: height,
+          left: 0,
+          width: 0,
+          height,
+          toJSON: () => ({}),
+        };
+      },
+    );
+
+    const { container } = render(
+      <>
+        <header className="site-header" />
+        <div className="dashboard-route-shell">
+          <DashboardRouteNav />
+        </div>
+      </>,
+    );
+    const shell = container.querySelector<HTMLElement>(
+      ".dashboard-route-shell",
+    );
+
+    expect(shell).toHaveStyle({
+      "--dashboard-header-height": "64px",
+      "--dashboard-route-height": "48px",
+    });
   });
 
   it("links every available section and marks clicks as current", () => {
