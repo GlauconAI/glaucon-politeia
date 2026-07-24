@@ -50,6 +50,37 @@ afterEach(async () => {
 });
 
 describe("collectSourceRepositories", () => {
+  it("continues below a trusted root repository to find nested Agent repositories", async () => {
+    const root = await mkdtemp(join(tmpdir(), "observatory-repositories-"));
+    roots.push(root);
+    const workspaceRoot = join(root, "workspace");
+    const vaultRoot = join(root, "vault");
+    await createRepository(
+      workspaceRoot,
+      "git@github.com:GlauconAI/workspace-control.git",
+    );
+    await createRepository(
+      join(workspaceRoot, "plato", "projects", "nested-app"),
+      "git@github.com:GlauconAI/nested-app.git",
+    );
+    await mkdir(vaultRoot, { recursive: true });
+
+    const result = await collectSourceRepositories(
+      {
+        workspaceRoot,
+        vaultRoot,
+        agents: [{ id: "plato" }],
+        projectGroups: [],
+      },
+      { now: () => new Date(collectedAt) },
+    );
+
+    expect(result.repositories.map((repository) => repository.name)).toEqual(
+      expect.arrayContaining(["workspace-control", "nested-app"]),
+    );
+    expect(result.repositories).toHaveLength(2);
+  });
+
   it("discovers repositories under both trusted roots and emits safe Git metadata", async () => {
     const root = await mkdtemp(join(tmpdir(), "observatory-repositories-"));
     roots.push(root);

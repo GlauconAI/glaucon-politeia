@@ -48,6 +48,19 @@ const assets: ObservatoryAsset[] = [
     summary: "Knowledge area present · metadata only",
     labels: [],
   },
+  {
+    id: "repository:workspace:plato:glaucon-politeia",
+    kind: "repository",
+    name: "glaucon-politeia",
+    owner: "plato",
+    authority: "observed",
+    source: "source-repositories/local-git",
+    collected_at: "2026-07-22T22:00:00.000Z",
+    freshness: "fresh",
+    health: "healthy",
+    summary: "GitHub linked · clean · active",
+    labels: [{ key: "scope", value: "workspace" }],
+  },
 ];
 
 const sourceHealth: ObservatorySourceHealth[] = [
@@ -107,6 +120,20 @@ describe("SystemInventory", () => {
     expect(screen.getByRole("heading", { name: "Dashboard refresh" })).toBeInTheDocument();
     expect(screen.getByText("stale", { selector: "span" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "weather" })).not.toBeInTheDocument();
+  });
+
+  it("keeps repository assets in their own domain", () => {
+    render(<SystemInventory assets={assets} />);
+    fireEvent.change(screen.getByRole("combobox", { name: /asset domain/i }), {
+      target: { value: "source_repositories" },
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "glaucon-politeia" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Dashboard refresh" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders a useful empty result", () => {

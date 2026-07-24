@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { FreshnessSummary } from "@/components/observatory/FreshnessSummary";
+import { SourceRepositoryInventory } from "@/components/observatory/SourceRepositoryInventory";
 import { SystemInventory } from "@/components/observatory/SystemInventory";
 import { SystemTopology } from "@/components/observatory/SystemTopology";
 import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
@@ -213,7 +214,7 @@ export function ObservatoryOverview({
       : items;
   const summary = state.snapshot.summary;
   const gatewayOnline = summary.gateway_running && summary.gateway_reachable;
-  const summaryItems = [
+  const summaryItems: ReadonlyArray<readonly [string, string | number]> = [
     ["Projects", summary.project_count],
     ["Primary scenes", summary.primary_scene_count],
     ["Secondary scenes", summary.secondary_scene_count],
@@ -222,8 +223,11 @@ export function ObservatoryOverview({
     ["Bindings", summary.binding_count],
     ["Active tasks", summary.task_totals.active],
     ["Failed tasks", summary.task_totals.failed],
+    ...("source_repositories" in state.snapshot
+      ? ([["Source repos", state.snapshot.source_repositories.repositories.length]] as const)
+      : []),
     ["Gateway", gatewayOnline ? "Online" : "Offline"],
-  ] as const;
+  ];
 
   return (
     <div className="observatory-overview">
@@ -243,6 +247,11 @@ export function ObservatoryOverview({
       {"assets" in state.snapshot ? (
         <>
           <FreshnessSummary sources={state.snapshot.source_health} />
+          {"source_repositories" in state.snapshot ? (
+            <SourceRepositoryInventory
+              inventory={state.snapshot.source_repositories}
+            />
+          ) : null}
           <SystemInventory assets={state.snapshot.assets} />
           <SystemTopology
             assets={state.snapshot.assets}

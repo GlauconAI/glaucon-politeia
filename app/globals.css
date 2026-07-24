@@ -395,6 +395,7 @@
 .observatory-source,
 .observatory-catalog,
 .observatory-source-health,
+.observatory-repository-inventory,
 .observatory-system-inventory,
 .observatory-topology,
 .observatory-v1-notice,
@@ -404,6 +405,7 @@
 }
 
 .observatory-source-health,
+.observatory-repository-inventory,
 .observatory-system-inventory,
 .observatory-topology,
 .observatory-v1-notice {
@@ -414,6 +416,8 @@
 }
 
 .observatory-health-counts,
+.observatory-repository-summary,
+.observatory-repository-controls,
 .observatory-inventory-controls {
   display: flex;
   flex-wrap: wrap;
@@ -421,6 +425,8 @@
 }
 
 .observatory-health-counts span,
+.observatory-repository-summary li,
+.observatory-repository-inventory .observatory-panel-heading > span,
 .observatory-system-inventory .observatory-panel-heading > span,
 .observatory-topology .observatory-panel-heading > span {
   border: 1px solid var(--border);
@@ -431,6 +437,7 @@
 }
 
 .observatory-source-health-list,
+.observatory-repository-list,
 .observatory-inventory-list,
 .observatory-relationship-list {
   display: grid;
@@ -441,6 +448,7 @@
 }
 
 .observatory-source-health-list li,
+.observatory-repository-list li,
 .observatory-inventory-list li,
 .observatory-relationship-list li {
   border: 1px solid var(--border);
@@ -466,11 +474,13 @@
   color: var(--muted);
 }
 
-.observatory-inventory-controls {
+.observatory-inventory-controls,
+.observatory-repository-controls {
   margin: 14px 0;
 }
 
-.observatory-inventory-controls label {
+.observatory-inventory-controls label,
+.observatory-repository-controls label {
   display: grid;
   min-width: 180px;
   flex: 1;
@@ -480,7 +490,9 @@
 }
 
 .observatory-inventory-controls input,
-.observatory-inventory-controls select {
+.observatory-inventory-controls select,
+.observatory-repository-controls input,
+.observatory-repository-controls select {
   min-height: 40px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -493,7 +505,18 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.observatory-repository-summary {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.observatory-repository-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .observatory-inventory-list p,
+.observatory-repository-list p,
 .observatory-relationship-list p {
   margin: 8px 0;
 }
@@ -503,6 +526,42 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 10px 0 0;
+}
+
+.observatory-repository-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.observatory-repository-list dl div {
+  min-width: 0;
+}
+
+.observatory-repository-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.observatory-repository-list dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.observatory-repository-link a {
+  color: var(--success);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.observatory-repository-failure {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+  padding: 12px;
 }
 
 .observatory-inventory-list dl div {
@@ -1477,6 +1536,8 @@
   }
 
   .observatory-summary,
+  .observatory-repository-list,
+  .observatory-repository-list dl,
   .observatory-object-grid,
   .observatory-provenance,
   .cockpit-summary,

@@ -233,7 +233,6 @@ async function discoverCandidates(
         if (candidates.length > limits.maxRepositories) {
           throw new SourceRepositoryCollectionError("SOURCE_LIMIT_EXCEEDED");
         }
-        continue;
       }
       if (current.depth >= limits.maxDepth) continue;
 

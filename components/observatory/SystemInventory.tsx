@@ -10,6 +10,7 @@ type Domain =
   | "tools_profiles"
   | "rules_config"
   | "knowledge_agenda"
+  | "source_repositories"
   | "operations";
 
 function domainFor(kind: ObservatoryAsset["kind"]): Exclude<Domain, "all"> {
@@ -17,6 +18,7 @@ function domainFor(kind: ObservatoryAsset["kind"]): Exclude<Domain, "all"> {
   if (kind === "tool" || kind === "profile") return "tools_profiles";
   if (kind === "rule" || kind === "config") return "rules_config";
   if (kind === "knowledge" || kind === "agenda") return "knowledge_agenda";
+  if (kind === "repository") return "source_repositories";
   return "operations";
 }
 
@@ -73,6 +75,7 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
             <option value="tools_profiles">Tools &amp; profiles</option>
             <option value="rules_config">Rules &amp; config</option>
             <option value="knowledge_agenda">Knowledge &amp; agenda</option>
+            <option value="source_repositories">Source repositories</option>
             <option value="operations">Operations</option>
           </select>
         </label>

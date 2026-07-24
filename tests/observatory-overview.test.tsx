@@ -10,6 +10,7 @@ import {
 } from "@/components/observatory/ObservatoryOverview";
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
+import type { ObservatorySourceRepositoryInventory } from "@/lib/observatory/source-repository-schema";
 
 const snapshot: ObservatoryCollectionEnvelope = {
   schema_version: "1.0.0",
@@ -183,6 +184,47 @@ const governance = projectDashboardGovernance(
   { collectedAt: "2026-07-23T04:30:00.000Z" },
 );
 
+const sourceRepositoryInventory: ObservatorySourceRepositoryInventory = {
+  repositories: ["app", "tool"].map((name, index) => ({
+    id: `repository:${String(index + 1).repeat(16)}`,
+    name,
+    scope: index === 0 ? "workspace" : "vault",
+    local_ref:
+      index === 0 ? "workspace/plato/app" : "vault/plato-academy/tool",
+    maintainer_agent_id: index === 0 ? "plato" : null,
+    knowledge_area: index === 0 ? null : "plato-academy",
+    github:
+      index === 0
+        ? {
+            owner: "GlauconAI",
+            repo: "app",
+            url: "https://github.com/GlauconAI/app",
+          }
+        : null,
+    current_branch: "main",
+    detached: false,
+    head: String(index + 1).repeat(40),
+    default_branch: "main",
+    last_commit_at: "2026-07-23T04:30:00.000Z",
+    working_tree: "clean",
+    activity: "active",
+    archive_state: "unknown",
+    registry_project_keys: [],
+    authority: "observed",
+    source: index === 0 ? "local-git/workspace" : "local-git/vault",
+    collected_at: "2026-07-23T04:30:00.000Z",
+    health: "healthy",
+  })),
+  source_health: {
+    status: "fresh",
+    health: "healthy",
+    collected_at: "2026-07-23T04:30:00.000Z",
+    last_success_at: "2026-07-23T04:30:00.000Z",
+    repository_count: 2,
+    omitted_count: 0,
+  },
+};
+
 function readyState(
   value: ObservatoryCollectionEnvelope = snapshot,
 ): ObservatoryOverviewState {
@@ -210,6 +252,29 @@ describe("ObservatoryOverview", () => {
     expect(
       screen.getByRole("region", { name: /project cockpit/i }),
     ).toBeInTheDocument();
+  });
+
+  it("mounts Source Repository Observatory and its summary for v4", () => {
+    const v4 = {
+      ...snapshot,
+      schema_version: "4.0.0",
+      collector_version: "4.0.0",
+      assets: [],
+      core_endpoint_ids: ["agent:plato", "agent:socrates"],
+      relationships: [],
+      source_health: [],
+      delivery_governance: governance,
+      source_repositories: sourceRepositoryInventory,
+    } as unknown as ObservatoryCollectionEnvelope;
+    render(<ObservatoryOverview state={readyState(v4)} />);
+
+    expect(
+      screen.getByRole("region", { name: /source repositories/i }),
+    ).toBeInTheDocument();
+    const summary = screen.getByRole("region", { name: /system summary/i });
+    expect(
+      within(summary).getByText("Source repos").parentElement,
+    ).toHaveTextContent("2");
   });
 
   it("renders operational summary cards from the validated snapshot", () => {
