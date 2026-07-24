@@ -122,6 +122,12 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
   evidence lifecycle, and append-only history. The production migration,
   retained full-state workflow smoke, authenticated UI checks, and anonymous
   route protection Gate have passed.
+- M3 Low-risk Agent Claim Engine and Dashboard Dogfood Pilot are Production
+  Accepted in dormant mode. The server-authoritative claim, heartbeat,
+  release, completion, sweep, lease, administrator policy, and cancellation
+  paths are deployed. No runner token is configured and no production claim
+  exists, so every runner API fails closed until a separately approved runner
+  identity and token are supplied.
 - Planned 402v Publishing System direction for public/private HTML artifact publishing.
 
 ## Core Commands

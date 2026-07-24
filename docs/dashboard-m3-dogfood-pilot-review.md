@@ -2,7 +2,7 @@
 
 Date: 2026-07-23
 Environment: disposable local Supabase plus local Next.js API
-Result: Accepted for Production Candidate
+Result: Production Accepted; Engine deployed dormant
 
 ## Scope
 
@@ -101,3 +101,28 @@ Production Candidate. The bounded policy remains:
 
 Production migration, `OBSERVATORY_AGENT_CLAIM_KEYS`, shared-main integration,
 push, deployment, and any production claim remain explicit release actions.
+
+## Production release
+
+The owner authorized the production migration, shared-main integration, and
+Vercel release with the safe default: do not configure a runner token and do
+not create a production claim.
+
+- Migration `20260723000200_observatory_agent_claim_engine.sql` was the only
+  clean-worktree dry-run change and was applied successfully.
+- Production RLS, grants, principal constraints, runner RPCs, administrator
+  RPCs, and the active-claim write guard passed read-only verification.
+- Application deployment `dpl_GNKqoTKeaQSGXGgBjU89MTXpHcCx` reached `READY`
+  for commit `dc2f2bd52c1597bde9f191b0a93695f352d70de1`.
+- Authenticated Board and item-detail Claim Policy UI smoke passed without
+  browser or console errors.
+- Anonymous Dashboard/detail protection and the legacy `/observatory`
+  redirect passed.
+- With `OBSERVATORY_AGENT_CLAIM_KEYS` absent, all runner mutation routes fail
+  closed with HTTP 503 `unavailable`.
+- The claims table is empty and both retained production Work Items remain
+  Agent-disabled.
+
+The local two-item dogfood proved the workflow. The production release proves
+the dormant safety boundary. Real runner activation remains a separate,
+owner-approved operation.

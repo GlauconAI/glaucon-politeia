@@ -404,3 +404,46 @@ The owner must explicitly approve each of these gates, in order:
 - Production migration, runner-token configuration, shared-main integration,
   Vercel deployment, and any production claim require new explicit owner
   approval.
+
+## M3 Agent Claim and Dogfood Production Gate (2026-07-23)
+
+- The authorized release fast-forwarded `main` from
+  `34f7db17f5587e5ccd77f2679ce4f9b198e90ebb` to
+  `dc2f2bd52c1597bde9f191b0a93695f352d70de1`. The unrelated anonymous
+  engagement working-tree changes remained uncommitted and were excluded from
+  the push.
+- A restricted schema-only production backup was captured before migration
+  with mode `0600`, size 58,097 bytes, and SHA-256
+  `7adda194e757dd0338dc239366f32d4fe98977c975283cf8de24764cff904287`.
+  Its bounded inspection confirmed the prior Work Tracker schema and the
+  absence of the claim table and risk policy columns.
+- A clean-worktree dry run showed
+  `20260723000200_observatory_agent_claim_engine.sql` as the only pending
+  migration. It was applied through the Supabase session pooler. Read-only
+  production verification confirmed the migration record, six policy fields,
+  principal-aware event/evidence columns, the claims table with RLS, exact
+  authenticated/service/anonymous grants, five runner RPC paths, the
+  administrator policy/cancel paths, the active-claim write guard, and
+  append-only protections.
+- The exact application deployment is
+  `dpl_GNKqoTKeaQSGXGgBjU89MTXpHcCx`, state `READY`, for
+  `dc2f2bd52c1597bde9f191b0a93695f352d70de1`, with `402v.com` and
+  `www.402v.com` aliases.
+- The merged working tree passed 81 test files / 443 tests, lint, typecheck,
+  production build, and committed-diff checks. The additional tests belong to
+  the preserved uncommitted anonymous-engagement work and were not pushed.
+- Authenticated production smoke confirmed the Board renders both retained
+  items as Manual, the retained Done item exposes the administrator Claim
+  Policy controls, and no active claim/history controls appear. Browser page
+  errors and console output were empty. Anonymous Dashboard/detail access
+  redirects to authentication and `/observatory` permanently redirects to
+  `/dashboard`.
+- `OBSERVATORY_AGENT_CLAIM_KEYS` is intentionally absent from the Vercel
+  production environment. POST, PUT, and PATCH runner routes all return
+  fail-closed HTTP 503 `unavailable`; the production claims table remains
+  empty and both retained work items remain Agent-disabled.
+- The production Engine is therefore deployed but dormant. Activating a real
+  runner requires a separately approved runner identity/token configuration
+  and a separately approved administrator policy on an eligible Low-risk
+  Ready Feature or Bug. This release created no production claim and did not
+  mutate either retained Work Item.
