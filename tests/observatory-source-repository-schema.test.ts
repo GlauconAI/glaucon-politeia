@@ -94,6 +94,19 @@ describe("ObservatorySourceRepositorySchema", () => {
     expect(() =>
       ObservatorySourceRepositoryInventorySchema.parse({
         ...inventory,
+        repositories: [
+          repository,
+          { ...repository, id: "repository:fedcba9876543210" },
+        ],
+        source_health: {
+          ...inventory.source_health,
+          repository_count: 2,
+        },
+      }),
+    ).toThrow(/logical reference/u);
+    expect(() =>
+      ObservatorySourceRepositoryInventorySchema.parse({
+        ...inventory,
         source_health: {
           ...inventory.source_health,
           repository_count: 2,

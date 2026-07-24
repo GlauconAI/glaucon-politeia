@@ -111,6 +111,7 @@ export const ObservatorySourceRepositoryInventorySchema = z
   })
   .superRefine((inventory, context) => {
     const ids = new Set<string>();
+    const localReferences = new Set<string>();
     inventory.repositories.forEach((repository, index) => {
       if (ids.has(repository.id)) {
         context.addIssue({
@@ -120,6 +121,14 @@ export const ObservatorySourceRepositoryInventorySchema = z
         });
       }
       ids.add(repository.id);
+      if (localReferences.has(repository.local_ref)) {
+        context.addIssue({
+          code: "custom",
+          path: ["repositories", index, "local_ref"],
+          message: `Duplicate repository logical reference "${repository.local_ref}".`,
+        });
+      }
+      localReferences.add(repository.local_ref);
     });
     if (
       inventory.source_health.repository_count !== inventory.repositories.length

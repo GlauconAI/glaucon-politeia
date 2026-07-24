@@ -436,7 +436,7 @@ Commit: `git commit -am "feat: show source repository observatory"`.
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-07-23-dashboard-source-repository-observatory.md`
 
-- [ ] **Step 1: Document the operating boundary**
+- [x] **Step 1: Document the operating boundary**
 
 Record:
 
@@ -446,7 +446,7 @@ Record:
 - no repository file content, raw remote, author, email, diff, or status filename is published;
 - production release requires explicit authorization.
 
-- [ ] **Step 2: Run focused verification**
+- [x] **Step 2: Run focused verification**
 
 Run:
 
@@ -475,7 +475,7 @@ git diff --check 0a8959e..HEAD
 
 Expected: all commands exit 0.
 
-- [ ] **Step 4: Run real two-root collection locally**
+- [x] **Step 4: Run real two-root collection locally**
 
 Collect against the approved workspace and Vault roots into a task-owned temporary file. Run `observatory:verify-snapshot` with the positional file path. Inspect only bounded aggregate fields:
 
@@ -488,9 +488,18 @@ Collect against the approved workspace and Vault roots into a task-owned tempora
 
 Do not print absolute source paths, raw remotes, repository file names, or credentials.
 
-- [ ] **Step 5: Request code review**
+- [x] **Step 5: Request code review**
 
 Review the committed range `0a8959e..HEAD` against the design and this plan. Fix every Critical and Important issue, rerun affected tests, and record any accepted Minor issue.
+
+Self-review note: session policy did not permit delegating a review subagent.
+The committed range and pending documentation were reviewed directly. The
+review found and fixed three Important issues: a root Git repository masking
+nested Agent repositories, repository-configured filesystem monitors being
+eligible to run during `git status`, and colliding safe logical references.
+The stale canonical-registry path in this runbook was also corrected. No
+Critical or Important issue remains. Accepted boundary: archive state remains
+`unknown` without a separately approved trusted enrichment source.
 
 - [ ] **Step 6: Re-run final evidence and commit**
 

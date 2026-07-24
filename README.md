@@ -116,6 +116,13 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
   Three-track Roadmap, Flow Analytics / Forecast, and Governance Reports /
   Review. These governance surfaces consume a strict sanitized read model and
   never write back to their authority sources.
+- M1 Source Repository Observatory discovers Git repositories below two
+  explicitly approved roots: the OpenClaw workspace and the Obsidian Vault.
+  Snapshot v4 publishes only bounded local Git metadata and canonical,
+  credential-free GitHub coordinates. It does not publish repository content,
+  absolute paths, raw remotes, commit messages, authors, email addresses,
+  diffs, or status filenames. Archive state remains `unknown` until a trusted
+  enrichment source is separately approved.
 - M3 manual Work Tracker core is Production Accepted: Quick Capture feeds an
   admin-only nine-state Board and item detail surface. Server-authoritative
   RPCs enforce allowed transitions, the Ready Gate, optimistic versions,

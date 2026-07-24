@@ -2,12 +2,16 @@
 
 > Dashboard is the current external project name and `/dashboard` is the canonical route. Internal `observatory_*` identifiers and historical release evidence are intentionally preserved for compatibility.
 
-This runbook retains the M1A release evidence and adds the completed System Observatory and first Delivery Governance workflow: collect a strict v3 Snapshot containing the v2 asset inventory plus a bounded Project Cockpit read model, publish the last-known-good Snapshot, prune bounded history, and operate automatic refresh without any Gateway lifecycle action. Collection is read-only. Migration, publication, deployment, and scheduling remain distinct release gates.
+This runbook retains the M1A release evidence and covers the current System Observatory and Delivery Governance workflow: collect a strict v4 Snapshot containing the v2 asset inventory, the bounded Project Cockpit read model, and the Source Repository Observatory; publish the last-known-good Snapshot; prune bounded history; and operate automatic refresh without any Gateway lifecycle action. Collection is read-only. Migration, publication, deployment, and scheduling remain distinct release gates.
 
 ## Safety boundary
 
 - Run collection from a clean checkout. The only expected output is `.observatory/observatory-snapshot.json`, which is ignored by Git and atomically written with mode `0600`.
 - The canonical registry and `openclaw agents list --json` / `openclaw status --json` are read-only inputs. The collector never writes to the registry or OpenClaw runtime.
+- Repository discovery is limited to the explicitly supplied workspace and
+  Vault roots. It never follows directory symlinks, reads repository content,
+  or serializes absolute paths, raw remotes, commit messages, authors, email
+  addresses, diffs, or status filenames.
 - Do not use `npm run supabase:apply-missing`, `npm run observatory:publish`, `npm run vercel:deploy`, a Cron command, or any Gateway lifecycle command as part of local verification.
 - Never infer approval for one gate from approval of another. Production migration, first snapshot publication, deployment, scheduling, and the first user mutation each require an explicit owner decision.
 
@@ -61,11 +65,11 @@ supabase stop --no-backup
 docker network rm observatory-local-loopback
 ```
 
-### 3. Collect the real local v3 snapshot
+### 3. Collect the real local v4 snapshot
 
 ```bash
 umask 077
-OBSERVATORY_REGISTRY_PATH="/Users/glaucon/Obsidian/Glaucon's Vault/🗺️ shared/projects/openclaw-orchestration-control/orchestration-system-design.html"
+OBSERVATORY_REGISTRY_PATH="/Users/glaucon/Obsidian/Glaucon's Vault/🗺️ shared/projects/openclaw-orchestrator/orchestration-system-design.html"
 npm run observatory:collect -- "$OBSERVATORY_REGISTRY_PATH" ".observatory/observatory-snapshot.json"
 git check-ignore -v .observatory/observatory-snapshot.json
 ```
@@ -91,13 +95,22 @@ openclaw agents list --json
 openclaw status --json
 ```
 
-The v3 collector extends that committed read-only allowlist with per-agent skill availability plus global plugin/tool, Cron, Gateway, and runtime summaries. It also projects only four exact Dashboard governance documents—README, Development Baseline, EDAD Tracker, and estimate calibration—into the strict Project Cockpit read model. Raw command objects, raw Markdown, Cron payloads, delivery destinations, session keys, config values, file contents, and absolute roots are never serialized.
+The v4 collector extends that committed read-only allowlist with per-agent
+skill availability plus global plugin/tool, Cron, Gateway, runtime, and local
+Git summaries. It also projects only four exact Dashboard governance
+documents—README, Development Baseline, EDAD Tracker, and estimate
+calibration—into the strict Project Cockpit read model. Repository archive
+state remains `unknown` in this local-only slice. Raw command objects, raw
+Markdown, Cron payloads, delivery destinations, session keys, config values,
+file contents, raw Git remotes, and absolute roots are never serialized.
 
 If either input, command, schema validation, digesting, or atomic write fails, stop. Do not publish. The destination is replaced only after a complete validated write; an existing local last-known-good file remains intact on collection/rename failure.
 
 ### 4. Validate provenance, consistency, and privacy
 
-Run the committed v3 verifier first. It reports only schema/count/check results, Project Cockpit counts, and privacy category counts; it never prints matched values.
+Run the committed v4 verifier first. It reports only schema/count/check
+results, Project Cockpit and repository counts, and privacy category counts;
+it never prints matched values.
 
 ```bash
 npm run observatory:verify-snapshot -- .observatory/observatory-snapshot.json
@@ -110,8 +123,8 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module <<'VERIF
 import { readFile } from "node:fs/promises";
 import {
   ObservatoryCollectionEnvelopeSchema,
-  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
-  OBSERVATORY_COLLECTOR_VERSION_V3,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
+  OBSERVATORY_COLLECTOR_VERSION_V4,
 } from "./lib/observatory/collection-schema.ts";
 import {
   OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
@@ -164,10 +177,11 @@ const counts = {
   tasks: snapshot.delivery_governance.summary.task_count,
   executor_runs: snapshot.delivery_governance.summary.run_count,
   gates: snapshot.delivery_governance.summary.gate_count,
+  source_repositories: snapshot.source_repositories.repositories.length,
 };
 const checks = {
-  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
-  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION_V3,
+  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
+  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION_V4,
   snapshot_schema: snapshot.registry.schema_version === OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   registry_schema: snapshot.registry.registry_schema_version === ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
   source_reference: snapshot.registry.source.logical_reference === ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,

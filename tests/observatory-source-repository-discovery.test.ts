@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -79,6 +87,43 @@ describe("collectSourceRepositories", () => {
       expect.arrayContaining(["workspace-control", "nested-app"]),
     );
     expect(result.repositories).toHaveLength(2);
+  });
+
+  it("adds a non-reversible suffix only when safe logical references collide", async () => {
+    const root = await mkdtemp(join(tmpdir(), "observatory-repositories-"));
+    roots.push(root);
+    const workspaceRoot = join(root, "workspace");
+    const vaultRoot = join(root, "vault");
+    await mkdir(vaultRoot, { recursive: true });
+    await createRepository(
+      join(workspaceRoot, "plato", "projects", "first"),
+      "git@github.com:GlauconAI/shared-name.git",
+    );
+    await createRepository(
+      join(workspaceRoot, "plato", "experiments", "second"),
+      "git@github.com:GlauconAI/shared-name.git",
+    );
+
+    const result = await collectSourceRepositories(
+      {
+        workspaceRoot,
+        vaultRoot,
+        agents: [{ id: "plato" }],
+        projectGroups: [],
+      },
+      { now: () => new Date(collectedAt) },
+    );
+
+    const references = result.repositories.map(
+      (repository) => repository.local_ref,
+    );
+    expect(new Set(references)).toHaveLength(2);
+    expect(references).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^workspace\/plato\/shared-name-[a-f0-9]{10}$/u),
+        expect.stringMatching(/^workspace\/plato\/shared-name-[a-f0-9]{10}$/u),
+      ]),
+    );
   });
 
   it("discovers repositories under both trusted roots and emits safe Git metadata", async () => {
@@ -196,6 +241,37 @@ describe("collectSourceRepositories", () => {
     );
 
     expect(result.repositories).toEqual([]);
+  });
+
+  it("disables repository-configured filesystem monitor commands", async () => {
+    const root = await mkdtemp(join(tmpdir(), "observatory-repositories-"));
+    roots.push(root);
+    const workspaceRoot = join(root, "workspace");
+    const vaultRoot = join(root, "vault");
+    const repository = join(workspaceRoot, "plato", "projects", "app");
+    const marker = join(root, "fsmonitor-ran");
+    const monitor = join(root, "fsmonitor.sh");
+    await mkdir(vaultRoot, { recursive: true });
+    await createRepository(
+      repository,
+      "git@github.com:GlauconAI/app.git",
+    );
+    await writeFile(monitor, `#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`);
+    await chmod(monitor, 0o755);
+    await git(repository, "config", "core.fsmonitor", monitor);
+
+    const result = await collectSourceRepositories(
+      {
+        workspaceRoot,
+        vaultRoot,
+        agents: [{ id: "plato" }],
+        projectGroups: [],
+      },
+      { now: () => new Date(collectedAt) },
+    );
+
+    expect(result.repositories).toHaveLength(1);
+    await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("rejects a .git file whose Git directory escapes both trusted roots", async () => {

@@ -158,8 +158,23 @@ function defaultGitRunner(
   return new Promise((resolveResult) => {
     execFile(
       "git",
-      ["-C", repositoryPath, ...args],
+      [
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.untrackedCache=false",
+        "-C",
+        repositoryPath,
+        ...args,
+      ],
       {
+        env: {
+          ...process.env,
+          GIT_OPTIONAL_LOCKS: "0",
+          GIT_TERMINAL_PROMPT: "0",
+        },
         timeout: timeoutMs,
         maxBuffer: 1024 * 1024,
         windowsHide: true,
@@ -339,6 +354,28 @@ function localReference(
     "unknown";
   const repository = logicalToken(repositoryName, "repository");
   return `${scope}/${owner}/${repository}`;
+}
+
+function disambiguateLocalReferences(
+  repositories: readonly ObservatorySourceRepository[],
+): ObservatorySourceRepository[] {
+  const counts = new Map<string, number>();
+  repositories.forEach((repository) => {
+    counts.set(
+      repository.local_ref,
+      (counts.get(repository.local_ref) ?? 0) + 1,
+    );
+  });
+  return repositories.map((repository) =>
+    (counts.get(repository.local_ref) ?? 0) > 1
+      ? ObservatorySourceRepositorySchema.parse({
+          ...repository,
+          local_ref: `${repository.local_ref}-${repository.id
+            .slice("repository:".length)
+            .slice(0, 10)}`,
+        })
+      : repository,
+  );
 }
 
 async function collectCandidate(
@@ -557,19 +594,21 @@ export async function collectSourceRepositories(
       }
     }
 
-    repositories.sort((left, right) =>
+    const disambiguatedRepositories =
+      disambiguateLocalReferences(repositories);
+    disambiguatedRepositories.sort((left, right) =>
       left.scope === right.scope
         ? left.local_ref.localeCompare(right.local_ref)
         : left.scope.localeCompare(right.scope),
     );
     return ObservatorySourceRepositoryInventorySchema.parse({
-      repositories,
+      repositories: disambiguatedRepositories,
       source_health: {
         status: "fresh",
         health: omittedCount > 0 ? "degraded" : "healthy",
         collected_at: collectedAt,
         last_success_at: collectedAt,
-        repository_count: repositories.length,
+        repository_count: disambiguatedRepositories.length,
         omitted_count: omittedCount,
       },
     });
