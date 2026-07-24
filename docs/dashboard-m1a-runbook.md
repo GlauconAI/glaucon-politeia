@@ -461,3 +461,42 @@ The owner must explicitly approve each of these gates, in order:
   and a separately approved administrator policy on an eligible Low-risk
   Ready Feature or Bug. This release created no production claim and did not
   mutate either retained Work Item.
+
+## M1.1 Source Repository Observatory Production Gate (2026-07-23)
+
+- The authorized release fast-forwarded production `main` from
+  `0a8959e366bd2e8960629e816355b7badb23c03a` to
+  `b90f15ad8ae6fad6b4c8620481862ec17bbb7193`. The unrelated anonymous
+  engagement working-tree changes remained uncommitted and were excluded from
+  the push.
+- The exact application deployment is
+  `dpl_GarmU9pEVop9zguEri289o4CVZiZ`, state `READY`, for
+  `b90f15ad8ae6fad6b4c8620481862ec17bbb7193`, with `402v.com`,
+  `www.402v.com`, and the production Vercel aliases attached.
+- The existing 15-minute refresh wrapper had retained a pre-rename registry
+  path and had reached nine consecutive reduced `REGISTRY_READ_FAILED`
+  results while preserving last-known-good. The ignored host wrapper was
+  repaired to the committed `openclaw-orchestrator` registry path. A bounded
+  refresh then reported `OBSERVATORY_REFRESH_OK`,
+  `OBSERVATORY_REFRESH_RECOVERY`, and `OBSERVATORY_RETENTION_OK`; failure
+  count returned to zero without changing the LaunchAgent schedule.
+- The latest production Snapshot is strict schema `4.0.0`, contains 1,613
+  assets, 1,452 relationships, all 7 source-health domains, and 6 deduplicated
+  source repositories. All 6 are currently workspace-scoped, GitHub-connected,
+  and active; 3 are clean and 3 are dirty. Vault repository count is zero and
+  all archive states remain explicitly unknown.
+- Snapshot mode, digest, successful status, all-domain coverage, relationship
+  integrity, and privacy verification passed. All eight privacy categories
+  reported zero findings. The latest digest was marked as release evidence in
+  production for retention and rollback safety.
+- Fresh release verification passed 82 test files / 457 tests, lint,
+  typecheck, production build, and committed-range checks. No database
+  migration, Work Item, Claim, runner token, Gateway configuration, or
+  scheduler definition was created or changed.
+- Anonymous `/dashboard` access redirects to authentication, `www.402v.com`
+  canonicalizes to `402v.com`, and `/observatory` permanently redirects to
+  `/dashboard`. Both saved scoped administrator browser states had expired;
+  no new credential or live-Chrome attachment was created for this release.
+  The production data path was verified read-only against the latest
+  release-marked v4 row, while administrator UI behavior remains covered by
+  the committed component and integration suite.
