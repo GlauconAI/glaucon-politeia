@@ -96,6 +96,34 @@ describe("FreshnessSummary", () => {
 });
 
 describe("SystemInventory", () => {
+  it("renders large inventories in bounded windows and resets after search", () => {
+    const largeInventory = Array.from({ length: 85 }, (_, index) => ({
+      ...assets[0],
+      id: `skill:plato:asset-${index}`,
+      name: `asset-${index}`,
+    }));
+
+    render(<SystemInventory assets={largeInventory} />);
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(40);
+    expect(screen.getByText("85 matching · 40 visible")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /show 40 more assets/i }),
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(80);
+
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: /search system assets/i }),
+      { target: { value: "asset-84" } },
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByText("1 matching · 1 visible")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /show more assets/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("searches all domains and shows provenance on each asset", () => {
     render(<SystemInventory assets={assets} />);
     fireEvent.change(

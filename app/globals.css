@@ -5071,6 +5071,28 @@ body {
   overflow-wrap: anywhere;
 }
 
+.observatory-show-more {
+  display: block;
+  width: min(100%, 360px);
+  min-height: 40px;
+  margin: 14px auto 0;
+  border: 1px solid rgba(124, 58, 237, 0.48);
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.observatory-show-more:hover,
+.observatory-show-more:focus-visible {
+  border-color: rgba(67, 211, 139, 0.58);
+  background: rgba(67, 211, 139, 0.1);
+  color: var(--success);
+}
+
 @media (max-width: 720px) {
   .dashboard-route-nav {
     top: 62px;

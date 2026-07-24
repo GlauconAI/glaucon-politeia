@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ObservatoryAsset } from "@/lib/observatory/asset-schema";
 
@@ -12,6 +12,8 @@ type Domain =
   | "knowledge_agenda"
   | "source_repositories"
   | "operations";
+
+const INVENTORY_PAGE_SIZE = 40;
 
 function domainFor(kind: ObservatoryAsset["kind"]): Exclude<Domain, "all"> {
   if (kind === "skill") return "skills";
@@ -26,6 +28,7 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState<Domain>("all");
   const [health, setHealth] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(INVENTORY_PAGE_SIZE);
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return assets.filter((asset) => {
@@ -47,6 +50,11 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
         .includes(normalizedQuery);
     });
   }, [assets, domain, health, query]);
+  const visibleAssets = filtered.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(INVENTORY_PAGE_SIZE);
+  }, [domain, health, query]);
 
   return (
     <section className="observatory-system-inventory" aria-labelledby="system-inventory-heading">
@@ -55,7 +63,9 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
           <p className="eyebrow">Safe metadata only</p>
           <h2 id="system-inventory-heading">System inventory</h2>
         </div>
-        <span>{filtered.length} shown</span>
+        <span>
+          {filtered.length} matching · {visibleAssets.length} visible
+        </span>
       </div>
       <div className="observatory-inventory-controls">
         <label>
@@ -92,26 +102,46 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
         </label>
       </div>
       {filtered.length ? (
-        <ul className="observatory-inventory-list">
-          {filtered.map((asset) => (
-            <li key={asset.id} data-health={asset.health}>
-              <article>
-                <div className="observatory-object-title">
-                  <h3 className="observatory-wrap">{asset.name}</h3>
-                  <span>{asset.kind}</span>
-                </div>
-                <p>{asset.summary}</p>
-                <dl>
-                  <div><dt>Owner</dt><dd>{asset.owner}</dd></div>
-                  <div><dt>Authority</dt><dd>{asset.authority}</dd></div>
-                  <div><dt>Freshness</dt><dd><span>{asset.freshness}</span></dd></div>
-                  <div><dt>Health</dt><dd>{asset.health}</dd></div>
-                  <div className="observatory-inventory-source"><dt>Source</dt><dd><code>{asset.source}</code></dd></div>
-                </dl>
-              </article>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="observatory-inventory-list">
+            {visibleAssets.map((asset) => (
+              <li key={asset.id} data-health={asset.health}>
+                <article>
+                  <div className="observatory-object-title">
+                    <h3 className="observatory-wrap">{asset.name}</h3>
+                    <span>{asset.kind}</span>
+                  </div>
+                  <p>{asset.summary}</p>
+                  <dl>
+                    <div><dt>Owner</dt><dd>{asset.owner}</dd></div>
+                    <div><dt>Authority</dt><dd>{asset.authority}</dd></div>
+                    <div><dt>Freshness</dt><dd><span>{asset.freshness}</span></dd></div>
+                    <div><dt>Health</dt><dd>{asset.health}</dd></div>
+                    <div className="observatory-inventory-source"><dt>Source</dt><dd><code>{asset.source}</code></dd></div>
+                  </dl>
+                </article>
+              </li>
+            ))}
+          </ul>
+          {visibleAssets.length < filtered.length ? (
+            <button
+              className="observatory-show-more"
+              type="button"
+              onClick={() =>
+                setVisibleCount((current) =>
+                  Math.min(current + INVENTORY_PAGE_SIZE, filtered.length),
+                )
+              }
+            >
+              Show{" "}
+              {Math.min(
+                INVENTORY_PAGE_SIZE,
+                filtered.length - visibleAssets.length,
+              )}{" "}
+              more assets ({filtered.length - visibleAssets.length} remaining)
+            </button>
+          ) : null}
+        </>
       ) : (
         <p className="empty-text">
           {assets.length ? "No assets match the current filters." : "No system assets reported."}

@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
+
 import type {
   ObservatoryAsset,
   ObservatoryRelationship,
 } from "@/lib/observatory/asset-schema";
 
 const VISUAL_EDGE_LIMIT = 20;
+const RELATIONSHIP_PAGE_SIZE = 40;
 
 export function SystemTopology({
   assets,
@@ -14,8 +19,10 @@ export function SystemTopology({
   coreEndpointLabels: Record<string, string>;
   relationships: ObservatoryRelationship[];
 }) {
+  const [visibleCount, setVisibleCount] = useState(RELATIONSHIP_PAGE_SIZE);
   const labels = new Map(assets.map((asset) => [asset.id, asset.name]));
   Object.entries(coreEndpointLabels).forEach(([id, label]) => labels.set(id, label));
+  const visibleRelationships = relationships.slice(0, visibleCount);
 
   return (
     <section className="observatory-topology" aria-labelledby="system-topology-heading">
@@ -24,7 +31,9 @@ export function SystemTopology({
           <p className="eyebrow">Declared and observed links</p>
           <h2 id="system-topology-heading">System topology</h2>
         </div>
-        <span>{relationships.length} relationships</span>
+        <span>
+          {relationships.length} relationships · {visibleRelationships.length} visible
+        </span>
       </div>
       {relationships.length ? (
         <>
@@ -44,7 +53,7 @@ export function SystemTopology({
             })}
           </svg>
           <ul className="observatory-relationship-list">
-            {relationships.map((item, index) => (
+            {visibleRelationships.map((item, index) => (
               <li key={`${item.from}:${item.to}:${item.kind}:${index}`}>
                 <p>
                   <strong>{labels.get(item.from) ?? item.from}</strong>{" "}
@@ -55,6 +64,28 @@ export function SystemTopology({
               </li>
             ))}
           </ul>
+          {visibleRelationships.length < relationships.length ? (
+            <button
+              className="observatory-show-more"
+              type="button"
+              onClick={() =>
+                setVisibleCount((current) =>
+                  Math.min(
+                    current + RELATIONSHIP_PAGE_SIZE,
+                    relationships.length,
+                  ),
+                )
+              }
+            >
+              Show{" "}
+              {Math.min(
+                RELATIONSHIP_PAGE_SIZE,
+                relationships.length - visibleRelationships.length,
+              )}{" "}
+              more relationships (
+              {relationships.length - visibleRelationships.length} remaining)
+            </button>
+          ) : null}
         </>
       ) : (
         <p className="empty-text">No declared or observed relationships reported.</p>

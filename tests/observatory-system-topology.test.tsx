@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { SystemTopology } from "@/components/observatory/SystemTopology";
@@ -63,6 +63,31 @@ describe("SystemTopology", () => {
     );
 
     expect(screen.getAllByRole("listitem")).toHaveLength(30);
+    expect(document.querySelectorAll("svg line")).toHaveLength(20);
+  });
+
+  it("renders large semantic relationship lists in bounded windows", () => {
+    const relationships = Array.from({ length: 85 }, (_, index) => ({
+      ...relationship,
+      kind: `relation-${index}`,
+    }));
+    render(
+      <SystemTopology
+        assets={assets}
+        coreEndpointLabels={{ "agent:plato": "Plato" }}
+        relationships={relationships}
+      />,
+    );
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(40);
+    expect(screen.getByText("85 relationships · 40 visible"))
+      .toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /show 40 more relationships/i }),
+    );
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(80);
     expect(document.querySelectorAll("svg line")).toHaveLength(20);
   });
 });
