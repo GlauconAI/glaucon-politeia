@@ -10,7 +10,7 @@ import {
 const collectedAt = "2026-07-22T22:00:00.000Z";
 
 describe("system asset command projections", () => {
-  it("projects per-agent skills without leaking paths or requirements", () => {
+  it("projects safe per-agent Skill metadata without leaking paths or requirements", () => {
     const result = projectSkillAssets(
       "plato",
       {
@@ -19,6 +19,8 @@ describe("system asset command projections", () => {
             name: "weather",
             eligible: true,
             description: "Forecast helper",
+            source: "openclaw-workspace",
+            version: "2026.7.1",
             path: "/Users/private/.openclaw/skills/weather/SKILL.md",
             missing: ["PRIVATE_TOKEN"],
             token: "secret-token",
@@ -40,8 +42,13 @@ describe("system asset command projections", () => {
         collected_at: collectedAt,
         freshness: "fresh",
         health: "healthy",
-        summary: "Ready",
-        labels: [{ key: "eligibility", value: "ready" }],
+        summary: "Forecast helper",
+        labels: [
+          { key: "eligibility", value: "ready" },
+          { key: "description", value: "Forecast helper" },
+          { key: "install_source", value: "openclaw-workspace" },
+          { key: "version", value: "2026.7.1" },
+        ],
       },
     ]);
     expect(result.relationships).toEqual([

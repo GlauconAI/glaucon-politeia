@@ -2,17 +2,18 @@ import { randomUUID } from "node:crypto";
 
 import { redirect } from "next/navigation";
 
+import { ObservatoryOverview } from "@/components/observatory/ObservatoryOverview";
 import {
-  ObservatoryOverview,
-  type ObservatoryOverviewState,
-} from "@/components/observatory/ObservatoryOverview";
+  DashboardSectionNav,
+  type DashboardSectionLink,
+} from "@/components/observatory/DashboardSectionNav";
 import { QuickCapture } from "@/components/observatory/QuickCapture";
 import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
 } from "@/components/observatory/WorkTrackerBoard";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
-import { ObservatoryCollectionEnvelopeSchema } from "@/lib/observatory/collection-schema";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
@@ -21,33 +22,42 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-async function loadOverviewState(): Promise<ObservatoryOverviewState> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const repository = createObservatoryRepository(
-      supabase as unknown as ObservatoryRepositoryClient,
-    );
-    const row = await repository.getLatestSuccessfulSnapshot();
-
-    if (!row) {
-      return { status: "empty" };
+function dashboardSections(
+  state: Awaited<ReturnType<typeof loadObservatoryOverviewState>>,
+): DashboardSectionLink[] {
+  const sections: DashboardSectionLink[] = [
+    { id: "dashboard-snapshot", label: "Snapshot" },
+  ];
+  if (state.status === "ready") {
+    sections.push({ id: "dashboard-index", label: "Index" });
+    if ("assets" in state.snapshot) {
+      sections.push({ id: "dashboard-sources", label: "Sources" });
+      if ("source_repositories" in state.snapshot) {
+        sections.push({
+          id: "dashboard-repositories",
+          label: "Repositories",
+        });
+      }
+      sections.push(
+        { id: "dashboard-inventory", label: "Inventory" },
+        { id: "dashboard-topology", label: "Topology" },
+      );
     }
-
-    const parsed = ObservatoryCollectionEnvelopeSchema.safeParse(row.payload);
-    if (!parsed.success) {
-      return {
-        status: "error",
-        message: "The latest snapshot failed validation and was not rendered.",
-      };
+    sections.push({ id: "dashboard-objects", label: "Objects" });
+    if ("delivery_governance" in state.snapshot) {
+      sections.push(
+        { id: "dashboard-projects", label: "Projects" },
+        { id: "dashboard-roadmap", label: "Roadmap" },
+        { id: "dashboard-analytics", label: "Analytics" },
+        { id: "dashboard-review", label: "Review" },
+      );
     }
-
-    return { status: "ready", snapshot: parsed.data };
-  } catch {
-    return {
-      status: "error",
-      message: "The latest snapshot could not be loaded. Try again later.",
-    };
   }
+  sections.push(
+    { id: "dashboard-capture", label: "Capture" },
+    { id: "dashboard-work", label: "Work" },
+  );
+  return sections;
 }
 
 async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
@@ -82,7 +92,7 @@ export default async function DashboardPage() {
   }
 
   const [overviewState, workTrackerState] = await Promise.all([
-    loadOverviewState(),
+    loadObservatoryOverviewState(),
     loadWorkTrackerState(),
   ]);
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
@@ -102,13 +112,26 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      <DashboardSectionNav sections={dashboardSections(overviewState)} />
+
       <div className="observatory-layout">
         <ObservatoryOverview state={overviewState} />
-        <aside className="observatory-capture" aria-label="Work item capture">
+        <aside
+          id="dashboard-capture"
+          className="observatory-capture dashboard-section-anchor"
+          aria-label="Work item capture"
+          data-dashboard-section
+        >
           <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
         </aside>
       </div>
-      <WorkTrackerBoard state={workTrackerState} />
+      <div
+        id="dashboard-work"
+        className="dashboard-section-anchor"
+        data-dashboard-section
+      >
+        <WorkTrackerBoard state={workTrackerState} />
+      </div>
     </section>
   );
 }

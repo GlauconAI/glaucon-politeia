@@ -154,6 +154,15 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("heading", { name: /work tracker/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: /dashboard sections/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Objects" })).toHaveAttribute(
+      "href",
+      "#dashboard-objects",
+    );
+    expect(document.getElementById("dashboard-capture")).toBeInTheDocument();
+    expect(document.getElementById("dashboard-work")).toBeInTheDocument();
   });
 
   it("generates a distinct cryptographically random capture key per page request", async () => {
