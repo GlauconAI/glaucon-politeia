@@ -149,6 +149,7 @@ M3 Work Tracker database Gate:
 supabase start
 supabase db reset --local --no-seed
 npm run observatory:verify-local-db
+npm run observatory:verify-local-claims
 supabase stop --no-backup
 ```
 
