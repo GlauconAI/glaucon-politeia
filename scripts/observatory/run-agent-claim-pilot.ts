@@ -9,8 +9,7 @@ const DATABASE_URL =
 const API_BASE =
   process.env.OBSERVATORY_PILOT_API_URL ??
   "http://127.0.0.1:3000/api/dashboard/work-items/claims";
-const TOKEN =
-  process.env.OBSERVATORY_PILOT_TOKEN ?? "owner-supplied-pilot-token";
+const TOKEN = process.env.OBSERVATORY_PILOT_TOKEN?.trim();
 const parsedDatabaseUrl = new URL(DATABASE_URL);
 const parsedApiUrl = new URL(API_BASE);
 if (
@@ -21,6 +20,11 @@ if (
 ) {
   throw new Error(
     "Pilot targets must target the disposable loopback database and API.",
+  );
+}
+if (!TOKEN) {
+  throw new Error(
+    "OBSERVATORY_PILOT_TOKEN is required and must be supplied ephemerally.",
   );
 }
 
