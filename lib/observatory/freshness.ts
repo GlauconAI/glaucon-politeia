@@ -13,6 +13,7 @@ const thresholdByDomain: Record<ObservatorySourceDomain, number> = {
   rules_config: TWENTY_FOUR_HOURS_MS,
   knowledge_agenda: TWENTY_FOUR_HOURS_MS,
   operations: FIFTEEN_MINUTES_MS,
+  source_repositories: TWENTY_FOUR_HOURS_MS,
 };
 
 export function deriveFreshness(
