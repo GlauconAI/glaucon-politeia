@@ -24,6 +24,26 @@ export type DashboardSkillInstance = {
   summary: string;
 };
 
+export const dashboardSkillCategories = [
+  "openclaw-built-in",
+  "system-web",
+  "shared-custom",
+  "agent-scoped-custom",
+] as const;
+
+export type DashboardSkillCategory =
+  (typeof dashboardSkillCategories)[number];
+
+export const dashboardSkillCategoryLabels: Record<
+  DashboardSkillCategory,
+  string
+> = {
+  "openclaw-built-in": "OpenClaw built-in",
+  "system-web": "System Web Skill",
+  "shared-custom": "Shared custom",
+  "agent-scoped-custom": "Agent-scoped custom",
+};
+
 export type DashboardSkillEntry = {
   key: string;
   name: string;
@@ -34,7 +54,8 @@ export type DashboardSkillEntry = {
   versions: string[];
   agentCount: number;
   instanceCount: number;
-  scope: "shared" | "private";
+  category: DashboardSkillCategory;
+  hasAgentOverride: boolean;
   instances: DashboardSkillInstance[];
 };
 
@@ -115,10 +136,50 @@ function aggregateHealth(
   );
 }
 
+const originSources = new Set([
+  "openclaw-bundled",
+  "agents-skills-personal",
+]);
+
+function classifySkill(
+  sources: string[],
+  agentCount: number,
+  representedAgentCount: number,
+): Pick<DashboardSkillEntry, "category" | "hasAgentOverride"> {
+  const hasBundled = sources.includes("openclaw-bundled");
+  const hasSystemWeb = sources.includes("agents-skills-personal");
+  const hasCustom = sources.some((source) => !originSources.has(source));
+
+  if (hasBundled) {
+    return {
+      category: "openclaw-built-in",
+      hasAgentOverride: hasCustom,
+    };
+  }
+  if (hasSystemWeb) {
+    return {
+      category: "system-web",
+      hasAgentOverride: hasCustom,
+    };
+  }
+  return {
+    category:
+      representedAgentCount > 0 && agentCount === representedAgentCount
+        ? "shared-custom"
+        : "agent-scoped-custom",
+    hasAgentOverride: false,
+  };
+}
+
 export function buildSkillDirectory(
   assets: ObservatoryAsset[],
 ): DashboardSkillEntry[] {
   const groups = new Map<string, ObservatoryAsset[]>();
+  const representedAgentCount = new Set(
+    assets
+      .filter((asset) => asset.kind === "skill")
+      .map((asset) => asset.owner),
+  ).size;
 
   for (const asset of assets) {
     if (asset.kind !== "skill") continue;
@@ -169,7 +230,11 @@ export function buildSkillDirectory(
         versions,
         agentCount: owners.length,
         instanceCount: sortedInstances.length,
-        scope: owners.length > 1 ? "shared" : "private",
+        ...classifySkill(
+          sources,
+          owners.length,
+          representedAgentCount,
+        ),
         instances: sortedInstances.map((instance) => ({
           id: instance.id,
           owner: instance.owner,
