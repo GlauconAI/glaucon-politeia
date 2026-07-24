@@ -13,7 +13,7 @@ const PATTERNS = {
   secretKey:
     /(?:password|passwd|secret|token|credential|authorization|private[_-]?key|api[_-]?key|service[_-]?role)/iu,
   secretValue:
-    /(?:bearer\s+[a-z0-9._~+/=-]{12,}|(?:^|[^a-z0-9])(?:sk|ghp|xox[abprs])[-_][a-z0-9_-]{16,}|(?:^|[^a-z0-9])eyJ[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,})/iu,
+    /(?:https?:\/\/[^/\s:@]+:[^@\s/]+@|bearer\s+[a-z0-9._~+/=-]{12,}|(?:^|[^a-z0-9])(?:sk|ghp|xox[abprs])[-_][a-z0-9_-]{16,}|(?:^|[^a-z0-9])eyJ[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]{8,})/iu,
   privatePath:
     /(?:\/(?:Users|home)\/|[a-z]:\\|\.openclaw\/|Obsidian\/|Glaucon[^/]*Vault)/iu,
   email:

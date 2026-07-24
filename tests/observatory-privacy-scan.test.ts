@@ -10,6 +10,11 @@ describe("scanObservatoryPrivacy", () => {
         kind: "skill",
         source: { logical_reference: "workspace:plato/skills/example" },
         labels: [{ key: "state", value: "eligible" }],
+        github: {
+          owner: "GlauconAI",
+          repo: "example",
+          url: "https://github.com/GlauconAI/example",
+        },
       }),
     ).toEqual({
       absolute_or_private_path: 0,
@@ -31,9 +36,13 @@ describe("scanObservatoryPrivacy", () => {
       cookie: "browser-secret",
       path: "/Users/private/.openclaw/config.json",
       sessionKey: "agent:plato:main",
+      remote_url: "https://user:token@github.com/owner/repository.git",
+      command_output: "?? secret-untracked.txt",
     });
 
     expect(Object.values(result).some((count) => count > 0)).toBe(true);
+    expect(result.secret_value).toBeGreaterThan(1);
+    expect(result.config_or_payload_data).toBeGreaterThan(0);
     expect(JSON.stringify(result)).not.toContain(forbidden);
     expect(Object.values(result).every(Number.isSafeInteger)).toBe(true);
   });
