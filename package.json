@@ -14,6 +14,7 @@
     "#observatory-system-assets": "./lib/observatory/system-assets.ts",
     "#observatory-system-collector": "./lib/observatory/system-collector.ts",
     "#observatory-filesystem-metadata": "./lib/observatory/filesystem-metadata.ts",
+    "#observatory-source-repository-schema": "./lib/observatory/source-repository-schema.ts",
     "#observatory-collect-options": "./lib/observatory/collect-options.ts",
     "#observatory-refresh-state": "./lib/observatory/refresh-state.ts",
     "#observatory-refresh-files": "./lib/observatory/refresh-files.ts",

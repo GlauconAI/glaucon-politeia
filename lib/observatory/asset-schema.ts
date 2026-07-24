@@ -11,6 +11,7 @@ export const OBSERVATORY_ASSET_KINDS = [
   "cron",
   "gateway",
   "runtime",
+  "repository",
 ] as const;
 
 export const OBSERVATORY_SOURCE_DOMAINS = [
@@ -20,6 +21,7 @@ export const OBSERVATORY_SOURCE_DOMAINS = [
   "rules_config",
   "knowledge_agenda",
   "operations",
+  "source_repositories",
 ] as const;
 
 export const OBSERVATORY_ASSET_MAX_ITEMS = 5_000;

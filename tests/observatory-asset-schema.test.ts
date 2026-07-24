@@ -32,6 +32,7 @@ describe("ObservatoryAssetInventorySchema", () => {
       "cron",
       "gateway",
       "runtime",
+      "repository",
     ]);
 
     const inventory = {
