@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { ObservatoryAsset } from "@/lib/observatory/asset-schema";
 
@@ -52,10 +52,6 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
   }, [assets, domain, health, query]);
   const visibleAssets = filtered.slice(0, visibleCount);
 
-  useEffect(() => {
-    setVisibleCount(INVENTORY_PAGE_SIZE);
-  }, [domain, health, query]);
-
   return (
     <section className="observatory-system-inventory" aria-labelledby="system-inventory-heading">
       <div className="observatory-panel-heading">
@@ -73,13 +69,22 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
           <input
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setVisibleCount(INVENTORY_PAGE_SIZE);
+              setQuery(event.target.value);
+            }}
             placeholder="Search name, owner, source…"
           />
         </label>
         <label>
           <span>Asset domain</span>
-          <select value={domain} onChange={(event) => setDomain(event.target.value as Domain)}>
+          <select
+            value={domain}
+            onChange={(event) => {
+              setVisibleCount(INVENTORY_PAGE_SIZE);
+              setDomain(event.target.value as Domain);
+            }}
+          >
             <option value="all">All domains</option>
             <option value="skills">Skills</option>
             <option value="tools_profiles">Tools &amp; profiles</option>
@@ -91,7 +96,13 @@ export function SystemInventory({ assets }: { assets: ObservatoryAsset[] }) {
         </label>
         <label>
           <span>Asset health</span>
-          <select value={health} onChange={(event) => setHealth(event.target.value)}>
+          <select
+            value={health}
+            onChange={(event) => {
+              setVisibleCount(INVENTORY_PAGE_SIZE);
+              setHealth(event.target.value);
+            }}
+          >
             <option value="all">All health</option>
             <option value="healthy">Healthy</option>
             <option value="degraded">Degraded</option>
