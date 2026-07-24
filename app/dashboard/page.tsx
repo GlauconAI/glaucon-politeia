@@ -86,6 +86,7 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
 
 export default async function DashboardPage() {
   const currentAdmin = await getCurrentObservatoryAdmin();
+
   if (!currentAdmin) {
     redirect("/auth?redirectTo=/dashboard");
   }

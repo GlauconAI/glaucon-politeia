@@ -5,9 +5,7 @@ import {
   copyResponseCookies,
   createProxyCookieAdapter,
 } from "@/lib/supabase/proxy";
-import {
-  resolvePostRequest,
-} from "@/proxy";
+import { resolvePostRequest } from "@/proxy";
 
 describe("standalone HTML proxy", () => {
   it("returns exact HTML for a visible HTML post", async () => {

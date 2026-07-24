@@ -4,29 +4,24 @@
 
 **Goal:** Remove repeated full-Snapshot work and excessive initial DOM creation when navigating among Dashboard, Projects, and Skills.
 
-**Architecture:** Put read authorization in a persistent Dashboard layout, cache the validated Snapshot server-side for 60 seconds, and progressively mount large Inventory, Topology, and Skill-instance lists. Preserve the complete Snapshot, existing filters, admin-only access, and collector freshness.
+**Architecture:** Keep read authorization at each Dashboard data page, add a persistent Dashboard navigation layout, cache the validated Snapshot server-side for 60 seconds, and progressively mount large Inventory, Topology, and Skill-instance lists. Preserve the complete Snapshot, existing filters, admin-only access, and collector freshness.
 
 **Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Supabase, Zod, Vitest, Testing Library.
 
 ---
 
-### Task 1: Shared Dashboard authorization and transition boundary
+### Task 1: Persistent Dashboard navigation and transition boundary
 
 **Files:**
 - Create: `app/dashboard/layout.tsx`
 - Create: `app/dashboard/loading.tsx`
 - Create: `components/observatory/DashboardRouteNav.tsx`
-- Modify: `proxy.ts`
-- Modify: `app/dashboard/page.tsx`
-- Modify: `app/dashboard/projects/page.tsx`
-- Modify: `app/dashboard/skills/page.tsx`
 - Modify: `app/globals.css`
 - Create: `tests/observatory-dashboard-layout.test.tsx`
 - Modify: `tests/observatory-page.test.tsx`
 - Modify: `tests/observatory-directory-pages.test.tsx`
-- Modify: `tests/proxy.test.ts`
 
-- [ ] **Step 1: Write failing layout and proxy tests**
+- [ ] **Step 1: Write failing layout tests**
 
 Test that the layout renders persistent route links and an accessible loading
 state while every child page continues to reject anonymous reads before loading
@@ -37,7 +32,7 @@ Snapshot data.
 Run:
 
 ```bash
-npx vitest run tests/observatory-dashboard-layout.test.tsx tests/observatory-page.test.tsx tests/observatory-directory-pages.test.tsx tests/proxy.test.ts
+npx vitest run tests/observatory-dashboard-layout.test.tsx tests/observatory-page.test.tsx tests/observatory-directory-pages.test.tsx
 ```
 
 Expected: failures because the layout, route navigation, and loading state do
@@ -57,8 +52,8 @@ Run the same focused Vitest command. Expected: all selected tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/dashboard app/globals.css components/observatory/DashboardRouteNav.tsx proxy.ts tests/observatory-dashboard-layout.test.tsx tests/observatory-page.test.tsx tests/observatory-directory-pages.test.tsx tests/proxy.test.ts
-git commit -m "perf: persist dashboard authorization shell"
+git add app/dashboard app/globals.css components/observatory/DashboardRouteNav.tsx tests/observatory-dashboard-layout.test.tsx tests/observatory-page.test.tsx tests/observatory-directory-pages.test.tsx
+git commit -m "perf: persist dashboard navigation shell"
 ```
 
 ### Task 2: Cache the validated Snapshot
