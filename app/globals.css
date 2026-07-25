@@ -5175,10 +5175,6 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard-section-nav {
-    margin-inline: -2px;
-  }
-
   .dashboard-section-nav div {
     scroll-snap-type: x proximity;
   }

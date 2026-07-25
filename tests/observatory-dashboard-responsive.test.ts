@@ -30,4 +30,10 @@ describe("Dashboard responsive layout contract", () => {
       /@media\s*\(max-width:\s*520px\)[\s\S]*?\.observatory-summary\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/u,
     );
   });
+
+  it("keeps the mobile section navigation inside the page width", () => {
+    expect(css).not.toMatch(
+      /\.dashboard-section-nav\s*\{[^}]*margin-inline:\s*-\d/u,
+    );
+  });
 });
