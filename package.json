@@ -19,6 +19,7 @@
     "#observatory-collect-options": "./lib/observatory/collect-options.ts",
     "#observatory-refresh-state": "./lib/observatory/refresh-state.ts",
     "#observatory-refresh-files": "./lib/observatory/refresh-files.ts",
+    "#observatory-refresh-report": "./lib/observatory/refresh-report.ts",
     "#observatory-privacy-scan": "./lib/observatory/privacy-scan.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
     "#observatory-command-runner": "./scripts/observatory/run-command.ts",

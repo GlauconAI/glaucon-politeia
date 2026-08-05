@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   acquireObservatoryRefreshLock,
   readObservatoryRefreshState,
+  writeObservatoryRefreshDiagnostic,
+  writeObservatoryRefreshReport,
   writeObservatoryRefreshState,
 } from "@/lib/observatory/refresh-files";
 import { createObservatoryRefreshState } from "@/lib/observatory/refresh-state";
@@ -93,5 +95,59 @@ describe("Observatory refresh files", () => {
     ).resolves.toEqual(
       createObservatoryRefreshState("2026-07-22T20:00:00.000Z"),
     );
+  });
+
+  it("keeps separate private diagnostic logs and prunes only the oldest entries", async () => {
+    const directory = await temporaryDirectory();
+    const first = await writeObservatoryRefreshDiagnostic(
+      directory,
+      {
+        failedAt: "2026-08-05T21:30:00.000Z",
+        stage: "collect",
+        failureCode: "COMMAND_TIMEOUT_AGENTS",
+        diagnostic: "first failure",
+      },
+      2,
+    );
+    await writeObservatoryRefreshDiagnostic(
+      directory,
+      {
+        failedAt: "2026-08-05T21:31:00.000Z",
+        stage: "publish",
+        failureCode: "PUBLISH_FAILED",
+        diagnostic: "second failure",
+      },
+      2,
+    );
+    const third = await writeObservatoryRefreshDiagnostic(
+      directory,
+      {
+        failedAt: "2026-08-05T21:32:00.000Z",
+        stage: "orchestration",
+        failureCode: "STEP_FAILED",
+        diagnostic: "third failure",
+      },
+      2,
+    );
+
+    const { readdir } = await import("node:fs/promises");
+    const files = (await readdir(directory)).sort();
+    expect(files).toHaveLength(2);
+    expect(files).not.toContain(first);
+    expect(files).toContain(third);
+    expect((await stat(join(directory, third))).mode & 0o777).toBe(0o600);
+    expect(await readFile(join(directory, third), "utf8")).toContain(
+      '"failure_code":"STEP_FAILED"',
+    );
+  });
+
+  it("writes the latest readable report atomically with private permissions", async () => {
+    const directory = await temporaryDirectory();
+    const reportPath = join(directory, "latest-refresh-report.txt");
+
+    await writeObservatoryRefreshReport(reportPath, "Dashboard 每日更新完成\n");
+
+    expect(await readFile(reportPath, "utf8")).toBe("Dashboard 每日更新完成\n");
+    expect((await stat(reportPath)).mode & 0o777).toBe(0o600);
   });
 });

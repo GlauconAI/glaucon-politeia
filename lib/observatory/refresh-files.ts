@@ -5,6 +5,7 @@ import {
   mkdir,
   open,
   readFile,
+  readdir,
   rename,
   unlink,
 } from "node:fs/promises";
@@ -169,4 +170,85 @@ export async function writeObservatoryRefreshState(
   await chmod(temporaryPath, 0o600);
   await rename(temporaryPath, statePath);
   await chmod(statePath, 0o600);
+}
+
+export async function writeObservatoryRefreshReport(
+  reportPath: string,
+  content: string,
+): Promise<void> {
+  if (Buffer.byteLength(content, "utf8") > 32 * 1024) {
+    throw new TypeError("The Observatory refresh report is too large.");
+  }
+  await mkdir(dirname(reportPath), { recursive: true, mode: 0o700 });
+  const temporaryPath = `${reportPath}.${process.pid}.${randomUUID()}.tmp`;
+  const handle = await open(temporaryPath, "wx", 0o600);
+  try {
+    await handle.writeFile(content, "utf8");
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await chmod(temporaryPath, 0o600);
+  await rename(temporaryPath, reportPath);
+  await chmod(reportPath, 0o600);
+}
+
+export interface ObservatoryRefreshDiagnostic {
+  failedAt: string;
+  stage: "collect" | "publish" | "orchestration";
+  failureCode: string;
+  diagnostic: string;
+}
+
+export async function writeObservatoryRefreshDiagnostic(
+  directory: string,
+  diagnostic: ObservatoryRefreshDiagnostic,
+  keep = 30,
+): Promise<string> {
+  const parsedTimestamp = Date.parse(diagnostic.failedAt);
+  if (
+    !Number.isFinite(parsedTimestamp) ||
+    new Date(parsedTimestamp).toISOString() !== diagnostic.failedAt ||
+    !/^[A-Z][A-Z0-9_]{0,63}$/u.test(diagnostic.failureCode) ||
+    !Number.isSafeInteger(keep) ||
+    keep < 1 ||
+    keep > 100
+  ) {
+    throw new TypeError("The Observatory refresh diagnostic is invalid.");
+  }
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await chmod(directory, 0o700);
+  const timestamp = diagnostic.failedAt
+    .replaceAll("-", "")
+    .replaceAll(":", "")
+    .replace(".", "");
+  const fileName = `${timestamp}-${diagnostic.stage}-${diagnostic.failureCode}.log`;
+  const filePath = `${directory}/${fileName}`;
+  const handle = await open(filePath, "wx", 0o600);
+  try {
+    await handle.writeFile(
+      `${JSON.stringify({
+        version: 1,
+        failed_at: diagnostic.failedAt,
+        stage: diagnostic.stage,
+        failure_code: diagnostic.failureCode,
+        diagnostic: diagnostic.diagnostic.slice(0, 16_384),
+      })}\n`,
+      "utf8",
+    );
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await chmod(filePath, 0o600);
+
+  const entries = (await readdir(directory))
+    .filter((entry) => entry.endsWith(".log"))
+    .sort();
+  await Promise.all(
+    entries.slice(0, Math.max(0, entries.length - keep)).map((entry) =>
+      unlink(`${directory}/${entry}`),
+    ),
+  );
+  return fileName;
 }
