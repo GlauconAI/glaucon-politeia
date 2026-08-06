@@ -343,4 +343,31 @@ describe("HTML artifact data blocks", () => {
       "sha256:8caddb789ec8639f5a81fe65a04c5b0d855d57c109273dc5b7e72baa36305262",
     );
   });
+
+  it("does not reinterpret an attribute name beginning with equals", () => {
+    expect(
+      extractDataBlocks(
+        '<script =type="application/json" id="x">1</script>',
+      ),
+    ).toEqual(new Map());
+  });
+
+  it("keeps scripts hidden across nested template boundaries", () => {
+    expect(
+      extractDataBlocks(
+        '<template><template></template>' +
+          '<script type="application/json" id="x">1</script></template>',
+      ),
+    ).toEqual(new Map());
+  });
+
+  it(
+    "advances monotonically through malformed declarations and closing tags",
+    () => {
+      for (const prefix of ["<!", "</", "<?"]) {
+        expect(extractDataBlocks(prefix.repeat(15_000))).toEqual(new Map());
+      }
+    },
+    1_000,
+  );
 });
