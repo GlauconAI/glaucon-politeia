@@ -122,18 +122,33 @@ describe("trusted local artifact entries", () => {
     }
   });
 
+  it("loads contained final symlinks through their resolved target", () => {
+    const { root } = fixture();
+    const target = join(root, "entries/inside.js");
+    writeFileSync(target, "window.inside = true;");
+    symlinkSync(target, join(root, "entries/inside-link.js"));
+
+    const loaded = loadScriptEntry(root, "./entries/inside-link.js");
+
+    expect(loaded).toEqual({
+      label: "entries/inside.js",
+      content: "window.inside = true;",
+    });
+    expect(resolveTrustedEntry(root, "./entries/inside-link.js")).toEqual({
+      label: "entries/inside.js",
+    });
+    expect(JSON.stringify(loaded)).not.toContain(root);
+  });
+
   it("rejects traversal, symlink escape, URLs, NUL bytes, and empty sources", () => {
     const { container, root } = fixture();
     const outside = join(container, "outside.js");
     writeFileSync(outside, "window.outside = true;");
     symlinkSync(outside, join(root, "entries/link.js"));
-    writeFileSync(join(root, "entries/inside.js"), "window.inside = true;");
-    symlinkSync(join(root, "entries/inside.js"), join(root, "entries/inside-link.js"));
 
     for (const source of [
       "../outside.js",
       "./entries/link.js",
-      "./entries/inside-link.js",
       "https://example.com/app.js",
       "file:///tmp/app.js",
       "./entries/app\0.js",
