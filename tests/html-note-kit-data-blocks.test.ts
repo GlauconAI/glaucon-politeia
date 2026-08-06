@@ -209,7 +209,7 @@ describe("HTML artifact data blocks", () => {
       '<script \u00a0type="application/json" id="nbsp">0</script>' +
         '<script type="application&#47;json" id="numeric">1</script>' +
         '<script type="application&sol;json" ' +
-        'id="payload&hyphen;one&period;v&colon;1&lowbar;x">2</script>',
+        'id="payload&#45;one&period;v&colon;1&lowbar;x">2</script>',
     );
 
     expect(extracted).toEqual(
@@ -370,4 +370,33 @@ describe("HTML artifact data blocks", () => {
     },
     1_000,
   );
+
+  it.each(["<!-->", "<!--->", "<!-- foo --!>"])(
+    "recovers a live data block after the abruptly closed comment %s",
+    (comment) => {
+      const html =
+        comment +
+        '<script type="application/json" id="live">{"ok":true}</script>';
+
+      expect(extractDataBlocks(html)).toEqual(
+        new Map([["live", { ok: true }]]),
+      );
+    },
+  );
+
+  it("keeps a post-template script inert when plaintext consumes the remainder", () => {
+    const html =
+      "<template><plaintext></template>" +
+      '<script type="application/json" id="inert">1</script>';
+
+    expect(extractDataBlocks(html)).toEqual(new Map());
+  });
+
+  it("never executes ordinary inline scripts while extracting data blocks", () => {
+    const html =
+      '<script>throw new Error("inline script executed")</script>' +
+      '<script type="application/json" id="safe">1</script>';
+
+    expect(extractDataBlocks(html)).toEqual(new Map([["safe", 1]]));
+  });
 });
