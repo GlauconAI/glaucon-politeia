@@ -430,6 +430,9 @@ describe("trusted local artifact entries", () => {
       ["event", '<path onmouseover="alert(1)"/>'],
       ["namespaced-event", '<path xmlns:x="urn:test" x:onload="alert(1)"/>'],
       ["href", '<a href="https://example.com"><path/></a>'],
+      ["ping", '<a href="#safe" ping="https://tracker.example/ping"><path/></a>'],
+      ["local-ping", '<a href="#safe" ping="./tracker"><path/></a>'],
+      ["fragment-ping", '<a href="#safe" ping="#tracker"><path/></a>'],
       ["xlink", '<use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="icons.svg#x"/>'],
       ["image", '<image href="data:image/png;base64,AA=="/>'],
       ["src", '<path src="local.bin"/>'],
@@ -625,7 +628,7 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/safe.svg"),
-      '<svg viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><g aria-label="Meet at local(office)" data-note="image-set(local.png 1x)"><path fill="url(#paint)"/><use href="#paint"/></g></svg>',
+      '<svg viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><g aria-label="Meet at local(office)" data-note="image-set(local.png 1x)"><path fill="url(#paint)"/><use href="#paint"/><a href="#paint"><text>Safe link</text></a></g></svg>',
     );
 
     const result = loadSvgAsset(root, {
@@ -641,6 +644,7 @@ describe("trusted local artifact entries", () => {
       );
       expect(svg?.querySelector('path[fill="url(#paint)"]')).not.toBeNull();
       expect(svg?.querySelector('use[href="#paint"]')).not.toBeNull();
+      expect(svg?.querySelector('a[href="#paint"]')).not.toBeNull();
       const metadata = svg?.querySelector("g[data-note]");
       expect(metadata?.getAttribute("aria-label")).toBe("Meet at local(office)");
       expect(metadata?.getAttribute("data-note")).toBe(
