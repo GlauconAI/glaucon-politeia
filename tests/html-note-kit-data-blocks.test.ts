@@ -203,4 +203,144 @@ describe("HTML artifact data blocks", () => {
 
     expect(extractDataBlocks(serializeDataBlocks(blocks))).toEqual(blocks);
   });
+
+  it("uses HTML whitespace and decodes bounded attribute references", () => {
+    const extracted = extractDataBlocks(
+      '<script \u00a0type="application/json" id="nbsp">0</script>' +
+        '<script type="application&#47;json" id="numeric">1</script>' +
+        '<script type="application&sol;json" ' +
+        'id="payload&hyphen;one&period;v&colon;1&lowbar;x">2</script>',
+    );
+
+    expect(extracted).toEqual(
+      new Map([
+        ["numeric", 1],
+        ["payload-one.v:1_x", 2],
+      ]),
+    );
+  });
+
+  it("ignores scripts inside noscript and template contexts", () => {
+    const extracted = extractDataBlocks(
+      '<noscript><script type="application/json" id="noscript">0</script></noscript>' +
+        '<template><script type="application/json" id="template">1</script></template>' +
+        '<script type="application/json" id="live">2</script>',
+    );
+
+    expect(extracted).toEqual(new Map([["live", 2]]));
+  });
+
+  it(
+    "advances monotonically through large malformed start tags",
+    () => {
+      expect(extractDataBlocks("<x".repeat(8_000))).toEqual(new Map());
+    },
+    750,
+  );
+
+  it("rejects accessors without invoking them", () => {
+    let getterCalls = 0;
+    const object = {};
+    Object.defineProperty(object, "value", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return "object";
+      },
+    });
+    const array = ["initial"];
+    Object.defineProperty(array, "0", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return "array";
+      },
+    });
+
+    let objectError;
+    let arrayError;
+    try {
+      canonicalizeJson(object);
+    } catch (error) {
+      objectError = error;
+    }
+    try {
+      canonicalizeJson(array);
+    } catch (error) {
+      arrayError = error;
+    }
+
+    expect(getterCalls).toBe(0);
+    expect(objectError).toBeInstanceOf(ArtifactBuildError);
+    expect(arrayError).toBeInstanceOf(ArtifactBuildError);
+  });
+
+  it("rejects JSON deeper than the explicit bound with a coded error", () => {
+    let nested: unknown = "leaf";
+    for (let depth = 0; depth < 300; depth += 1) nested = [nested];
+
+    expectInvalidDataBlock(() => canonicalizeJson(nested));
+  });
+
+  it("normalizes structured error details without invoking accessors", () => {
+    let getterCalls = 0;
+    const details: Record<PropertyKey, unknown> = {};
+    Object.defineProperty(details, "accessor", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return "invoked";
+      },
+    });
+    details.big = 1n;
+    details.fn = () => "function";
+    details.symbol = Symbol("token");
+    details.self = details;
+    let deep: Record<string, unknown> = { end: true };
+    for (let depth = 0; depth < 20; depth += 1) deep = { next: deep };
+    details.deep = deep;
+
+    const output = new ArtifactBuildError("E_DETAILS", "Unsafe details", details).toJSON();
+    let encoded;
+    let stringifyError;
+    try {
+      encoded = JSON.stringify(output);
+    } catch (error) {
+      stringifyError = error;
+    }
+
+    expect(getterCalls).toBe(0);
+    expect(stringifyError).toBeUndefined();
+    expect(encoded).toContain('"accessor":"[Accessor]"');
+    expect(encoded).toContain('"big":"1"');
+    expect(encoded).toContain('"fn":"[function]"');
+    expect(encoded).toContain('"symbol":"Symbol(token)"');
+    expect(encoded).toContain('"self":"[Circular]"');
+    expect(encoded).toContain("[MaxDepth]");
+
+    let invalidIdError;
+    try {
+      serializeDataBlocks(new Map<unknown, unknown>([[1n, null]]));
+    } catch (error) {
+      invalidIdError = error;
+    }
+    expect(invalidIdError).toBeInstanceOf(ArtifactBuildError);
+    expect((invalidIdError as ArtifactBuildError).toJSON()).toMatchObject({
+      error: { details: { id: "1" } },
+    });
+    expect(() =>
+      JSON.stringify((invalidIdError as ArtifactBuildError).toJSON()),
+    ).not.toThrow();
+  });
+
+  it("pins the source hash byte contract", () => {
+    const blocks = new Map([
+      ["beta", [true, null]],
+      ["alpha", { z: 2, a: 1 }],
+    ]);
+
+    expect(computeSourceHash(blocks)).toBe(
+      "sha256:8caddb789ec8639f5a81fe65a04c5b0d855d57c109273dc5b7e72baa36305262",
+    );
+  });
 });
