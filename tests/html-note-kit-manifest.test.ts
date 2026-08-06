@@ -2,19 +2,21 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
 import { renderInteractiveModel } from "../lib/html-note-kit/interactive.mjs";
 import { loadArtifactManifest } from "../lib/html-note-kit/manifest.mjs";
+import { registerManifestInternals } from "../lib/html-note-kit/manifest-registry.mjs";
 
 const roots: string[] = [];
 
@@ -182,7 +184,7 @@ describe("interactive artifact manifest", () => {
     expect((await renderInteractiveModel(manifest)).slots.mainSections).toBe("second");
   });
 
-  it("loads relative imports from both the manifest and renderer file URLs", async () => {
+  it("rejects manifest and renderer dependency graphs as unsupported P0 inputs", async () => {
     const root = fixture();
     writeFileSync(join(root, "data.json"), "{}");
     writeFileSync(
@@ -210,11 +212,23 @@ describe("interactive artifact manifest", () => {
        };`,
     );
 
-    const manifest = await loadArtifactManifest(path);
-    const model = await renderInteractiveModel(manifest);
+    await expectArtifactError(() => loadArtifactManifest(path), "INVALID_MANIFEST");
 
-    expect(model.metadata.title).toBe("Imported title");
-    expect(model.slots.mainSections).toBe("Imported renderer");
+    writeFileSync(
+      path,
+      `export default {
+        contractVersion: 1, mode: "interactive",
+        metadata: { title: "Single file", description: "", eyebrow: "", lang: "en" },
+        dataBlocks: [{ id: "project-registry", source: "./data.json" }],
+        renderer: "./renderer.mjs", styles: [], scripts: [], svgAssets: [],
+        requiredDataBlocks: ["project-registry"]
+      };`,
+    );
+    const manifest = await loadArtifactManifest(path);
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_RENDERER_RESULT",
+    );
   });
 
   it("revalidates the renderer path when the entry becomes an escaping symlink", async () => {
@@ -249,7 +263,7 @@ describe("interactive artifact manifest", () => {
     writeFileSync(join(root, "data.json"), "{}");
     writeFileSync(
       join(root, "renderer.mjs"),
-      `import { writeFileSync } from "node:fs";
+      `const { writeFileSync } = process.getBuiltinModule("node:fs");
        const ownUrl = new URL(import.meta.url); ownUrl.search = "";
        writeFileSync(ownUrl, 'export function renderArtifact() { return { mainSections: "changed" }; }');
        export function renderArtifact() { return { mainSections: "original" }; }`,
@@ -263,6 +277,36 @@ describe("interactive artifact manifest", () => {
       expect(error).toMatchObject({ code: "INVALID_RENDERER_RESULT" });
       expect((error as Error).message).toMatch(/changed while importing/i);
     }
+  });
+
+  it("pins root identity across sequential rename and symlink substitution", async () => {
+    const root = fixture();
+    const consumer = join(root, "consumer");
+    const original = join(root, "consumer-original");
+    const outside = join(root, "outside-root");
+    mkdirSync(consumer);
+    mkdirSync(outside);
+    writeFileSync(join(consumer, "data.json"), "{}");
+    writeFileSync(join(consumer, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    const markerPath = join(root, "root-substitution-executed.txt");
+    writeFileSync(join(outside, "data.json"), "{}");
+    writeFileSync(
+      join(outside, "renderer.mjs"),
+      `const { writeFileSync } = process.getBuiltinModule("node:fs");
+       writeFileSync(${JSON.stringify(markerPath)}, "executed");
+       export function renderArtifact() { return {}; }`,
+    );
+    const manifest = await loadArtifactManifest(
+      writeManifest(root, validManifest(', rootDirectory: "./consumer"')),
+    );
+    renameSync(consumer, original);
+    symlinkSync(outside, consumer);
+
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_RENDERER_RESULT",
+    );
+    expect(existsSync(markerPath)).toBe(false);
   });
 
   it("rejects unsupported versions, modes, unknown keys, malformed shapes, and duplicate IDs", async () => {
@@ -311,11 +355,13 @@ describe("interactive artifact manifest", () => {
     await expectArtifactError(() => loadArtifactManifest(invalidUtf8), "INVALID_DATA_BLOCK");
 
     writeFileSync(join(root, "data.json"), "{}");
-    const outside = join(root, "..", "outside-renderer.mjs");
+    const outsideName = `outside-renderer-${basename(root)}.mjs`;
+    const outside = join(root, "..", outsideName);
     writeFileSync(outside, "export function renderArtifact() { return {}; }");
+    roots.push(outside);
     const escaped = writeManifest(
       root,
-      validManifest().replace('renderer: "./renderer.mjs"', 'renderer: "../outside-renderer.mjs"'),
+      validManifest().replace('renderer: "./renderer.mjs"', `renderer: "../${outsideName}"`),
       "escaped.mjs",
     );
     await expectArtifactError(() => loadArtifactManifest(escaped), "UNSAFE_ENTRY_PATH");
@@ -525,6 +571,186 @@ describe("interactive artifact manifest", () => {
     await expectArtifactError(
       () => renderInteractiveModel(manifest),
       "INVALID_RENDERER_RESULT",
+    );
+  });
+
+  it("rejects resource counts above the bounded manifest contract", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    const cases = [
+      [
+        "dataBlocks",
+        `[${Array.from({ length: 33 }, (_, index) =>
+          `{ id: "block-${index}", source: "./data-${index}.json" }`,
+        ).join(",")}]`,
+      ],
+      [
+        "styles",
+        `[${Array.from({ length: 17 }, (_, index) => `"./style-${index}.css"`).join(",")}]`,
+      ],
+      [
+        "scripts",
+        `[${Array.from({ length: 17 }, (_, index) => `"./script-${index}.js"`).join(",")}]`,
+      ],
+      [
+        "svgAssets",
+        `[${Array.from({ length: 17 }, (_, index) =>
+          `{ id: "svg-${index}", source: "./svg-${index}.svg" }`,
+        ).join(",")}]`,
+      ],
+    ];
+
+    for (const [index, [field, replacement]] of cases.entries()) {
+      const original =
+        field === "dataBlocks"
+          ? 'dataBlocks: [{ id: "project-registry", source: "./data.json" }]'
+          : field === "styles"
+            ? "styles: []"
+            : field === "scripts"
+              ? "scripts: []"
+              : "svgAssets: []";
+      const body = validManifest()
+        .replace(original, `${field}: ${replacement}`)
+        .replace(
+          'requiredDataBlocks: ["project-registry"]',
+          field === "dataBlocks" ? "requiredDataBlocks: []" : 'requiredDataBlocks: ["project-registry"]',
+        );
+      await expectArtifactError(
+        () => loadArtifactManifest(writeManifest(root, body, `count-${index}.mjs`)),
+        "INVALID_MANIFEST",
+      );
+    }
+  });
+
+  it("rejects duplicate resolved sources within every resource list", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    symlinkSync(join(root, "data.json"), join(root, "data-alias.json"));
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    writeFileSync(join(root, "shared.css"), ".card { color: white; }");
+    symlinkSync(join(root, "shared.css"), join(root, "shared-alias.css"));
+    writeFileSync(join(root, "shared.js"), "window.ready = true;");
+    symlinkSync(join(root, "shared.js"), join(root, "shared-alias.js"));
+    writeFileSync(
+      join(root, "shared.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>Map</title></svg>',
+    );
+    symlinkSync(join(root, "shared.svg"), join(root, "shared-alias.svg"));
+
+    const bodies = [
+      validManifest()
+        .replace(
+          'dataBlocks: [{ id: "project-registry", source: "./data.json" }]',
+          'dataBlocks: [{ id: "project-registry", source: "./data.json" }, { id: "other", source: "./data-alias.json" }]',
+        ),
+      validManifest().replace(
+        "styles: []",
+        'styles: ["./shared.css", "./shared-alias.css"]',
+      ),
+      validManifest().replace(
+        "scripts: []",
+        'scripts: ["./shared.js", "./shared-alias.js"]',
+      ),
+      validManifest().replace(
+        "svgAssets: []",
+        'svgAssets: [{ id: "map-a", source: "./shared.svg" }, { id: "map-b", source: "./shared-alias.svg" }]',
+      ),
+    ];
+
+    for (const [index, body] of bodies.entries()) {
+      await expectArtifactError(
+        () => loadArtifactManifest(writeManifest(root, body, `duplicate-${index}.mjs`)),
+        "INVALID_MANIFEST",
+      );
+    }
+  });
+
+  it("enforces aggregate raw, canonical-node, and stylesheet budgets", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    const rawDefinitions = [];
+    for (let index = 0; index < 3; index += 1) {
+      const source = `raw-${index}.json`;
+      writeFileSync(join(root, source), `"${"x".repeat(11 * 1024 * 1024)}"`);
+      rawDefinitions.push(`{ id: "raw-${index}", source: "./${source}" }`);
+    }
+    const rawManifest = validManifest()
+      .replace(
+        'dataBlocks: [{ id: "project-registry", source: "./data.json" }]',
+        `dataBlocks: [${rawDefinitions.join(",")}]`,
+      )
+      .replace('requiredDataBlocks: ["project-registry"]', "requiredDataBlocks: []");
+    await expectArtifactError(
+      () => loadArtifactManifest(writeManifest(root, rawManifest, "raw-budget.mjs")),
+      "INVALID_DATA_BLOCK",
+    );
+
+    writeFileSync(join(root, "nodes.json"), JSON.stringify(new Array(250_000).fill(0)));
+    const nodeManifest = validManifest().replace("./data.json", "./nodes.json");
+    await expectArtifactError(
+      () => loadArtifactManifest(writeManifest(root, nodeManifest, "node-budget.mjs")),
+      "INVALID_DATA_BLOCK",
+    );
+
+    writeFileSync(join(root, "data.json"), "{}");
+    const styles = [];
+    for (let index = 0; index < 5; index += 1) {
+      const source = `aggregate-${index}.css`;
+      writeFileSync(join(root, source), " ".repeat(1_700_000));
+      styles.push(`"./${source}"`);
+    }
+    const styleManifest = validManifest().replace(
+      "styles: []",
+      `styles: [${styles.join(",")}]`,
+    );
+    const manifest = await loadArtifactManifest(
+      writeManifest(root, styleManifest, "style-budget.mjs"),
+    );
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_STYLESHEET",
+    );
+  });
+
+  it("does not accept copied forgeable manifest internals", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    const manifest = await loadArtifactManifest(writeManifest(root, validManifest()));
+    const oldBrand = Symbol.for("402v.html-note-kit.manifest-internal.v1");
+    const forged = {
+      contractVersion: 1,
+      mode: "interactive",
+      metadata: manifest.metadata,
+      requiredDataBlocks: manifest.requiredDataBlocks,
+    };
+    Object.defineProperty(forged, oldBrand, {
+      value: Object.getOwnPropertyDescriptor(manifest, oldBrand)?.value,
+    });
+
+    await expectArtifactError(
+      () => renderInteractiveModel(forged),
+      "INVALID_MANIFEST",
+    );
+    expect(Object.getOwnPropertySymbols(manifest)).toEqual([]);
+  });
+
+  it("normalizes hostile registered internals before invoking them", async () => {
+    const forged = {
+      contractVersion: 1,
+      mode: "interactive",
+      metadata: { title: "Forged", description: "", eyebrow: "", lang: "en" },
+      requiredDataBlocks: [],
+    };
+    registerManifestInternals(
+      forged,
+      new Proxy({}, { ownKeys() { throw new Error("internal trap"); } }),
+    );
+
+    await expectArtifactError(
+      () => renderInteractiveModel(forged),
+      "INVALID_MANIFEST",
     );
   });
 
