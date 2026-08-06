@@ -394,8 +394,8 @@ describe("HTML artifact data blocks", () => {
 
   it("never executes ordinary inline scripts while extracting data blocks", () => {
     const html =
-      '<script>throw new Error("inline script executed")</script>' +
-      '<script type="application/json" id="safe">1</script>';
+      '<script type="application/json" id="safe">1</script>' +
+      '<script>document.getElementById("safe").remove()</script>';
 
     expect(extractDataBlocks(html)).toEqual(new Map([["safe", 1]]));
   });
