@@ -452,6 +452,37 @@ describe("trusted local artifact entries", () => {
     }
   });
 
+  it("rejects every unsupported SMIL element before inspecting its values", () => {
+    const { root } = fixture();
+    const bodies = new Map([
+      ["animate", '<animate values="url(https://example.com/a.svg#x);#safe"/>'],
+      ["animatemotion", '<animateMotion path="M0 0L1 1"/>'],
+      ["animatetransform", '<animateTransform values="0;360"/>'],
+      ["set", '<set attributeName="href" to="https://example.com/a.svg#x"/>'],
+      ["discard", '<discard begin="1s"/>'],
+    ]);
+
+    for (const [element, body] of bodies) {
+      writeFileSync(
+        join(root, "entries", `${element}.svg`),
+        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+      );
+      try {
+        loadSvgAsset(root, {
+          id: `unsafe-${element}`,
+          source: `./entries/${element}.svg`,
+        });
+        throw new Error("Expected an UNSAFE_SVG error");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ArtifactBuildError);
+        expect(error).toMatchObject({
+          code: "UNSAFE_SVG",
+          details: { element },
+        });
+      }
+    }
+  });
+
   it("rejects external CSS references in SVG attributes and style blocks", () => {
     const { root } = fixture();
     const cases = new Map([
@@ -459,6 +490,14 @@ describe("trusted local artifact entries", () => {
       [
         "escaped-presentation",
         '<path fill="u\\72l(h\\74tps\\3a //example.com/a.svg#paint)"/>',
+      ],
+      [
+        "mask-image",
+        '<path mask-image="url(https://example.com/m.svg#x)"/>',
+      ],
+      [
+        "escaped-mask-image",
+        '<path mask-image="u\\72l(h\\74tps\\3a //example.com/m.svg#x)"/>',
       ],
       ["local", '<path style="fill:url(./paint.svg#paint)"/>'],
       ["style", "<style>.x { fill: url(//example.com/a.svg#paint); }</style>"],
