@@ -431,6 +431,67 @@ describe("interactive artifact manifest", () => {
     );
   });
 
+  it("normalizes hostile manifest and render-options boundaries", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    const manifest = await loadArtifactManifest(writeManifest(root, validManifest()));
+
+    const revokedManifest = Proxy.revocable(manifest, {});
+    revokedManifest.revoke();
+    await expectArtifactError(
+      () => renderInteractiveModel(revokedManifest.proxy),
+      "INVALID_MANIFEST",
+    );
+    await expectArtifactError(
+      () =>
+        renderInteractiveModel(
+          new Proxy(manifest, {
+            getOwnPropertyDescriptor() {
+              throw new Error("manifest trap");
+            },
+          }),
+        ),
+      "INVALID_MANIFEST",
+    );
+
+    let getterInvoked = false;
+    const accessorOptions = Object.defineProperty({}, "preservedData", {
+      enumerable: true,
+      get() {
+        getterInvoked = true;
+        throw new Error("options getter");
+      },
+    });
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest, accessorOptions),
+      "INVALID_DATA_BLOCK",
+    );
+    expect(getterInvoked).toBe(false);
+
+    const revokedOptions = Proxy.revocable({}, {});
+    revokedOptions.revoke();
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest, revokedOptions.proxy),
+      "INVALID_DATA_BLOCK",
+    );
+    await expectArtifactError(
+      () =>
+        renderInteractiveModel(
+          manifest,
+          new Proxy({}, { ownKeys() { throw new Error("options trap"); } }),
+        ),
+      "INVALID_DATA_BLOCK",
+    );
+
+    const revokedData = Proxy.revocable(new Map(), {});
+    revokedData.revoke();
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest, { preservedData: revokedData.proxy }),
+      "INVALID_DATA_BLOCK",
+    );
+  });
+
   it("rejects oversized manifest, data, and renderer sources with stable errors", async () => {
     const root = fixture();
     const oversizedManifest = join(root, "oversized-manifest.mjs");
