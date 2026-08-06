@@ -21,6 +21,8 @@ import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
 
 const CSS_AND_JS_LIMIT = 2 * 1024 * 1024;
 const SVG_LIMIT = 5 * 1024 * 1024;
+const SVG_ELEMENT_LIMIT = 5_000;
+const SVG_DEPTH_LIMIT = 256;
 const roots: string[] = [];
 
 afterEach(() => {
@@ -180,6 +182,17 @@ describe("trusted local artifact entries", () => {
     }
   });
 
+  it("requires rootDirectory to resolve to a directory", () => {
+    const { container } = fixture();
+    const rootFile = join(container, "manifest-file");
+    writeFileSync(rootFile, "window.notARoot = true;");
+
+    expectArtifactError(
+      () => resolveTrustedEntry(rootFile, "."),
+      "UNSAFE_ENTRY_PATH",
+    );
+  });
+
   it("enforces strict UTF-8 for every entry type", () => {
     const { root } = fixture();
     const invalidUtf8 = Buffer.from([0xc3, 0x28]);
@@ -262,8 +275,14 @@ describe("trusted local artifact entries", () => {
       ["static-import.js", 'import value from "./value.js";'],
       ["export.js", "export const value = 1;"],
       ["dynamic-import.js", 'const load = import("./value.js");'],
+      [
+        "nested-dynamic-import.js",
+        'function loadLater() { return import("./later.js"); }',
+      ],
       ["source-map.js", "//# sourceMappingURL=app.js.map"],
       ["close.js", 'window.value = "</ScRiPt>";'],
+      ["open.js", 'window.value = "<ScRiPt ";'],
+      ["comment-open.js", 'window.value = "<!--";'],
     ]);
 
     for (const [filename, content] of cases) {
@@ -283,7 +302,7 @@ describe("trusted local artifact entries", () => {
     );
   });
 
-  it("conservatively rejects standalone import tokens inside comments and strings", () => {
+  it("rejects import expressions without overblocking properties, strings, or comments", () => {
     const { root } = fixture();
     const cases = new Map([
       ["comment.js", "// import('./later.js')"],
@@ -291,15 +310,18 @@ describe("trusted local artifact entries", () => {
       ["carriage-return.js", "// import\rwindow.ready = true;"],
       ["line-separator.js", "// import\u2028window.ready = true;"],
       ["paragraph-separator.js", "// import\u2029window.ready = true;"],
-      ["annex-b.js", "<!-- import\nwindow.ready = true;"],
       ["plain-string.js", 'const text = "import";'],
+      [
+        "method.js",
+        "const object = { import() { return 1; } }; object.import();",
+      ],
+      ["computed.js", 'const value = { ["import"]: 1 }["import"];'],
     ]);
 
     for (const [filename, content] of cases) {
       writeFileSync(join(root, "entries", filename), content);
-      expectArtifactError(
-        () => loadScriptEntry(root, `./entries/${filename}`),
-        "INVALID_JAVASCRIPT",
+      expect(loadScriptEntry(root, `./entries/${filename}`).content).toBe(
+        content,
       );
     }
 
@@ -309,6 +331,35 @@ describe("trusted local artifact entries", () => {
     );
     expect(loadScriptEntry(root, "./entries/identifiers.js").content).toContain(
       "$import",
+    );
+  });
+
+  it("rejects HTML raw-text markers before scripts are inlined", () => {
+    const { root } = fixture();
+    const safeContent =
+      'const text = "<main>safe</main>"; window.safeText = text;';
+    writeFileSync(join(root, "entries/safe-inline.js"), safeContent);
+
+    const accepted = loadScriptEntry(root, "./entries/safe-inline.js");
+    const acceptedDom = new JSDOM(
+      `<script>${accepted.content}</script><main id="after-script">Following content</main>`,
+    );
+    try {
+      expect(
+        acceptedDom.window.document.querySelector("main#after-script")
+          ?.textContent,
+      ).toBe("Following content");
+    } finally {
+      acceptedDom.window.close();
+    }
+
+    writeFileSync(
+      join(root, "entries/double-escaped.js"),
+      'window.value = "<!--<script ";',
+    );
+    expectArtifactError(
+      () => loadScriptEntry(root, "./entries/double-escaped.js"),
+      "INVALID_JAVASCRIPT",
     );
   });
 
@@ -481,6 +532,66 @@ describe("trusted local artifact entries", () => {
         "UNSAFE_SVG",
       );
     }
+  });
+
+  it("accepts the SVG element-count boundary and rejects one element over", () => {
+    const { root } = fixture();
+    const svgWithElementCount = (count: number) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>Wide</title>${"<path/>".repeat(count - 2)}</svg>`;
+    writeFileSync(
+      join(root, "entries/wide-boundary.svg"),
+      svgWithElementCount(SVG_ELEMENT_LIMIT),
+    );
+    writeFileSync(
+      join(root, "entries/wide-over.svg"),
+      svgWithElementCount(SVG_ELEMENT_LIMIT + 1),
+    );
+
+    expect(
+      loadSvgAsset(root, {
+        id: "wide-boundary",
+        source: "./entries/wide-boundary.svg",
+      }).label,
+    ).toBe("entries/wide-boundary.svg");
+    expectArtifactError(
+      () =>
+        loadSvgAsset(root, {
+          id: "wide-over",
+          source: "./entries/wide-over.svg",
+        }),
+      "UNSAFE_SVG",
+    );
+  });
+
+  it("accepts the SVG depth boundary and rejects one level over", () => {
+    const { root } = fixture();
+    const svgWithDepth = (depth: number) => {
+      const nestedLevels = depth - 1;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>Deep</title>${"<g>".repeat(nestedLevels)}${"</g>".repeat(nestedLevels)}</svg>`;
+    };
+    writeFileSync(
+      join(root, "entries/deep-boundary.svg"),
+      svgWithDepth(SVG_DEPTH_LIMIT),
+    );
+    writeFileSync(
+      join(root, "entries/deep-over.svg"),
+      svgWithDepth(SVG_DEPTH_LIMIT + 1),
+    );
+
+    expect(
+      loadSvgAsset(root, {
+        id: "deep-boundary",
+        source: "./entries/deep-boundary.svg",
+      }).label,
+    ).toBe("entries/deep-boundary.svg");
+    expectArtifactError(
+      () =>
+        loadSvgAsset(root, {
+          id: "deep-over",
+          source: "./entries/deep-over.svg",
+        }),
+      "UNSAFE_SVG",
+    );
   });
 
   it("rejects prefixed or foreign-namespace SVG roots and elements", () => {
