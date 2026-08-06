@@ -341,7 +341,7 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/escaped-safe.css"),
-      '.a { fill: u\\72l(\\23 paint); } .b { background: url(d\\61ta\\3a image/png;base64,AA==); } .c::after { content: "u\\72l(https://text-only.example) image-set(local.png 1x)"; } .d::after { content: "line\\A break"; } /* @\\69mport url(https://comment.example); local("Comment Font"); */',
+      '.a { fill: u\\72l(\\23 paint); } .b { background: url(d\\61ta\\3a image/png;base64,AA==); } .c::after { content: "u\\72l(https://text-only.example) image-set(local.png 1x)"; } .d::after { content: "line\\A break"; } .e { background: linear-gradient(red, blue); } /* @\\69mport url(https://comment.example); local("Comment Font"); */',
     );
 
     expect(loadStylesheetEntry(root, "./entries/escaped-safe.css").label).toBe(
@@ -379,6 +379,14 @@ describe("trusted local artifact entries", () => {
       [
         "escaped-local-font.css",
         '@font-face { font-family: Artifact; src: l\\6f cal("Installed Font"); }',
+      ],
+      [
+        "image-function.css",
+        'body { background: image("https://example.com/x.png"); }',
+      ],
+      [
+        "escaped-image-function.css",
+        'body { background: im\\61ge("https://example.com/x.png"); }',
       ],
     ]);
 
@@ -579,6 +587,14 @@ describe("trusted local artifact entries", () => {
       [
         "attribute-local-font",
         '<text style="font-family:local(\'Installed Font\')">Text</text>',
+      ],
+      [
+        "style-image-function",
+        '<style>.x { background: image("https://example.com/x.png"); }</style>',
+      ],
+      [
+        "attribute-escaped-image-function",
+        '<path style="background:im\\61ge(\'https://example.com/x.png\')"/>',
       ],
     ]);
 
