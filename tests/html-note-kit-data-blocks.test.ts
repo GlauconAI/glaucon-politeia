@@ -197,4 +197,10 @@ describe("HTML artifact data blocks", () => {
 
     expect(extracted).toEqual(new Map([["first", 1]]));
   });
+
+  it("round-trips Unicode payload text without changing HTML indices", () => {
+    const blocks = new Map([["payload", { text: "İ" }]]);
+
+    expect(extractDataBlocks(serializeDataBlocks(blocks))).toEqual(blocks);
+  });
 });
