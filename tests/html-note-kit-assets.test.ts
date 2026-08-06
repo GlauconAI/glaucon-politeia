@@ -456,6 +456,10 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     const cases = new Map([
       ["attribute", '<path fill="url(https://example.com/a.svg#paint)"/>'],
+      [
+        "escaped-presentation",
+        '<path fill="u\\72l(h\\74tps\\3a //example.com/a.svg#paint)"/>',
+      ],
       ["local", '<path style="fill:url(./paint.svg#paint)"/>'],
       ["style", "<style>.x { fill: url(//example.com/a.svg#paint); }</style>"],
       ["import", '<style>@import "theme.css";</style>'],
@@ -582,7 +586,7 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/safe.svg"),
-      '<svg viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><path fill="url(#paint)"/><use href="#paint"/></svg>',
+      '<svg viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><g aria-label="Meet at local(office)" data-note="image-set(local.png 1x)"><path fill="url(#paint)"/><use href="#paint"/></g></svg>',
     );
 
     const result = loadSvgAsset(root, {
@@ -598,6 +602,11 @@ describe("trusted local artifact entries", () => {
       );
       expect(svg?.querySelector('path[fill="url(#paint)"]')).not.toBeNull();
       expect(svg?.querySelector('use[href="#paint"]')).not.toBeNull();
+      const metadata = svg?.querySelector("g[data-note]");
+      expect(metadata?.getAttribute("aria-label")).toBe("Meet at local(office)");
+      expect(metadata?.getAttribute("data-note")).toBe(
+        "image-set(local.png 1x)",
+      );
     } finally {
       dom.window.close();
     }
