@@ -191,6 +191,7 @@ Checks include:
 - no external script source, stylesheet, font, iframe runtime, remote image, or import;
 - no unresolved local asset reference;
 - interactive runtime and entry syntax;
+- synchronous startup execution in an isolated JSDOM document, with uncaught script errors promoted to verification failures;
 - SVG safety, accessibility metadata, `viewBox`, and scroll container;
 - responsive shell guards for page-level horizontal overflow;
 - byte equality when a deterministic comparison is requested.
