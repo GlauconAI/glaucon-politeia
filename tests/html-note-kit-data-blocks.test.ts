@@ -159,4 +159,42 @@ describe("HTML artifact data blocks", () => {
     expectInvalidDataBlock(() => canonicalizeJson(cyclic));
     expectInvalidDataBlock(() => canonicalizeJson(sparse));
   });
+
+  it("rejects arrays whose prototype is not exactly Array.prototype", () => {
+    class JsonArray extends Array<unknown> {
+      toJSON() {
+        return ["rewritten"];
+      }
+    }
+
+    const customPrototype = Object.create(Array.prototype, {
+      toJSON: {
+        value: () => ["rewritten"],
+      },
+    });
+    const customArray = ["original"];
+    Object.setPrototypeOf(customArray, customPrototype);
+
+    expectInvalidDataBlock(() => canonicalizeJson(new JsonArray("original")));
+    expectInvalidDataBlock(() => canonicalizeJson(customArray));
+  });
+
+  it("ignores script-like text outside actual script elements", () => {
+    const extracted = extractDataBlocks(
+      '<!-- <script type="application/json" id="comment">1</script> -->' +
+        '<textarea><script type="application/json" id="textarea">2</script></textarea>' +
+        '<script-foo type="application/json" id="custom">3</script>',
+    );
+
+    expect(extracted).toEqual(new Map());
+  });
+
+  it("uses the first occurrence of duplicate HTML attributes", () => {
+    const extracted = extractDataBlocks(
+      '<script type="text/javascript" type="application/json" id="fake">0</script>' +
+        '<script type="application/json" id="first" id="second">1</script>',
+    );
+
+    expect(extracted).toEqual(new Map([["first", 1]]));
+  });
 });
