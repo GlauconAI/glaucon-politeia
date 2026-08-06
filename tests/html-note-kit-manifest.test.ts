@@ -1,7 +1,10 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -179,6 +182,89 @@ describe("interactive artifact manifest", () => {
     expect((await renderInteractiveModel(manifest)).slots.mainSections).toBe("second");
   });
 
+  it("loads relative imports from both the manifest and renderer file URLs", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(
+      join(root, "manifest-values.mjs"),
+      'export const title = "Imported title";',
+    );
+    writeFileSync(
+      join(root, "renderer-helper.mjs"),
+      'export const section = "Imported renderer";',
+    );
+    writeFileSync(
+      join(root, "renderer.mjs"),
+      'import { section } from "./renderer-helper.mjs"; export function renderArtifact() { return { mainSections: section }; }',
+    );
+    const path = join(root, "artifact.mjs");
+    writeFileSync(
+      path,
+      `import { title } from "./manifest-values.mjs";
+       export default {
+         contractVersion: 1, mode: "interactive",
+         metadata: { title, description: "", eyebrow: "", lang: "en" },
+         dataBlocks: [{ id: "project-registry", source: "./data.json" }],
+         renderer: "./renderer.mjs", styles: [], scripts: [], svgAssets: [],
+         requiredDataBlocks: ["project-registry"]
+       };`,
+    );
+
+    const manifest = await loadArtifactManifest(path);
+    const model = await renderInteractiveModel(manifest);
+
+    expect(model.metadata.title).toBe("Imported title");
+    expect(model.slots.mainSections).toBe("Imported renderer");
+  });
+
+  it("revalidates the renderer path when the entry becomes an escaping symlink", async () => {
+    const root = fixture();
+    const consumer = join(root, "consumer");
+    mkdirSync(consumer);
+    writeFileSync(join(consumer, "data.json"), "{}");
+    const rendererPath = join(consumer, "renderer.mjs");
+    writeFileSync(rendererPath, 'export function renderArtifact() { return { mainSections: "inside" }; }');
+    const markerPath = join(root, "outside-executed.txt");
+    writeFileSync(
+      join(root, "outside.mjs"),
+      `import { writeFileSync } from "node:fs";
+       writeFileSync(${JSON.stringify(markerPath)}, "executed");
+       export function renderArtifact() { return { mainSections: "outside" }; }`,
+    );
+    const manifest = await loadArtifactManifest(
+      writeManifest(root, validManifest(', rootDirectory: "./consumer"')),
+    );
+    unlinkSync(rendererPath);
+    symlinkSync(join(root, "outside.mjs"), rendererPath);
+
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_RENDERER_RESULT",
+    );
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("rejects a renderer that changes while its content-hashed module is importing", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(
+      join(root, "renderer.mjs"),
+      `import { writeFileSync } from "node:fs";
+       const ownUrl = new URL(import.meta.url); ownUrl.search = "";
+       writeFileSync(ownUrl, 'export function renderArtifact() { return { mainSections: "changed" }; }');
+       export function renderArtifact() { return { mainSections: "original" }; }`,
+    );
+    const manifest = await loadArtifactManifest(writeManifest(root, validManifest()));
+
+    try {
+      await renderInteractiveModel(manifest);
+      throw new Error("Expected renderer import mismatch");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "INVALID_RENDERER_RESULT" });
+      expect((error as Error).message).toMatch(/changed while importing/i);
+    }
+  });
+
   it("rejects unsupported versions, modes, unknown keys, malformed shapes, and duplicate IDs", async () => {
     const root = fixture();
     writeFileSync(join(root, "data.json"), "{}");
@@ -278,6 +364,107 @@ describe("interactive artifact manifest", () => {
       const manifest = await loadArtifactManifest(path);
       await expectArtifactError(() => renderInteractiveModel(manifest), "INVALID_RENDERER_RESULT");
     }
+  });
+
+  it("normalizes reflective Proxy failures from manifests and renderer results", async () => {
+    const root = fixture();
+    writeFileSync(join(root, "data.json"), "{}");
+    const traps = ["getPrototypeOf", "ownKeys", "getOwnPropertyDescriptor"];
+    for (const [index, trap] of traps.entries()) {
+      const proxyManifest = join(root, `proxy-manifest-${index}.mjs`);
+      writeFileSync(
+        proxyManifest,
+        `export default new Proxy({ contractVersion: 1 }, { ${trap}() { throw new Error("trap"); } });`,
+      );
+      await expectArtifactError(
+        () => loadArtifactManifest(proxyManifest),
+        "INVALID_MANIFEST",
+      );
+
+      const rendererName = `proxy-renderer-${index}.mjs`;
+      writeFileSync(
+        join(root, rendererName),
+        `export function renderArtifact() {
+          return new Proxy({ mainSections: "ok" }, { ${trap}() { throw new Error("trap"); } });
+        }`,
+      );
+      const manifest = await loadArtifactManifest(
+        writeManifest(
+          root,
+          validManifest().replace(
+            'renderer: "./renderer.mjs"',
+            `renderer: "./${rendererName}"`,
+          ),
+          `proxy-renderer-manifest-${index}.mjs`,
+        ),
+      );
+      await expectArtifactError(
+        () => renderInteractiveModel(manifest),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
+  });
+
+  it("normalizes revoked Proxy inspection failures", async () => {
+    const root = fixture();
+    const revokedManifest = join(root, "revoked-manifest.mjs");
+    writeFileSync(
+      revokedManifest,
+      `const state = Proxy.revocable({}, {}); state.revoke(); export default state.proxy;`,
+    );
+    await expectArtifactError(
+      () => loadArtifactManifest(revokedManifest),
+      "INVALID_MANIFEST",
+    );
+
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(
+      join(root, "renderer.mjs"),
+      `export function renderArtifact() {
+        const state = Proxy.revocable({}, {}); state.revoke(); return state.proxy;
+      }`,
+    );
+    const manifest = await loadArtifactManifest(writeManifest(root, validManifest()));
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_RENDERER_RESULT",
+    );
+  });
+
+  it("rejects oversized manifest, data, and renderer sources with stable errors", async () => {
+    const root = fixture();
+    const oversizedManifest = join(root, "oversized-manifest.mjs");
+    writeFileSync(
+      oversizedManifest,
+      `${" ".repeat(2 * 1024 * 1024 + 1)}export default {};`,
+    );
+    await expectArtifactError(
+      () => loadArtifactManifest(oversizedManifest),
+      "INVALID_MANIFEST",
+    );
+
+    writeFileSync(join(root, "renderer.mjs"), "export function renderArtifact() { return {}; }");
+    writeFileSync(
+      join(root, "data.json"),
+      `"${"x".repeat(16 * 1024 * 1024)}"`,
+    );
+    await expectArtifactError(
+      () => loadArtifactManifest(writeManifest(root, validManifest(), "oversized-data.mjs")),
+      "INVALID_DATA_BLOCK",
+    );
+
+    writeFileSync(join(root, "data.json"), "{}");
+    writeFileSync(
+      join(root, "renderer.mjs"),
+      `${" ".repeat(2 * 1024 * 1024 + 1)}export function renderArtifact() { return {}; }`,
+    );
+    const manifest = await loadArtifactManifest(
+      writeManifest(root, validManifest(), "oversized-renderer.mjs"),
+    );
+    await expectArtifactError(
+      () => renderInteractiveModel(manifest),
+      "INVALID_RENDERER_RESULT",
+    );
   });
 
   it("does not expose absolute paths through manifest, model, or structured errors", async () => {
