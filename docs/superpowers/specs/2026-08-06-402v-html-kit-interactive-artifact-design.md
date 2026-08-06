@@ -131,11 +131,11 @@ export default {
 };
 ```
 
-`rootDirectory` defaults to the manifest directory. Relative entries resolve against it. The CLI does not accept remote manifests or URL entries.
+`rootDirectory` defaults to the manifest directory. Relative entries resolve against it. The CLI does not accept remote manifests or URL entries. Manifest and renderer entries are single-file ESM modules in P0: static imports, dynamic imports, and dependency re-exports are unsupported. After validation, the Kit imports the exact validated UTF-8 bytes through a content-addressed `data:` URL, then revalidates the pinned local source and root identity before accepting the result.
 
 ### `lib/html-note-kit/interactive.mjs`
 
-Builds the interactive document model. It imports the renderer with a cache-busting file URL based on file content, passes deep-frozen copies of data and SVG assets, and requires this contract:
+Builds the interactive document model. It imports the exact validated renderer bytes through a content-addressed `data:` URL, passes deep-frozen copies of data and SVG assets, and requires this contract:
 
 ```js
 export function renderArtifact({ data, svg, metadata }) {
