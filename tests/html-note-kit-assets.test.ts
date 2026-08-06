@@ -388,6 +388,14 @@ describe("trusted local artifact entries", () => {
         "escaped-image-function.css",
         'body { background: im\\61ge("https://example.com/x.png"); }',
       ],
+      [
+        "src-function.css",
+        'body { background: src("https://example.com/x.png"); }',
+      ],
+      [
+        "escaped-src-function.css",
+        'body { background: s\\72 c("https://example.com/x.png"); }',
+      ],
     ]);
 
     for (const [filename, content] of cases) {
@@ -595,6 +603,14 @@ describe("trusted local artifact entries", () => {
       [
         "attribute-escaped-image-function",
         '<path style="background:im\\61ge(\'https://example.com/x.png\')"/>',
+      ],
+      [
+        "style-src-function",
+        '<style>.x { background: src("https://example.com/x.png"); }</style>',
+      ],
+      [
+        "attribute-escaped-src-function",
+        '<path style="background:s\\72 c(\'https://example.com/x.png\')"/>',
       ],
     ]);
 
