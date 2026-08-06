@@ -341,12 +341,54 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/escaped-safe.css"),
-      '.a { fill: u\\72l(\\23 paint); } .b { background: url(d\\61ta\\3a image/png;base64,AA==); } .c::after { content: "u\\72l(https://text-only.example)"; } .d::after { content: "line\\A break"; } /* @\\69mport url(https://comment.example); */',
+      '.a { fill: u\\72l(\\23 paint); } .b { background: url(d\\61ta\\3a image/png;base64,AA==); } .c::after { content: "u\\72l(https://text-only.example) image-set(local.png 1x)"; } .d::after { content: "line\\A break"; } /* @\\69mport url(https://comment.example); local("Comment Font"); */',
     );
 
     expect(loadStylesheetEntry(root, "./entries/escaped-safe.css").label).toBe(
       "entries/escaped-safe.css",
     );
+  });
+
+  it("rejects implicit CSS resource functions including escaped names", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      [
+        "image-set-remote.css",
+        'body { background: image-set("https://example.com/x.png" 1x); }',
+      ],
+      [
+        "image-set-protocol.css",
+        'body { background: image-set("//example.com/x.png" 1x); }',
+      ],
+      [
+        "image-set-local.css",
+        'body { background: image-set("./x.png" 1x); }',
+      ],
+      [
+        "webkit-image-set.css",
+        'body { background: -webkit-image-set("https://example.com/x.png" 1x); }',
+      ],
+      [
+        "escaped-image-set.css",
+        'body { background: im\\61ge-set("https://example.com/x.png" 1x); }',
+      ],
+      [
+        "local-font.css",
+        '@font-face { font-family: Artifact; src: local("Installed Font"); }',
+      ],
+      [
+        "escaped-local-font.css",
+        '@font-face { font-family: Artifact; src: l\\6f cal("Installed Font"); }',
+      ],
+    ]);
+
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", filename), content);
+      expectArtifactError(
+        () => loadStylesheetEntry(root, `./entries/${filename}`),
+        "INVALID_STYLESHEET",
+      );
+    }
   });
 
   it("rejects SVG declarations, missing accessibility, and malformed roots", () => {
@@ -450,6 +492,47 @@ describe("trusted local artifact entries", () => {
       [
         "attribute-protocol",
         '<path style="fill:url(h\\74tps\\3a //example.com/x.svg)"/>',
+      ],
+    ]);
+
+    for (const [filename, body] of cases) {
+      writeFileSync(
+        join(root, "entries", `${filename}.svg`),
+        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+      );
+      expectArtifactError(
+        () =>
+          loadSvgAsset(root, {
+            id: `unsafe-${filename}`,
+            source: `./entries/${filename}.svg`,
+          }),
+        "UNSAFE_SVG",
+      );
+    }
+  });
+
+  it("rejects implicit resource functions in SVG styles and style attributes", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      [
+        "style-image-set",
+        '<style>.x { background: image-set("https://example.com/x.png" 1x); }</style>',
+      ],
+      [
+        "style-protocol-image-set",
+        '<style>.x { background: image-set("//example.com/x.png" 1x); }</style>',
+      ],
+      [
+        "attribute-local-image-set",
+        '<path style="background:image-set(\'./x.png\' 1x)"/>',
+      ],
+      [
+        "attribute-escaped-image-set",
+        '<path style="background:im\\61ge-set(\'https://example.com/x.png\' 1x)"/>',
+      ],
+      [
+        "attribute-local-font",
+        '<text style="font-family:local(\'Installed Font\')">Text</text>',
       ],
     ]);
 
