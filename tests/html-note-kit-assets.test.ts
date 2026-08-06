@@ -68,7 +68,7 @@ describe("trusted local artifact entries", () => {
     writeFileSync(join(root, "entries/app.js"), "window.ready = true;");
     writeFileSync(
       join(root, "entries/map.svg"),
-      '<svg class="map" viewBox="0 0 100 50"><defs><path id="route" d="M0 0h100"/></defs><use href="#route"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" class="map" viewBox="0 0 100 50"><defs><path id="route" d="M0 0h100"/></defs><use href="#route"/></svg>',
     );
 
     const css = loadStylesheetEntry(root, "./entries/app.css");
@@ -127,10 +127,13 @@ describe("trusted local artifact entries", () => {
     const outside = join(container, "outside.js");
     writeFileSync(outside, "window.outside = true;");
     symlinkSync(outside, join(root, "entries/link.js"));
+    writeFileSync(join(root, "entries/inside.js"), "window.inside = true;");
+    symlinkSync(join(root, "entries/inside.js"), join(root, "entries/inside-link.js"));
 
     for (const source of [
       "../outside.js",
       "./entries/link.js",
+      "./entries/inside-link.js",
       "https://example.com/app.js",
       "file:///tmp/app.js",
       "./entries/app\0.js",
@@ -201,7 +204,7 @@ describe("trusted local artifact entries", () => {
       Buffer.alloc(CSS_AND_JS_LIMIT + 1, 32),
     );
 
-    const svgStart = '<svg viewBox="0 0 1 1"><title>Exact</title><!--';
+    const svgStart = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>Exact</title><!--';
     const svgEnd = "--></svg>";
     writeFileSync(
       join(root, "entries/exact.svg"),
@@ -265,18 +268,32 @@ describe("trusted local artifact entries", () => {
     );
   });
 
-  it("conservatively rejects dynamic import tokens inside comments and strings", () => {
+  it("conservatively rejects standalone import tokens inside comments and strings", () => {
     const { root } = fixture();
-    writeFileSync(join(root, "entries/comment.js"), "// import('./later.js')");
-    writeFileSync(join(root, "entries/string.js"), 'const text = "import( later )";');
+    const cases = new Map([
+      ["comment.js", "// import('./later.js')"],
+      ["string.js", 'const text = "import( later )";'],
+      ["carriage-return.js", "// import\rwindow.ready = true;"],
+      ["line-separator.js", "// import\u2028window.ready = true;"],
+      ["paragraph-separator.js", "// import\u2029window.ready = true;"],
+      ["annex-b.js", "<!-- import\nwindow.ready = true;"],
+      ["plain-string.js", 'const text = "import";'],
+    ]);
 
-    expectArtifactError(
-      () => loadScriptEntry(root, "./entries/comment.js"),
-      "INVALID_JAVASCRIPT",
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", filename), content);
+      expectArtifactError(
+        () => loadScriptEntry(root, `./entries/${filename}`),
+        "INVALID_JAVASCRIPT",
+      );
+    }
+
+    writeFileSync(
+      join(root, "entries/identifiers.js"),
+      "const important = 1; const importValue = 2; const $import = 3;",
     );
-    expectArtifactError(
-      () => loadScriptEntry(root, "./entries/string.js"),
-      "INVALID_JAVASCRIPT",
+    expect(loadScriptEntry(root, "./entries/identifiers.js").content).toContain(
+      "$import",
     );
   });
 
@@ -310,6 +327,24 @@ describe("trusted local artifact entries", () => {
     expect(loadStylesheetEntry(root, "./entries/safe.css").label).toBe(
       "entries/safe.css",
     );
+  });
+
+  it("rejects Unicode boundary whitespace in CSS resource values", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      ["nbsp.css", 'body { background: url("\u00a0#paint"); }'],
+      ["feff.css", 'body { background: url("\ufeffdata:image/png;base64,AA=="); }'],
+      ["escaped-nbsp.css", 'body { background: url("\\a0 #paint"); }'],
+      ["trailing-nbsp.css", 'body { background: url("#paint\u00a0"); }'],
+    ]);
+
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", filename), content);
+      expectArtifactError(
+        () => loadStylesheetEntry(root, `./entries/${filename}`),
+        "INVALID_STYLESHEET",
+      );
+    }
   });
 
   it("rejects escaped CSS imports, function names, protocols, and malformed escapes", () => {
@@ -412,12 +447,12 @@ describe("trusted local artifact entries", () => {
     const cases = new Map([
       [
         "doctype.svg",
-        '<!DOCTYPE svg [<!ENTITY xxe "value">]><svg viewBox="0 0 1 1"><title>&xxe;</title></svg>',
+        '<!DOCTYPE svg [<!ENTITY xxe "value">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>&xxe;</title></svg>',
       ],
-      ["entity.svg", '<!ENTITY x "value"><svg viewBox="0 0 1 1"><title>X</title></svg>'],
+      ["entity.svg", '<!ENTITY x "value"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>X</title></svg>'],
       ["root.svg", '<html><title>Wrong root</title></html>'],
-      ["viewbox.svg", "<svg><title>No dimensions</title></svg>"],
-      ["title.svg", '<svg viewBox="0 0 1 1"><path d="M0 0"/></svg>'],
+      ["viewbox.svg", '<svg xmlns="http://www.w3.org/2000/svg"><title>No dimensions</title></svg>'],
+      ["title.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0"/></svg>'],
     ]);
 
     for (const [filename, content] of cases) {
@@ -427,6 +462,49 @@ describe("trusted local artifact entries", () => {
           loadSvgAsset(root, {
             id: `unsafe-${filename.replace(".svg", "")}`,
             source: `./entries/${filename}`,
+          }),
+        "UNSAFE_SVG",
+      );
+    }
+  });
+
+  it("rejects prefixed or foreign-namespace SVG roots and elements", () => {
+    const { root } = fixture();
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const cases = new Map([
+      [
+        "prefixed-root",
+        `<s:svg xmlns:s="${svgNamespace}" viewBox="0 0 1 1"><s:title>Title</s:title></s:svg>`,
+      ],
+      [
+        "foreign-root",
+        '<svg xmlns="urn:foreign" viewBox="0 0 1 1"><title>Title</title></svg>',
+      ],
+      [
+        "prefixed-child",
+        `<svg xmlns="${svgNamespace}" viewBox="0 0 1 1"><title>Title</title><s:path xmlns:s="${svgNamespace}"/></svg>`,
+      ],
+      [
+        "foreign-child",
+        `<svg xmlns="${svgNamespace}" viewBox="0 0 1 1"><title>Title</title><path xmlns="urn:foreign"/></svg>`,
+      ],
+      [
+        "prefixed-title",
+        `<svg xmlns="${svgNamespace}" viewBox="0 0 1 1"><s:title xmlns:s="${svgNamespace}">Title</s:title></svg>`,
+      ],
+      [
+        "foreign-description",
+        `<svg xmlns="${svgNamespace}" viewBox="0 0 1 1"><title>Title</title><desc xmlns="urn:foreign">Description</desc></svg>`,
+      ],
+    ]);
+
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", `${filename}.svg`), content);
+      expectArtifactError(
+        () =>
+          loadSvgAsset(root, {
+            id: `unsafe-${filename}`,
+            source: `./entries/${filename}.svg`,
           }),
         "UNSAFE_SVG",
       );
@@ -458,7 +536,7 @@ describe("trusted local artifact entries", () => {
     for (const [filename, body] of bodies) {
       writeFileSync(
         join(root, "entries", `${filename}.svg`),
-        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
       );
       expectArtifactError(
         () =>
@@ -484,7 +562,7 @@ describe("trusted local artifact entries", () => {
     for (const [element, body] of bodies) {
       writeFileSync(
         join(root, "entries", `${element}.svg`),
-        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
       );
       try {
         loadSvgAsset(root, {
@@ -526,7 +604,7 @@ describe("trusted local artifact entries", () => {
     for (const [filename, body] of cases) {
       writeFileSync(
         join(root, "entries", `${filename}.svg`),
-        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
       );
       expectArtifactError(
         () =>
@@ -560,7 +638,7 @@ describe("trusted local artifact entries", () => {
     for (const [filename, body] of cases) {
       writeFileSync(
         join(root, "entries", `${filename}.svg`),
-        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
       );
       expectArtifactError(
         () =>
@@ -617,7 +695,7 @@ describe("trusted local artifact entries", () => {
     for (const [filename, body] of cases) {
       writeFileSync(
         join(root, "entries", `${filename}.svg`),
-        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
       );
       expectArtifactError(
         () =>
@@ -635,11 +713,11 @@ describe("trusted local artifact entries", () => {
     const cases = new Map([
       [
         "title-collision",
-        '<svg id="collision-title" viewBox="0 0 10 10"><title>Title</title></svg>',
+        '<svg xmlns="http://www.w3.org/2000/svg" id="collision-title" viewBox="0 0 10 10"><title>Title</title></svg>',
       ],
       [
         "description-collision",
-        '<svg id="collision-description" viewBox="0 0 10 10"><title>Title</title><desc>Description</desc></svg>',
+        '<svg xmlns="http://www.w3.org/2000/svg" id="collision-description" viewBox="0 0 10 10"><title>Title</title><desc>Description</desc></svg>',
       ],
     ]);
 
@@ -656,11 +734,38 @@ describe("trusted local artifact entries", () => {
     }
   });
 
+  it("rejects Unicode boundary whitespace in SVG resource values", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      ["href-nbsp", '<use href="\u00a0#paint"/>'],
+      ["href-feff", '<use href="\ufeff#paint"/>'],
+      ["href-entity", '<use href="&#xA0;#paint"/>'],
+      ["href-trailing", '<use href="#paint\u00a0"/>'],
+      ["css-entity", '<path fill="url(&#xA0;#paint)"/>'],
+      ["css-escaped", '<path fill="url(\\a0 #paint)"/>'],
+    ]);
+
+    for (const [filename, body] of cases) {
+      writeFileSync(
+        join(root, "entries", `${filename}.svg`),
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+      );
+      expectArtifactError(
+        () =>
+          loadSvgAsset(root, {
+            id: `unsafe-${filename}`,
+            source: `./entries/${filename}.svg`,
+          }),
+        "UNSAFE_SVG",
+      );
+    }
+  });
+
   it("preserves safe SVG content, existing accessible text, and fragment references", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/safe.svg"),
-      '<svg viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><g aria-label="Meet at local(office)" data-note="image-set(local.png 1x)"><path fill="url(#paint)"/><use href="#paint"/><a href="#paint"><text>Safe link</text></a></g></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Existing title</title><desc>Existing description</desc><defs><linearGradient id="paint"/></defs><g aria-label="Meet at local(office)" data-note="image-set(local.png 1x)"><path fill="url(#paint)"/><use href="#paint"/><use id="xlink-use" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#paint"/><a href="#paint"><text>Safe link</text></a></g></svg>',
     );
 
     const result = loadSvgAsset(root, {
@@ -676,6 +781,10 @@ describe("trusted local artifact entries", () => {
       );
       expect(svg?.querySelector('path[fill="url(#paint)"]')).not.toBeNull();
       expect(svg?.querySelector('use[href="#paint"]')).not.toBeNull();
+      expect(svg?.querySelector("#xlink-use")?.getAttributeNS(
+        "http://www.w3.org/1999/xlink",
+        "href",
+      )).toBe("#paint");
       expect(svg?.querySelector('a[href="#paint"]')).not.toBeNull();
       const metadata = svg?.querySelector("g[data-note]");
       expect(metadata?.getAttribute("aria-label")).toBe("Meet at local(office)");
@@ -691,7 +800,7 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/text.svg"),
-      '<svg viewBox="0 0 5 5"><title id="old-title">Old</title><desc id="old-desc">Old description</desc><path id="kept"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5"><title id="old-title">Old</title><desc id="old-desc">Old description</desc><path id="kept"/></svg>',
     );
 
     const definition = {
@@ -726,7 +835,7 @@ describe("trusted local artifact entries", () => {
     const { root } = fixture();
     writeFileSync(
       join(root, "entries/id.svg"),
-      '<svg viewBox="0 0 1 1"><title>Safe</title></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><title>Safe</title></svg>',
     );
 
     for (const id of ["bad id", "1starts-with-number", `a${"x".repeat(128)}`]) {
