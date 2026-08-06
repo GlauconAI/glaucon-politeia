@@ -49,6 +49,16 @@ function expectArtifactError(run: () => unknown, code: string) {
 }
 
 describe("trusted local artifact entries", () => {
+  it("exposes only a manifest-relative label from public path resolution", () => {
+    const { root } = fixture();
+    writeFileSync(join(root, "entries/app.css"), ".card { color: white; }");
+
+    const resolved = resolveTrustedEntry(root, "./entries/app.css");
+
+    expect(resolved).toEqual({ label: "entries/app.css" });
+    expect(JSON.stringify(resolved)).not.toContain(root);
+  });
+
   it("loads valid CSS, classic JavaScript, and an accessible SVG with relative labels", () => {
     const { root } = fixture();
     writeFileSync(
@@ -302,6 +312,43 @@ describe("trusted local artifact entries", () => {
     );
   });
 
+  it("rejects escaped CSS imports, function names, protocols, and malformed escapes", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      ["escaped-import.css", '@\\69mport "https://example.com/x.css";'],
+      [
+        "escaped-url-name.css",
+        "body { background: u\\72 l(https://example.com/x.png); }",
+      ],
+      [
+        "escaped-protocol.css",
+        "body { background: url(h\\74tps\\3a //example.com/x.png); }",
+      ],
+      ["escaped-newline.css", "body { background: url(http\\\n://example.com); }"],
+      ["trailing-escape.css", "body { background: url(data:image/png,\\); }"],
+    ]);
+
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", filename), content);
+      expectArtifactError(
+        () => loadStylesheetEntry(root, `./entries/${filename}`),
+        "INVALID_STYLESHEET",
+      );
+    }
+  });
+
+  it("allows escaped safe CSS URLs while ignoring strings and comments", () => {
+    const { root } = fixture();
+    writeFileSync(
+      join(root, "entries/escaped-safe.css"),
+      '.a { fill: u\\72l(\\23 paint); } .b { background: url(d\\61ta\\3a image/png;base64,AA==); } .c::after { content: "u\\72l(https://text-only.example)"; } .d::after { content: "line\\A break"; } /* @\\69mport url(https://comment.example); */',
+    );
+
+    expect(loadStylesheetEntry(root, "./entries/escaped-safe.css").label).toBe(
+      "entries/escaped-safe.css",
+    );
+  });
+
   it("rejects SVG declarations, missing accessibility, and malformed roots", () => {
     const { root } = fixture();
     const cases = new Map([
@@ -381,6 +428,66 @@ describe("trusted local artifact entries", () => {
         () =>
           loadSvgAsset(root, {
             id: `unsafe-${filename}`,
+            source: `./entries/${filename}.svg`,
+          }),
+        "UNSAFE_SVG",
+      );
+    }
+  });
+
+  it("rejects escaped imports and URLs in SVG style elements and attributes", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      ["style-import", '<style>@\\69mport "https://example.com/x.css";</style>'],
+      [
+        "style-url-name",
+        "<style>.x { fill: u\\72 l(https://example.com/x.svg); }</style>",
+      ],
+      [
+        "attribute-url-name",
+        '<path style="fill:u\\72 l(https://example.com/x.svg)"/>',
+      ],
+      [
+        "attribute-protocol",
+        '<path style="fill:url(h\\74tps\\3a //example.com/x.svg)"/>',
+      ],
+    ]);
+
+    for (const [filename, body] of cases) {
+      writeFileSync(
+        join(root, "entries", `${filename}.svg`),
+        `<svg viewBox="0 0 10 10"><title>Unsafe</title>${body}</svg>`,
+      );
+      expectArtifactError(
+        () =>
+          loadSvgAsset(root, {
+            id: `unsafe-${filename}`,
+            source: `./entries/${filename}.svg`,
+          }),
+        "UNSAFE_SVG",
+      );
+    }
+  });
+
+  it("rejects accessible title and description ids colliding with the SVG root", () => {
+    const { root } = fixture();
+    const cases = new Map([
+      [
+        "title-collision",
+        '<svg id="collision-title" viewBox="0 0 10 10"><title>Title</title></svg>',
+      ],
+      [
+        "description-collision",
+        '<svg id="collision-description" viewBox="0 0 10 10"><title>Title</title><desc>Description</desc></svg>',
+      ],
+    ]);
+
+    for (const [filename, content] of cases) {
+      writeFileSync(join(root, "entries", `${filename}.svg`), content);
+      expectArtifactError(
+        () =>
+          loadSvgAsset(root, {
+            id: "collision",
             source: `./entries/${filename}.svg`,
           }),
         "UNSAFE_SVG",
