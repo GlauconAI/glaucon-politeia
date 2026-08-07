@@ -28,7 +28,7 @@ function model() {
       eyebrow: "402v",
       lang: "en",
     },
-    data: new Map([
+    data: new Map<string, unknown>([
       ["zeta", { ready: true }],
       ["registry", { projects: [{ name: "Atlas" }] }],
     ]),

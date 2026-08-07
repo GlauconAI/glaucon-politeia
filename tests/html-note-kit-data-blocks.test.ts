@@ -318,7 +318,7 @@ describe("HTML artifact data blocks", () => {
     expect(encoded).toContain('"self":"[Circular]"');
     expect(encoded).toContain("[MaxDepth]");
 
-    let invalidIdError;
+    let invalidIdError: unknown;
     try {
       serializeDataBlocks(new Map<unknown, unknown>([[1n, null]]));
     } catch (error) {
