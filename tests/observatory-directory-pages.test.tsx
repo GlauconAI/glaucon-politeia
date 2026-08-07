@@ -145,7 +145,10 @@ describe("Dashboard directory pages", () => {
   it("renders de-duplicated Skills with URL-derived filters", async () => {
     render(
       await SkillsPage({
-        searchParams: Promise.resolve({ q: "weather", scope: "private" }),
+        searchParams: Promise.resolve({
+          q: "weather",
+          category: "shared-custom",
+        }),
       }),
     );
 
@@ -154,8 +157,8 @@ describe("Dashboard directory pages", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: /search skills/i }))
       .toHaveValue("weather");
-    expect(screen.getByRole("combobox", { name: /skill scope/i }))
-      .toHaveValue("private");
+    expect(screen.getByRole("combobox", { name: /category/i }))
+      .toHaveValue("shared-custom");
     expect(screen.getByRole("heading", { name: "weather" }))
       .toBeInTheDocument();
   });

@@ -160,7 +160,8 @@ describe("Dashboard directory view models", () => {
       owners: ["plato"],
       agentCount: 1,
       instanceCount: 1,
-      scope: "private",
+      category: "agent-scoped-custom",
+      hasAgentOverride: false,
     });
     expect(result[1]).toMatchObject({
       name: "Weather",
@@ -170,7 +171,8 @@ describe("Dashboard directory view models", () => {
       sources: ["openclaw-bundled", "openclaw-workspace"],
       agentCount: 2,
       instanceCount: 2,
-      scope: "shared",
+      category: "openclaw-built-in",
+      hasAgentOverride: true,
     });
     expect(result[1].instances).toEqual([
       expect.objectContaining({
@@ -186,5 +188,67 @@ describe("Dashboard directory view models", () => {
         source: "openclaw-workspace",
       }),
     ]);
+  });
+
+  it("derives the four user-facing Skill categories from source and visibility", () => {
+    const categoryAssets = [
+      skill("skill:a:weather", "weather", "a", "healthy", [
+        { key: "install_source", value: "openclaw-bundled" },
+      ]),
+      skill("skill:b:weather", "weather", "b", "healthy", [
+        { key: "install_source", value: "openclaw-workspace" },
+      ]),
+      skill("skill:a:agent-browser", "agent-browser", "a", "healthy", [
+        { key: "install_source", value: "agents-skills-personal" },
+      ]),
+      skill("skill:b:agent-browser", "agent-browser", "b", "healthy", [
+        { key: "install_source", value: "agents-skills-personal" },
+      ]),
+      skill("skill:a:shared", "shared", "a", "healthy", [
+        { key: "install_source", value: "openclaw-managed" },
+      ]),
+      skill("skill:b:shared", "shared", "b", "healthy", [
+        { key: "install_source", value: "openclaw-extra" },
+      ]),
+      skill("skill:a:private", "private", "a", "healthy", [
+        { key: "install_source", value: "openclaw-workspace" },
+      ]),
+      skill("skill:a:future", "future", "a", "healthy", [
+        { key: "install_source", value: "future-source" },
+      ]),
+    ];
+
+    expect(
+      Object.fromEntries(
+        buildSkillDirectory(categoryAssets).map((entry) => [
+          entry.name,
+          {
+            category: entry.category,
+            hasAgentOverride: entry.hasAgentOverride,
+          },
+        ]),
+      ),
+    ).toEqual({
+      "agent-browser": {
+        category: "system-web",
+        hasAgentOverride: false,
+      },
+      future: {
+        category: "agent-scoped-custom",
+        hasAgentOverride: false,
+      },
+      private: {
+        category: "agent-scoped-custom",
+        hasAgentOverride: false,
+      },
+      shared: {
+        category: "shared-custom",
+        hasAgentOverride: false,
+      },
+      weather: {
+        category: "openclaw-built-in",
+        hasAgentOverride: true,
+      },
+    });
   });
 });

@@ -7,7 +7,10 @@ import {
 } from "@/components/observatory/SkillDirectory";
 import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
-import { buildSkillDirectory } from "@/lib/observatory/dashboard-directory";
+import {
+  buildSkillDirectory,
+  dashboardSkillCategories,
+} from "@/lib/observatory/dashboard-directory";
 import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +35,9 @@ function oneOf<Value extends string>(
 function filtersFrom(params: SearchParams): SkillDirectoryFilters {
   return {
     q: value(params, "q") ?? "",
-    scope: oneOf(
-      value(params, "scope"),
-      ["all", "shared", "private"] as const,
+    category: oneOf(
+      value(params, "category"),
+      ["all", ...dashboardSkillCategories] as const,
       "all",
     ),
     health: value(params, "health") ?? "all",

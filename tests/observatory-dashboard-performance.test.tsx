@@ -31,7 +31,7 @@ const projectFilters: ProjectDirectoryFilters = {
 
 const skillFilters: SkillDirectoryFilters = {
   q: "",
-  scope: "all",
+  category: "all",
   health: "all",
   agent: "all",
   source: "all",
@@ -83,7 +83,8 @@ function skill(index: number): DashboardSkillEntry {
     versions: [],
     agentCount: instances.length,
     instanceCount: instances.length,
-    scope: "shared",
+    category: "shared-custom",
+    hasAgentOverride: false,
     instances,
   };
 }

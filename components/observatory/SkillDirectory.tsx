@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { DashboardSkillEntry } from "@/lib/observatory/dashboard-directory";
+import {
+  dashboardSkillCategories,
+  dashboardSkillCategoryLabels,
+  type DashboardSkillCategory,
+  type DashboardSkillEntry,
+} from "@/lib/observatory/dashboard-directory";
 
 export type SkillDirectoryFilters = {
   q: string;
-  scope: "all" | "shared" | "private";
+  category: "all" | DashboardSkillCategory;
   health: string;
   agent: string;
   source: string;
@@ -16,7 +21,9 @@ export type SkillDirectoryFilters = {
 function updateUrl(filters: SkillDirectoryFilters) {
   const search = new URLSearchParams();
   if (filters.q) search.set("q", filters.q);
-  if (filters.scope !== "all") search.set("scope", filters.scope);
+  if (filters.category !== "all") {
+    search.set("category", filters.category);
+  }
   if (filters.health !== "all") search.set("health", filters.health);
   if (filters.agent !== "all") search.set("agent", filters.agent);
   if (filters.source !== "all") search.set("source", filters.source);
@@ -60,7 +67,10 @@ export function SkillDirectory({
     const query = filters.q.trim().toLocaleLowerCase();
     return skills
       .filter((skill) => {
-        if (filters.scope !== "all" && skill.scope !== filters.scope) {
+        if (
+          filters.category !== "all" &&
+          skill.category !== filters.category
+        ) {
           return false;
         }
         if (filters.health !== "all" && skill.health !== filters.health) {
@@ -77,6 +87,7 @@ export function SkillDirectory({
           skill.name,
           skill.description,
           skill.health,
+          dashboardSkillCategoryLabels[skill.category],
           ...skill.owners,
           ...skill.sources,
           ...skill.versions,
@@ -122,6 +133,12 @@ export function SkillDirectory({
     (total, skill) => total + skill.instanceCount,
     0,
   );
+  const categoryCounts = Object.fromEntries(
+    dashboardSkillCategories.map((category) => [
+      category,
+      skills.filter((skill) => skill.category === category).length,
+    ]),
+  ) as Record<DashboardSkillCategory, number>;
 
   return (
     <section className="dashboard-directory" aria-labelledby="skill-directory-heading">
@@ -137,6 +154,34 @@ export function SkillDirectory({
         </div>
       </div>
 
+      <div
+        className="dashboard-skill-categories"
+        aria-label="Skill categories"
+      >
+        {dashboardSkillCategories.map((category) => {
+          const count = categoryCounts[category];
+          return (
+            <button
+              key={category}
+              className="dashboard-skill-category"
+              type="button"
+              aria-pressed={filters.category === category}
+              onClick={() =>
+                setFilter(
+                  "category",
+                  filters.category === category ? "all" : category,
+                )
+              }
+            >
+              <strong>{dashboardSkillCategoryLabels[category]}</strong>
+              <span>
+                {count} Skill{count === 1 ? "" : "s"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="dashboard-directory-controls">
         <label className="dashboard-directory-search">
           <span>Search Skills</span>
@@ -148,19 +193,22 @@ export function SkillDirectory({
           />
         </label>
         <label>
-          <span>Skill scope</span>
+          <span>Category</span>
           <select
-            value={filters.scope}
+            value={filters.category}
             onChange={(event) =>
               setFilter(
-                "scope",
-                event.target.value as SkillDirectoryFilters["scope"],
+                "category",
+                event.target.value as SkillDirectoryFilters["category"],
               )
             }
           >
-            <option value="all">All scopes</option>
-            <option value="shared">Shared</option>
-            <option value="private">Single Agent</option>
+            <option value="all">All categories</option>
+            {dashboardSkillCategories.map((category) => (
+              <option key={category} value={category}>
+                {dashboardSkillCategoryLabels[category]}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -232,7 +280,12 @@ export function SkillDirectory({
                 </div>
                 <p>{skill.description}</p>
                 <div className="dashboard-skill-meta">
-                  <span>{skill.scope === "shared" ? "Shared" : "Single Agent"}</span>
+                  <span>{dashboardSkillCategoryLabels[skill.category]}</span>
+                  {skill.hasAgentOverride ? (
+                    <span className="dashboard-skill-override">
+                      Agent override
+                    </span>
+                  ) : null}
                   <span>
                     {skill.agentCount} Agent{skill.agentCount === 1 ? "" : "s"} ·{" "}
                     {skill.instanceCount} instance
