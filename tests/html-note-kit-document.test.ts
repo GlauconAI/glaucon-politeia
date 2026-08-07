@@ -9,6 +9,7 @@ import {
   extractDataBlocks,
 } from "../lib/html-note-kit/data-blocks.mjs";
 import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
+import { renderInteractiveRuntime } from "../lib/html-note-kit/runtime.mjs";
 import { renderHtmlDocument } from "../lib/html-note-kit/template.mjs";
 
 function model() {
@@ -135,6 +136,32 @@ describe("interactive 402v document", () => {
     expect(() => artifactWindow.__402vArtifact.getData("unknown")).toThrow(
       "Unknown artifact data block: unknown",
     );
+    dom.window.close();
+  });
+
+  it("binds getData to captured JSON nodes despite an earlier duplicate id", () => {
+    const dom = new JSDOM(
+      `<!doctype html>
+<div id="registry">shadow</div>
+<script type="application/json" id="registry">{"source":"captured"}</script>
+<script>${renderInteractiveRuntime()}</script>`,
+      { runScripts: "dangerously" },
+    );
+    const artifactWindow = dom.window as unknown as {
+      __402vArtifact: { getData(id: string): unknown };
+    };
+    const captured = dom.window.document.querySelector(
+      'script[type="application/json"][id="registry"]',
+    );
+    if (captured === null) throw new Error("missing captured data script");
+
+    expect(artifactWindow.__402vArtifact.getData("registry")).toEqual({
+      source: "captured",
+    });
+    captured.textContent = '{"source":"mutated"}';
+    expect(artifactWindow.__402vArtifact.getData("registry")).toEqual({
+      source: "mutated",
+    });
     dom.window.close();
   });
 
@@ -300,6 +327,38 @@ describe("interactive 402v document", () => {
       () => renderInteractiveDocument(duplicateTruth),
       "INVALID_RENDERER_RESULT",
     );
+  });
+
+  it("rejects every script element in slots, including case and template variants", () => {
+    const hostileSlots = [
+      '<SCRIPT>Object.defineProperty(window, "__402vArtifact", { value: "blocked", configurable: false });</SCRIPT>',
+      '<template><script type="text/javascript">window.templateRan = true;</script></template>',
+    ];
+
+    for (const slot of hostileSlots) {
+      const input = model();
+      input.slots.navigation = slot;
+      expectArtifactError(
+        () => renderInteractiveDocument(input),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
+  });
+
+  it("rejects slot ids that collide with canonical data ids", () => {
+    const collidingSlots = [
+      '<section id="registry">shadow</section>',
+      '<template><span id="registry">nested shadow</span></template>',
+    ];
+
+    for (const slot of collidingSlots) {
+      const input = model();
+      input.slots.rail = slot;
+      expectArtifactError(
+        () => renderInteractiveDocument(input),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
   });
 
   it("keeps note mode byte-stable and free of interactive declarations", () => {
