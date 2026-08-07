@@ -5,9 +5,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const html = readFileSync(args.input, "utf8").trim();
+const html = readFileSync(args.input, "utf8");
 
-if (!html) {
+if (!html.trim()) {
   fail("Input HTML file is empty");
 }
 

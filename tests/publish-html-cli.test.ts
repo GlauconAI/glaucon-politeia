@@ -9,7 +9,8 @@ describe("publish html cli", () => {
   it("prints the insert payload in dry-run mode", () => {
     const dir = mkdtempSync(join(tmpdir(), "publish-html-"));
     const input = join(dir, "artifact.html");
-    writeFileSync(input, "<html><body><h1>Artifact</h1></body></html>");
+    const html = "<html><body><h1>Artifact</h1></body></html>\n";
+    writeFileSync(input, html);
 
     try {
       const result = spawnSync(
@@ -46,7 +47,7 @@ describe("publish html cli", () => {
         status: "draft",
         tag_slugs: ["family", "sites"],
       });
-      expect(payload.content_html).toContain("<h1>Artifact</h1>");
+      expect(payload.content_html).toBe(html);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

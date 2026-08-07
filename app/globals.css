@@ -4539,6 +4539,13 @@ body {
     grid-template-columns: 1fr auto;
   }
 
+  .header-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .site-nav {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

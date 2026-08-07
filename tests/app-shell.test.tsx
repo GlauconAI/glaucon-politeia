@@ -69,6 +69,9 @@ describe("app shell", () => {
     expect(
       screen.getByRole("link", { name: /^dashboard$/i }),
     ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.getByRole("link", { name: /^orchestrator$/i }),
+    ).toHaveAttribute("href", "/orchestrator");
   });
 
   it("does not show publishing access to logged-in non-admin users", () => {
@@ -84,6 +87,9 @@ describe("app shell", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /^dashboard$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /^orchestrator$/i }),
     ).not.toBeInTheDocument();
   });
 

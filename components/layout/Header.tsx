@@ -34,6 +34,9 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
               <Link href="/dashboard" className="operator-link">
                 Dashboard
               </Link>
+              <Link href="/orchestrator" className="operator-link">
+                Orchestrator
+              </Link>
               <Link href="/editor" className="write-link">
                 Publish
               </Link>
