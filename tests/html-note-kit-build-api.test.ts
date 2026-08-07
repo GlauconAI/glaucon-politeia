@@ -15,6 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
+import { JSDOM } from "jsdom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { renderInteractiveDocument } from "../lib/html-note-kit/document.mjs";
@@ -362,6 +363,10 @@ describe("artifact verification", () => {
       "<section>Ready</section>",
       '<section id="registry">Ready</section>',
     );
+    const crlfData = source.replace(
+      '<script type="application/json" id="registry">\n{\n  "ready": true\n}\n</script>',
+      '<script type="application/json" id="registry">\r\n{\r\n  "ready": true\r\n}\r\n</script>',
+    );
 
     expect(issueCodes(expectArtifactError(() => verifyArtifactHtml(malformed), "ARTIFACT_VERIFICATION_FAILED"))).toContain(
       "INVALID_DATA_BLOCK",
@@ -383,6 +388,9 @@ describe("artifact verification", () => {
     );
     expect(issueCodes(expectArtifactError(() => verifyArtifactHtml(shadowedId), "ARTIFACT_VERIFICATION_FAILED"))).toContain(
       "DUPLICATE_DATA_BLOCK",
+    );
+    expect(issueCodes(expectArtifactError(() => verifyArtifactHtml(crlfData), "ARTIFACT_VERIFICATION_FAILED"))).toContain(
+      "NON_CANONICAL_DATA_BLOCK",
     );
     expect(
       issueCodes(
@@ -426,7 +434,13 @@ describe("artifact verification", () => {
       [source.replace('content="402v HTML Note Kit"', 'content="Other"'), "INVALID_GENERATOR"],
       [source.replace('content="interactive"', 'content="unknown"'), "INVALID_MODE"],
       [source.replace(/<script data-402v-runtime>[\s\S]*?<\/script>\n/, ""), "MISSING_RUNTIME"],
-      [source.replace("overflow-x: clip;", "overflow-x: visible;"), "MISSING_OVERFLOW_GUARD"],
+      [
+        source.replace(
+          "overflow-x: clip !important;",
+          "overflow-x: visible !important;",
+        ),
+        "MISSING_OVERFLOW_GUARD",
+      ],
     ];
 
     for (const [html, expectedCode] of cases) {
@@ -439,6 +453,69 @@ describe("artifact verification", () => {
         ),
         expectedCode,
       ).toContain(expectedCode);
+    }
+  });
+
+  it("rejects overflow declarations spoofed entirely inside CSS comments", () => {
+    const commentSpoof = validHtml()
+      .replace(/ style="[^"]*!important[^"]*"/g, "")
+      .replace(
+        /<style>[\s\S]*?<\/style>/,
+        `<style>/*
+html,
+body { max-width: 100%; overflow-x: clip; }
+[data-artifact-root],
+.artifact-rail { min-width: 0; max-width: 100%; }
+.artifact-svg-frame { max-width: 100%; overflow-x: auto; }
+*/</style>`,
+      );
+
+    const error = expectArtifactError(
+      () => verifyArtifactHtml(commentSpoof),
+      "ARTIFACT_VERIFICATION_FAILED",
+    );
+    expect(issueCodes(error)).toContain("MISSING_OVERFLOW_GUARD");
+  });
+
+  it("keeps protected overflow styles effective against later consumer important rules", () => {
+    const svg =
+      '<div class="artifact-svg-frame"><svg class="artifact-svg" role="img" aria-labelledby="protected-title" viewBox="0 0 10 10"><title id="protected-title">Protected</title><path d="M0 0h10v10z"/></svg></div>';
+    const overridden = validHtml(svg).replace(
+      "</head>",
+      `<style data-artifact-style="override.css">
+html, body { max-width: none !important; overflow-x: visible !important; }
+[data-artifact-root], .artifact-topbar-inner, .artifact-shell,
+.artifact-layout, .artifact-main-panel, .artifact-rail {
+  min-width: auto !important; max-width: none !important;
+}
+.artifact-svg-frame { max-width: none !important; overflow-x: visible !important; }
+</style>
+</head>`,
+    );
+
+    expect(verifyArtifactHtml(overridden)).toMatchObject({ ok: true });
+    const dom = new JSDOM(overridden);
+    try {
+      const { document } = dom.window;
+      expect(dom.window.getComputedStyle(document.documentElement).overflowX).toBe("clip");
+      expect(dom.window.getComputedStyle(document.body).maxWidth).toBe("100%");
+      expect(
+        dom.window.getComputedStyle(
+          document.querySelector("[data-artifact-root]") as Element,
+        ).minWidth,
+      ).toBe("0px");
+      expect(
+        dom.window.getComputedStyle(
+          document.querySelector(".artifact-main-panel") as Element,
+        ).maxWidth,
+      ).toBe("100%");
+      expect(
+        dom.window.getComputedStyle(
+          document.querySelector(".artifact-svg-frame") as Element,
+        ).overflowX,
+      ).toBe("auto");
+    } finally {
+      dom.window.close();
     }
   });
 
@@ -572,21 +649,27 @@ describe("artifact verification", () => {
     expect(verifyArtifactHtml(source)).toMatchObject({ ok: true });
 
     const cases: Array<[string, string]> = [
-      [validSvg.replace(' viewBox="0 0 10 10"', ""), "SVG_MISSING_VIEWBOX"],
-      [validSvg.replace(' aria-labelledby="map-title"', ""), "SVG_INACCESSIBLE"],
-      [validSvg.replace('<div class="artifact-svg-frame">', "<div>"), "SVG_MISSING_FRAME"],
-      [validSvg.replace("<path", '<script>alert(1)</script><path'), "UNSAFE_SVG"],
-      [validSvg.replace("<path", '<image href="https://example.com/x.png"/><path'), "UNSAFE_SVG"],
-      [validSvg.replace("<svg ", '<svg onload="window.svgRan=true" '), "UNSAFE_SVG"],
-      [validSvg.replace("<path", '<use href="#missing"/><path'), "UNSAFE_SVG"],
-      [validSvg.replace("<path", '<path style="fill:url(data:image/svg+xml,x)"/><path'), "UNSAFE_SVG"],
+      [source.replace(' viewBox="0 0 10 10"', ""), "SVG_MISSING_VIEWBOX"],
+      [source.replace(' aria-labelledby="map-title"', ""), "SVG_INACCESSIBLE"],
+      [
+        source.replace(
+          '<div class="artifact-svg-frame" style="max-width: 100% !important; overflow-x: auto !important;">',
+          "<div>",
+        ),
+        "SVG_MISSING_FRAME",
+      ],
+      [source.replace("<path", '<script>alert(1)</script><path'), "UNSAFE_SVG"],
+      [source.replace("<path", '<image href="https://example.com/x.png"/><path'), "UNSAFE_SVG"],
+      [source.replace("<svg ", '<svg onload="window.svgRan=true" '), "UNSAFE_SVG"],
+      [source.replace("<path", '<use href="#missing"/><path'), "UNSAFE_SVG"],
+      [source.replace("<path", '<path style="fill:url(data:image/svg+xml,x)"/><path'), "UNSAFE_SVG"],
     ];
 
-    for (const [svg, expectedCode] of cases) {
+    for (const [html, expectedCode] of cases) {
       expect(
         issueCodes(
           expectArtifactError(
-            () => verifyArtifactHtml(source.replace(validSvg, svg)),
+            () => verifyArtifactHtml(html),
             "ARTIFACT_VERIFICATION_FAILED",
           ),
         ),
@@ -628,6 +711,37 @@ describe("artifact verification", () => {
 });
 
 describe("atomic I/O and note compatibility", () => {
+  it("normalizes interactive and note output-parent failures without pollution", async () => {
+    const interactiveRoot = writeProject();
+    const interactiveParent = join(interactiveRoot, "blocked-parent");
+    const interactiveOutput = join(interactiveParent, "artifact.html");
+    writeFileSync(interactiveParent, "PARENT-FILE");
+
+    await expectArtifactRejection(
+      () =>
+        buildInteractiveArtifact({
+          manifestPath: join(interactiveRoot, "artifact.mjs"),
+          outputPath: interactiveOutput,
+        }),
+      "ATOMIC_WRITE_FAILED",
+    );
+    expect(readFileSync(interactiveParent, "utf8")).toBe("PARENT-FILE");
+    expect(readdirSync(interactiveRoot).filter((name) => name.includes(".tmp-"))).toEqual([]);
+
+    const noteRoot = temporaryRoot();
+    const noteInput = join(noteRoot, "note.md");
+    const noteParent = join(noteRoot, "blocked-parent");
+    const noteOutput = join(noteParent, "note.html");
+    writeFileSync(noteInput, "# Note");
+    writeFileSync(noteParent, "PARENT-FILE");
+    await expectArtifactRejection(
+      () => buildNote({ inputPath: noteInput, outputPath: noteOutput }),
+      "ATOMIC_WRITE_FAILED",
+    );
+    expect(readFileSync(noteParent, "utf8")).toBe("PARENT-FILE");
+    expect(readdirSync(noteRoot).filter((name) => name.includes(".tmp-"))).toEqual([]);
+  });
+
   it("cleans only its exact temporary file when replacement fails", () => {
     const root = temporaryRoot();
     const destinationDirectory = join(root, "destination");
