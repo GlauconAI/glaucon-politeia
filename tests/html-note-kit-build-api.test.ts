@@ -31,6 +31,7 @@ import {
   atomicWriteUtf8,
   readUtf8File,
 } from "../lib/html-note-kit/io.mjs";
+import { ARTIFACT_RESOURCE_LIMITS } from "../lib/html-note-kit/resource-limits.mjs";
 import {
   verifyArtifactHtml,
   verifyArtifactStartup,
@@ -766,6 +767,31 @@ html, body { max-width: none !important; overflow-x: visible !important; }
 });
 
 describe("atomic I/O and note compatibility", () => {
+  it("rejects note artifacts above the path-reader limit before replacing output", async () => {
+    const root = temporaryRoot();
+    const input = join(root, "large-note.md");
+    const image = join(root, "large.png");
+    const output = join(root, "large-note.html");
+    writeFileSync(image, Buffer.alloc(9 * 1024 * 1024));
+    writeFileSync(
+      input,
+      `# Large note\n\n${"![Large](./large.png)\n\n".repeat(6)}`,
+    );
+    writeFileSync(output, "KEEP");
+
+    const error = await expectArtifactRejection(
+      () => buildNote({ inputPath: input, outputPath: output, force: true }),
+      "ARTIFACT_OUTPUT_TOO_LARGE",
+    );
+
+    expect(error.details).toMatchObject({
+      maximumBytes: ARTIFACT_RESOURCE_LIMITS.artifactBytes,
+      output,
+    });
+    expect(readFileSync(output, "utf8")).toBe("KEEP");
+    expect(readdirSync(root).filter((name) => name.includes(".tmp-"))).toEqual([]);
+  });
+
   it("normalizes interactive and note output-parent failures without pollution", async () => {
     const interactiveRoot = writeProject();
     const interactiveParent = join(interactiveRoot, "blocked-parent");
