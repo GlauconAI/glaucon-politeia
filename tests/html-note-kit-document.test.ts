@@ -464,6 +464,23 @@ describe("interactive 402v document", () => {
     }
   });
 
+  it("allows prior sentinel attributes and boundary-like values in valid slots", () => {
+    const boundaryLike = "a".repeat(64);
+    const input = model();
+    input.slots.mainSections =
+      `<section id="legitimate-boundary" data-402v-slot-wrapper ` +
+      `data-402v-slot-before data-402v-slot-after ` +
+      `data-402v-boundary="${boundaryLike}">valid</section>`;
+
+    const html = renderInteractiveDocument(input);
+
+    expect(html).toContain('id="legitimate-boundary"');
+    expect(html).toContain("data-402v-slot-wrapper");
+    expect(html).toContain("data-402v-slot-before");
+    expect(html).toContain("data-402v-slot-after");
+    expect(html.match(/data-402v-boundary=/g)).toHaveLength(1);
+  });
+
   it("enforces per-slot and aggregate UTF-8 budgets before contextual parsing", () => {
     const perSlotBytes = 4 * 1024 * 1024;
     const aggregateBytes = 8 * 1024 * 1024;
