@@ -18,8 +18,8 @@ const artifact = {
     {
       id: "system-map",
       source: "./system-map.svg",
-      title: "Generic project system map",
-      description: "Three project nodes connected through a shared local artifact.",
+      title: "Artifact compilation pipeline",
+      description: "Canonical JSON flows through renderer slots into offline HTML.",
     },
   ],
   requiredDataBlocks: ["project-registry"],

@@ -38,7 +38,7 @@ export function renderArtifact({ data, svg }) {
             <p class="fixture-kicker">Local registry</p>
             <h2 id="projects-heading">Projects</h2>
           </div>
-          <p class="fixture-count"><span id="visible-count">${projects.length}</span> visible</p>
+          <p class="fixture-count"><span id="visible-count" aria-live="polite" aria-atomic="true">${projects.length}</span> visible</p>
         </div>
         <label class="fixture-search-label" for="project-search">Filter projects</label>
         <input
@@ -54,7 +54,7 @@ export function renderArtifact({ data, svg }) {
     rail: `
       <section class="artifact-rail-panel fixture-system-map" aria-labelledby="system-map-heading">
         <p class="fixture-kicker">Prepared SVG</p>
-        <h2 id="system-map-heading">System map</h2>
+        <h2 id="system-map-heading">Artifact pipeline</h2>
         ${svg["system-map"].html}
       </section>`,
     footer: '<p class="fixture-footer">Generic interactive fixture · canonical data, local assets, offline runtime.</p>',

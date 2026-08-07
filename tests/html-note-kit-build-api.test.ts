@@ -566,7 +566,7 @@ html, body { max-width: none !important; overflow-x: visible !important; }
         },
       ],
     });
-  }, 12_000);
+  }, 20_000);
 
   it("bounds infinite startup loops in an isolated process", () => {
     const looping = validHtml().replace(

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { JSDOM } from "jsdom";
@@ -11,12 +12,23 @@ import {
 } from "../lib/html-note-kit/index.mjs";
 
 const fixture = join(process.cwd(), "fixtures", "html-note-kit-interactive");
-const output = join(fixture, "artifact.generated.html");
+const roots: string[] = [];
 
-afterEach(() => rmSync(output, { force: true }));
+afterEach(() => {
+  for (const root of roots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function temporaryOutput() {
+  const root = mkdtempSync(join(tmpdir(), "html-kit-interactive-fixture-"));
+  roots.push(root);
+  return join(root, "artifact.html");
+}
 
 describe("generic interactive artifact fixture", () => {
   it("builds deterministically and performs a real offline filter", async () => {
+    const output = temporaryOutput();
     const options = {
       manifestPath: join(fixture, "artifact.mjs"),
       outputPath: output,
@@ -68,6 +80,23 @@ describe("generic interactive artifact fixture", () => {
     expect(html).not.toMatch(/<(?:iframe|img)[^>]+(?:src|srcset)=/i);
     expect(html).toContain('class="artifact-svg-frame"');
 
+    const forbiddenSvgVocabulary = [
+      "Agent Atlas",
+      "Memory Loom",
+      "Local Observer",
+      "Coordination",
+      "Knowledge",
+      "Diagnostics",
+    ];
+    const svgSource = readFileSync(join(fixture, "system-map.svg"), "utf8");
+    for (const value of forbiddenSvgVocabulary) {
+      expect(svgSource.toLowerCase()).not.toContain(value.toLowerCase());
+    }
+
+    const clientSource = readFileSync(join(fixture, "artifact.js"), "utf8");
+    expect(clientSource).not.toContain("toLocaleLowerCase");
+    expect(clientSource).toContain(".toLowerCase()");
+
     const dom = new JSDOM(html, {
       runScripts: "dangerously",
       url: "https://artifact.local/",
@@ -77,6 +106,22 @@ describe("generic interactive artifact fixture", () => {
         "#project-search",
       );
       if (!input) throw new Error("missing project search input");
+
+      const svgFrame = dom.window.document.querySelector(
+        '[data-svg-id="system-map"]',
+      );
+      if (!svgFrame) throw new Error("missing prepared SVG frame");
+      for (const value of forbiddenSvgVocabulary) {
+        expect(svgFrame.textContent?.toLowerCase()).not.toContain(
+          value.toLowerCase(),
+        );
+      }
+
+      const count = dom.window.document.querySelector("#visible-count");
+      expect(count).toMatchObject({
+        ariaAtomic: "true",
+        ariaLive: "polite",
+      });
 
       input.value = "memory";
       input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
@@ -89,9 +134,7 @@ describe("generic interactive artifact fixture", () => {
         .filter((node) => !node.hidden)
         .map((node) => node.dataset.projectName);
       expect(visible).toEqual(["Memory Loom"]);
-      expect(dom.window.document.querySelector("#visible-count")?.textContent).toBe(
-        "1",
-      );
+      expect(count?.textContent).toBe("1");
     } finally {
       dom.window.close();
     }

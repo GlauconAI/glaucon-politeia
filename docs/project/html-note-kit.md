@@ -108,8 +108,8 @@ export default {
     {
       id: "system-map",
       source: "./system-map.svg",
-      title: "System map",
-      description: "Relationships between generic system components.",
+      title: "Artifact compilation pipeline",
+      description: "Canonical JSON flows through renderer slots into offline HTML.",
     },
   ],
   requiredDataBlocks: ["project-registry"],
@@ -267,7 +267,7 @@ Current bounded inputs are:
 
 ## Generic Interactive Fixture
 
-[`fixtures/html-note-kit-interactive/`](../../fixtures/html-note-kit-interactive/) is a reusable, schema-neutral example. It builds three generic projects from one `project-registry` block, renders all five slots, inlines local CSS and an accessible wide SVG, and filters the rendered cards through `window.__402vArtifact.getData` while opened directly from disk. The wide map demonstrates that only its `.artifact-svg-frame` scrolls horizontally at desktop and mobile widths.
+[`fixtures/html-note-kit-interactive/`](../../fixtures/html-note-kit-interactive/) is a reusable, schema-neutral example. It builds three generic projects from one `project-registry` block, renders all five slots, inlines local CSS and an accessible wide compilation-pipeline SVG, and filters the rendered cards through `window.__402vArtifact.getData` while opened directly from disk. The wide pipeline demonstrates that only its `.artifact-svg-frame` scrolls horizontally at desktop and mobile widths; its labels describe Kit stages rather than duplicating registry values.
 
 The fixture is an example consumer, not a Kit feature. The Kit does not implement consumer schemas, search behavior, projection rules, domain transactions, publishing policy, or an Orchestrator migration. Those remain consumer responsibilities.
 

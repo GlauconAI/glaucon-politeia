@@ -6,7 +6,7 @@
   const cards = [...document.querySelectorAll("[data-project-card]")];
 
   const update = () => {
-    const query = input.value.trim().toLocaleLowerCase();
+    const query = input.value.trim().toLowerCase();
     let visible = 0;
 
     for (const card of cards) {
@@ -15,7 +15,7 @@
       const searchable = project
         ? [project.name, project.category, project.description]
             .join(" ")
-            .toLocaleLowerCase()
+            .toLowerCase()
         : "";
       const matches = searchable.includes(query);
       card.hidden = !matches;
