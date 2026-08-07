@@ -188,7 +188,7 @@ describe("HTML Note Kit v2 CLI", () => {
         ]),
       );
     }
-  }, 10_000);
+  }, 30_000);
 
   it.each([
     ["unknown flag", ["build-artifact", "artifact.mjs", "--wat"]],

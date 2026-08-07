@@ -23,6 +23,7 @@ import {
   updateArtifactData,
   verifyArtifact,
 } from "../lib/html-note-kit/index.mjs";
+import { ARTIFACT_RESOURCE_LIMITS } from "../lib/html-note-kit/resource-limits.mjs";
 
 const roots: string[] = [];
 const cli = join(process.cwd(), "scripts", "html-note-kit.mjs");
@@ -253,11 +254,19 @@ describe("updateArtifactData", () => {
     const before = readFileSync(artifactPath);
     const cycle: { self?: unknown } = {};
     cycle.self = cycle;
+    const tooDeep: { next?: unknown } = {};
+    let cursor = tooDeep;
+    for (let depth = 0; depth < 258; depth += 1) {
+      const next: { next?: unknown } = {};
+      cursor.next = next;
+      cursor = next;
+    }
 
     for (const [id, value, code] of [
       ["missing", {}, "MISSING_DATA_BLOCK"],
       ["bad id", {}, "INVALID_DATA_BLOCK"],
       ["registry", cycle, "INVALID_DATA_BLOCK"],
+      ["registry", tooDeep, "INVALID_DATA_BLOCK"],
       ["registry", () => undefined, "INVALID_DATA_BLOCK"],
     ] as const) {
       await expect(
@@ -270,6 +279,106 @@ describe("updateArtifactData", () => {
     }
     expect(temporaryNames(root)).toEqual([]);
   });
+
+  it("normalizes replacement Proxy traps without exposing their messages", async () => {
+    const root = fixture();
+    const artifactPath = join(root, "missing.html");
+    const manifestPath = join(root, "artifact.mjs");
+    const trappedValues = [
+      new Proxy({}, {
+        getPrototypeOf() {
+          throw new Error("SECRET_GET_PROTOTYPE");
+        },
+      }),
+      new Proxy({}, {
+        ownKeys() {
+          throw new Error("SECRET_OWN_KEYS");
+        },
+      }),
+    ];
+
+    for (const value of trappedValues) {
+      try {
+        await updateArtifactData({
+          artifactPath,
+          manifestPath,
+          id: "registry",
+          value,
+        });
+        throw new Error("Expected INVALID_DATA_BLOCK");
+      } catch (error) {
+        artifactError(error, "INVALID_DATA_BLOCK");
+        expect((error as Error).cause).toBeUndefined();
+        const serialized = JSON.stringify((error as ArtifactBuildError).toJSON());
+        expect(serialized).not.toContain("SECRET_GET_PROTOTYPE");
+        expect(serialized).not.toContain("SECRET_OWN_KEYS");
+      }
+    }
+    expect(existsSync(artifactPath)).toBe(false);
+  });
+
+  it("rejects an oversized replacement before reading the artifact", async () => {
+    const root = fixture();
+    const artifactPath = join(root, "missing.html");
+    const value = Array.from(
+      { length: ARTIFACT_RESOURCE_LIMITS.canonicalJsonNodes + 1 },
+      () => null,
+    );
+
+    await expect(
+      updateArtifactData({
+        artifactPath,
+        manifestPath: join(root, "artifact.mjs"),
+        id: "registry",
+        value,
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      artifactError(error, "INVALID_DATA_BLOCK");
+      return true;
+    });
+    expect(existsSync(artifactPath)).toBe(false);
+  });
+
+  it("stops replacement descriptor traversal at the canonical node budget", async () => {
+    const root = fixture();
+    const artifactPath = join(root, "missing.html");
+    const keys = Array.from(
+      { length: ARTIFACT_RESOURCE_LIMITS.canonicalJsonNodes + 1 },
+      (_, index) => `key-${index}`,
+    );
+    let descriptorCount = 0;
+    const value = new Proxy({}, {
+      getOwnPropertyDescriptor() {
+        descriptorCount += 1;
+        return {
+          configurable: true,
+          enumerable: true,
+          value: null,
+          writable: true,
+        };
+      },
+      ownKeys() {
+        return keys;
+      },
+    });
+
+    await expect(
+      updateArtifactData({
+        artifactPath,
+        manifestPath: join(root, "artifact.mjs"),
+        id: "registry",
+        value,
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      artifactError(error, "INVALID_DATA_BLOCK");
+      return true;
+    });
+    expect(descriptorCount).toBeLessThan(keys.length);
+    expect(descriptorCount).toBeLessThanOrEqual(
+      ARTIFACT_RESOURCE_LIMITS.canonicalJsonNodes,
+    );
+    expect(existsSync(artifactPath)).toBe(false);
+  }, 30_000);
 
   it("strictly validates its plain options before touching the artifact", async () => {
     const root = fixture();
@@ -458,6 +567,36 @@ describe("Task 7 CLI", () => {
     expect(
       extractDataBlocks(readFileSync(artifactPath, "utf8")).get("registry"),
     ).toEqual({ items: ["in-place"], version: 2 });
+  }, 20_000);
+
+  it("updates in place when an explicit output is lexically equivalent", () => {
+    const root = fixture();
+    const manifestPath = join(root, "artifact.mjs");
+    const artifactPath = join(root, "artifact.html");
+    const lexicalOutputPath = `${root}/./artifact.html`;
+    const inputPath = join(root, "replacement.json");
+    parseSuccess(run(["build-artifact", manifestPath]));
+    writeFileSync(inputPath, '{"version":2,"items":["same-path"]}');
+
+    const result = parseSuccess(
+      run([
+        "update-data",
+        artifactPath,
+        "--manifest",
+        manifestPath,
+        "--id",
+        "registry",
+        "--input",
+        inputPath,
+        "--output",
+        lexicalOutputPath,
+      ]),
+    );
+
+    expect(result).toMatchObject({ command: "update-data", output: artifactPath });
+    expect(
+      extractDataBlocks(readFileSync(artifactPath, "utf8")).get("registry"),
+    ).toEqual({ items: ["same-path"], version: 2 });
   }, 20_000);
 
   it("does not clobber an alternate output when force is omitted", () => {

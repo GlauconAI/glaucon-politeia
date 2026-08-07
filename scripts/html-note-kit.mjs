@@ -79,13 +79,16 @@ async function runArtifactCommand(name, args) {
 
   if (name === "update-data") {
     const parsed = parseUpdateDataArgs(args);
+    const inPlace =
+      parsed.output === undefined ||
+      resolve(parsed.output) === resolve(parsed.artifact);
     const result = await runArtifactWorker("update-data", {
       artifactPath: parsed.artifact,
       manifestPath: parsed.manifest,
       id: parsed.id,
       inputPath: parsed.input,
       ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
-      ...(parsed.force === undefined && parsed.output === undefined
+      ...(parsed.force === undefined && inPlace
         ? {}
         : { force: parsed.force ?? false }),
     });
