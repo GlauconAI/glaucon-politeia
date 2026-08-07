@@ -1,23 +1,25 @@
 #!/usr/bin/env node
 
+import { fork } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
-import { parseMarkdownDocument } from "../lib/html-note-kit/frontmatter.mjs";
 import {
-  buildInteractiveArtifact,
-  verifyArtifact,
+  buildNote as buildNoteArtifact,
 } from "../lib/html-note-kit/index.mjs";
-import { renderMarkdown } from "../lib/html-note-kit/render.mjs";
-import { renderHtmlDocument } from "../lib/html-note-kit/template.mjs";
+
+const WORKER_PATH = fileURLToPath(
+  new URL("./html-note-kit-worker.mjs", import.meta.url),
+);
+const WORKER_TIMEOUT_MS = 30_000;
+const WORKER_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 
 const values = process.argv.slice(2);
 const command = values[0];
@@ -34,7 +36,7 @@ if (command === "build-artifact" || command === "verify") {
     if (command === "init") {
       initNote(values.slice(1));
     } else if (command === "build") {
-      buildNote(values.slice(1));
+      await buildLegacyNote(values.slice(1));
     } else if (command === "--help" || command === "-h" || !command) {
       process.stdout.write(helpText());
     } else {
@@ -49,7 +51,7 @@ if (command === "build-artifact" || command === "verify") {
 async function runArtifactCommand(name, args) {
   if (name === "build-artifact") {
     const parsed = parseBuildArtifactArgs(args);
-    const result = await buildInteractiveArtifact({
+    const result = await runArtifactWorker("build-artifact", {
       manifestPath: parsed.input,
       ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
       force: parsed.force,
@@ -69,7 +71,7 @@ async function runArtifactCommand(name, args) {
   }
 
   const parsed = parseVerifyArgs(args);
-  const result = verifyArtifact({
+  const result = await runArtifactWorker("verify", {
     path: parsed.input,
     requiredDataBlocks: parsed.requiredBlocks,
   });
@@ -81,6 +83,101 @@ async function runArtifactCommand(name, args) {
     dataBlockIds: result.dataBlockIds,
     issues: result.issues,
   });
+}
+
+function runArtifactWorker(workerCommand, options) {
+  const token = randomBytes(32).toString("hex");
+  const child = fork(WORKER_PATH, [], {
+    cwd: process.cwd(),
+    execArgv: [],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    let discardedBytes = 0;
+    let settled = false;
+
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeAllListeners();
+      child.stdout?.removeAllListeners();
+      child.stderr?.removeAllListeners();
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+      callback(value);
+    };
+    const rejectWorker = (code, message, details = undefined) => {
+      finish(
+        rejectPromise,
+        new ArtifactBuildError(code, message, details),
+      );
+    };
+    const discard = (chunk) => {
+      discardedBytes += Buffer.byteLength(chunk);
+      if (discardedBytes > WORKER_OUTPUT_LIMIT_BYTES) {
+        rejectWorker(
+          "CLI_WORKER_OUTPUT_LIMIT",
+          "Artifact worker exceeded its bounded diagnostic output",
+        );
+      }
+    };
+
+    child.stdout?.on("data", discard);
+    child.stderr?.on("data", discard);
+    child.once("error", () => {
+      rejectWorker("CLI_WORKER_FAILED", "Artifact worker could not be started");
+    });
+    child.once("exit", () => {
+      rejectWorker("CLI_WORKER_FAILED", "Artifact worker exited without a result");
+    });
+    child.on("message", (message) => {
+      if (!isWorkerEnvelope(message, token)) return;
+      if (message.kind === "result") {
+        finish(resolvePromise, message.payload);
+        return;
+      }
+      const error = message.payload;
+      finish(
+        rejectPromise,
+        new ArtifactBuildError(error.code, error.message, error.details),
+      );
+    });
+
+    const timer = setTimeout(() => {
+      rejectWorker("CLI_WORKER_TIMEOUT", "Artifact worker exceeded its time limit");
+    }, WORKER_TIMEOUT_MS);
+    timer.unref();
+
+    child.send({ token, command: workerCommand, options }, (error) => {
+      if (error !== null) {
+        rejectWorker("CLI_WORKER_FAILED", "Artifact worker request could not be delivered");
+      }
+    });
+  });
+}
+
+function isWorkerEnvelope(value, token) {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    value.token !== token ||
+    (value.kind !== "result" && value.kind !== "error") ||
+    value.payload === null ||
+    typeof value.payload !== "object"
+  ) {
+    return false;
+  }
+  if (value.kind === "error") {
+    return (
+      typeof value.payload.code === "string" &&
+      value.payload.code.length > 0 &&
+      typeof value.payload.message === "string"
+    );
+  }
+  return value.payload.ok === true;
 }
 
 function cliFailure(message) {
@@ -182,7 +279,7 @@ function initNote(args) {
   printResult({ command: "init", source: sourcePath });
 }
 
-function buildNote(args) {
+async function buildLegacyNote(args) {
   const inputValue = positional(args, 0);
   const outputValue = flag(args, "--output");
   const force = args.includes("--force");
@@ -208,47 +305,28 @@ function buildNote(args) {
     throw new Error(`Output already exists: ${outputPath}`);
   }
 
-  const source = readFileSync(inputPath, "utf8");
-  const { body, metadata } = parseMarkdownDocument(source);
-  const { articleHtml, headings } = renderMarkdown(body, {
-    sourceDirectory: dirname(inputPath),
-  });
-  const html = renderHtmlDocument({ metadata, articleHtml, headings });
-  verifyGeneratedHtml(html);
-
-  mkdirSync(dirname(outputPath), { recursive: true });
-  const temporaryPath = `${outputPath}.tmp-${process.pid}`;
   try {
-    writeFileSync(temporaryPath, html, "utf8");
-    renameSync(temporaryPath, outputPath);
-  } finally {
-    if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
-  }
-
-  printResult({
-    command: "build",
-    source: inputPath,
-    output: outputPath,
-    title: metadata.title,
-    bytes: Buffer.byteLength(html),
-  });
-}
-
-function verifyGeneratedHtml(html) {
-  const checks = [
-    [/^<!doctype html>/i, "doctype"],
-    [/<title>[^<]+<\/title>/i, "title"],
-    [/<style>[\s\S]+<\/style>/i, "inline stylesheet"],
-    [/<article class="note-article">[\s\S]+<\/article>/i, "article content"],
-  ];
-
-  for (const [pattern, label] of checks) {
-    if (!pattern.test(html)) {
-      throw new Error(`Generated HTML is missing ${label}`);
+    const result = await buildNoteArtifact({
+      inputPath,
+      outputPath,
+      force,
+    });
+    printResult({
+      command: "build",
+      source: inputPath,
+      output: result.output,
+      title: result.title,
+      bytes: result.bytes,
+    });
+  } catch (error) {
+    if (error instanceof ArtifactBuildError) {
+      if (error.code === "OUTPUT_EXISTS") {
+        throw new Error(`Output already exists: ${outputPath}`);
+      }
+      const serialized = error.toJSON();
+      throw new Error(serialized.error.message);
     }
-  }
-  if (/<script[^>]+src=/i.test(html)) {
-    throw new Error("Generated HTML has an external script dependency");
+    throw error;
   }
 }
 

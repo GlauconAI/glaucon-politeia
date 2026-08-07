@@ -64,6 +64,12 @@ function writeProject(options: { script?: string; renderer?: string } = {}) {
   return root;
 }
 
+function expectSingleJsonDocument(value: string) {
+  const parsed = JSON.parse(value);
+  expect(value).toBe(`${JSON.stringify(parsed, null, 2)}\n`);
+  return parsed;
+}
+
 function parseSuccess(result: ReturnType<typeof run>) {
   expect(result.status).toBe(0);
   expect(result.stderr).toBe("");
@@ -226,6 +232,67 @@ describe("HTML Note Kit v2 CLI", () => {
     expect(readFileSync(startupOutput, "utf8")).toBe("KEEP");
   });
 
+  it("isolates direct, console, and scheduled consumer stream noise", () => {
+    const root = writeProject({
+      renderer: `export function renderArtifact() {
+        process.stdout.write("forged stdout\\n");
+        process.stderr.write("forged stderr\\n");
+        console.log("console stdout");
+        console.error("console stderr");
+        setTimeout(() => {
+          process.stdout.write('{"ok":false,"spoofed":true}\\n');
+          process.stderr.write("late stderr\\n");
+        }, 0);
+        process.send?.({
+          token: "0".repeat(64),
+          kind: "result",
+          payload: { ok: true, forged: true },
+        });
+        return { mainSections: "<section>isolated</section>" };
+      }`,
+    });
+
+    const result = run(["build-artifact", join(root, "artifact.mjs")]);
+    const parsed = expectSingleJsonDocument(result.stdout);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(parsed).toMatchObject({ ok: true, command: "build-artifact" });
+  });
+
+  it("isolates consumer stream noise when the build fails", () => {
+    const root = writeProject({
+      renderer: `export function renderArtifact() {
+        process.stdout.write("forged stdout before failure\\n");
+        process.stderr.write("forged stderr before failure\\n");
+        setTimeout(() => process.stdout.write("late forged stdout\\n"), 0);
+        throw new Error("renderer failure");
+      }`,
+    });
+
+    const result = run(["build-artifact", join(root, "artifact.mjs")]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    const parsed = expectSingleJsonDocument(result.stderr);
+    expect(parsed).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_RENDERER_RESULT" },
+    });
+  });
+
+  it("normalizes an abnormal artifact worker exit", () => {
+    const root = writeProject({
+      renderer: "export function renderArtifact(){ process.exit(17); }",
+    });
+
+    const result = run(["build-artifact", join(root, "artifact.mjs")]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(expectSingleJsonDocument(result.stderr)).toMatchObject({
+      ok: false,
+      error: { code: "CLI_WORKER_FAILED" },
+    });
+  });
+
   it("preserves legacy help, result fields, and plain-text errors", () => {
     const root = temporaryRoot();
     const initializedRoot = join(root, "initialized");
@@ -259,5 +326,44 @@ describe("HTML Note Kit v2 CLI", () => {
     expect(missing.stdout).toBe("");
     expect(missing.stderr).toBe(`Markdown input not found: ${join(root, "missing.md")}\n`);
     expect(() => JSON.parse(missing.stderr)).toThrow();
+  });
+
+  it("keeps legacy build validation and note rendering behavior through the public API", () => {
+    const root = temporaryRoot();
+    const wrongExtension = join(root, "note.txt");
+    const markdown = join(root, "note.md");
+    const output = join(root, "note.html");
+    writeFileSync(wrongExtension, "# Wrong\n");
+    writeFileSync(
+      markdown,
+      `# Compatibility
+
+![Remote](https://example.com/image.png)
+
+\`\`\`mermaid
+flowchart LR
+A[One] --> B[Two]
+\`\`\`
+`,
+    );
+
+    const wrong = run(["build", wrongExtension]);
+    expect(wrong.status).toBe(1);
+    expect(wrong.stderr).toBe("Input must be a .md file\n");
+
+    const builtResult = run(["build", markdown, "--output", output]);
+    const built = parseSuccess(builtResult);
+    const html = readFileSync(output, "utf8");
+    expect(built.bytes).toBe(Buffer.byteLength(html));
+    expect(html).toContain('src="https://example.com/image.png"');
+    expect(html).toContain('data-diagram="flowchart"');
+
+    rmSync(output);
+    symlinkSync("missing-output.html", output);
+    const dangling = run(["build", markdown, "--output", output]);
+    expect(dangling.status).toBe(1);
+    expect(dangling.stdout).toBe("");
+    expect(dangling.stderr).toBe(`Output already exists: ${output}\n`);
+    expect(lstatSync(output).isSymbolicLink()).toBe(true);
   });
 });
