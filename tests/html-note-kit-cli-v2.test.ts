@@ -199,7 +199,6 @@ describe("HTML Note Kit v2 CLI", () => {
     ["duplicate force", ["build-artifact", "a.mjs", "--force", "--force"]],
     ["short flag", ["verify", "a.html", "-x"]],
     ["separator", ["verify", "--", "a.html"]],
-    ["unavailable preserve flag", ["build-artifact", "a.mjs", "--preserve-data-from", "a.html"]],
   ])("rejects %s with one structured error", (_label, args) => {
     const failed = parseFailure(run(args));
     expect(failed.error.code).toBe("INVALID_CLI_ARGUMENTS");

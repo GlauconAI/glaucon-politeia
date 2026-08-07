@@ -331,16 +331,16 @@ describe("interactive artifact build API", () => {
     expect(existsSync(output)).toBe(false);
   });
 
-  it("exports only the Task 5 public build surface", async () => {
+  it("exports only the five-function public build surface", async () => {
     const api = await import("../lib/html-note-kit/index.mjs");
 
     expect(Object.keys(api).sort()).toEqual([
       "buildInteractiveArtifact",
       "buildNote",
       "extractDataBlocks",
+      "updateArtifactData",
       "verifyArtifact",
     ]);
-    expect(api).not.toHaveProperty("updateArtifactData");
   });
 });
 

@@ -24,7 +24,11 @@ const WORKER_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 const values = process.argv.slice(2);
 const command = values[0];
 
-if (command === "build-artifact" || command === "verify") {
+if (
+  command === "build-artifact" ||
+  command === "update-data" ||
+  command === "verify"
+) {
   try {
     await runArtifactCommand(command, values.slice(1));
   } catch (error) {
@@ -54,11 +58,38 @@ async function runArtifactCommand(name, args) {
     const result = await runArtifactWorker("build-artifact", {
       manifestPath: parsed.input,
       ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
+      ...(parsed.preserveDataFrom === undefined
+        ? {}
+        : { preserveDataFrom: parsed.preserveDataFrom }),
       force: parsed.force,
     });
     printResult({
       ok: result.ok,
       command: "build-artifact",
+      mode: result.mode,
+      output: result.output,
+      title: result.title,
+      bytes: result.bytes,
+      sourceHash: result.sourceHash,
+      outputHash: result.outputHash,
+      dataBlockIds: result.dataBlockIds,
+    });
+    return;
+  }
+
+  if (name === "update-data") {
+    const parsed = parseUpdateDataArgs(args);
+    const result = await runArtifactWorker("update-data", {
+      artifactPath: parsed.artifact,
+      manifestPath: parsed.manifest,
+      id: parsed.id,
+      inputPath: parsed.input,
+      ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
+      force: parsed.force,
+    });
+    printResult({
+      ok: result.ok,
+      command: "update-data",
       mode: result.mode,
       output: result.output,
       title: result.title,
@@ -195,6 +226,7 @@ function requireFlagValue(args, cursor, flagName) {
 function parseBuildArtifactArgs(args) {
   let input;
   let output;
+  let preserveDataFrom;
   let force = false;
 
   for (let cursor = 0; cursor < args.length; cursor += 1) {
@@ -202,6 +234,12 @@ function parseBuildArtifactArgs(args) {
     if (value === "--output") {
       if (output !== undefined) cliFailure("--output may only be provided once");
       output = requireFlagValue(args, cursor, "--output");
+      cursor += 1;
+    } else if (value === "--preserve-data-from") {
+      if (preserveDataFrom !== undefined) {
+        cliFailure("--preserve-data-from may only be provided once");
+      }
+      preserveDataFrom = requireFlagValue(args, cursor, "--preserve-data-from");
       cursor += 1;
     } else if (value === "--force") {
       if (force) cliFailure("--force may only be provided once");
@@ -218,7 +256,57 @@ function parseBuildArtifactArgs(args) {
   if (input === undefined) {
     cliFailure("build-artifact requires exactly one manifest path");
   }
-  return { force, input, output };
+  return { force, input, output, preserveDataFrom };
+}
+
+function parseUpdateDataArgs(args) {
+  let artifact;
+  let manifest;
+  let id;
+  let input;
+  let output;
+  let force = false;
+
+  for (let cursor = 0; cursor < args.length; cursor += 1) {
+    const value = args[cursor];
+    if (
+      value === "--manifest" ||
+      value === "--id" ||
+      value === "--input" ||
+      value === "--output"
+    ) {
+      const property = value.slice(2);
+      const current = { manifest, id, input, output }[property];
+      if (current !== undefined) cliFailure(`${value} may only be provided once`);
+      const flagValue = requireFlagValue(args, cursor, value);
+      if (value === "--manifest") manifest = flagValue;
+      else if (value === "--id") id = flagValue;
+      else if (value === "--input") input = flagValue;
+      else output = flagValue;
+      cursor += 1;
+    } else if (value === "--force") {
+      if (force) cliFailure("--force may only be provided once");
+      force = true;
+    } else if (value.startsWith("-")) {
+      cliFailure(`Unsupported option for update-data: ${value}`);
+    } else if (artifact === undefined) {
+      artifact = value;
+    } else {
+      cliFailure("update-data accepts exactly one artifact path");
+    }
+  }
+
+  if (artifact === undefined) {
+    cliFailure("update-data requires exactly one artifact path");
+  }
+  for (const [flagName, value] of [
+    ["--manifest", manifest],
+    ["--id", id],
+    ["--input", input],
+  ]) {
+    if (value === undefined) cliFailure(`${flagName} is required`);
+  }
+  return { artifact, force, id, input, manifest, output };
 }
 
 function parseVerifyArgs(args) {
@@ -394,7 +482,8 @@ function helpText() {
 Usage:
   node scripts/html-note-kit.mjs init <directory> --title <title> [--force]
   node scripts/html-note-kit.mjs build <input.md> [--output <output.html>] [--force]
-  node scripts/html-note-kit.mjs build-artifact <manifest.mjs> [--output <output.html>] [--force]
+  node scripts/html-note-kit.mjs build-artifact <manifest.mjs> [--output <output.html>] [--preserve-data-from <artifact.html>] [--force]
+  node scripts/html-note-kit.mjs update-data <artifact.html> --manifest <manifest.mjs> --id <block-id> --input <data.json> [--output <output.html>] [--force]
   node scripts/html-note-kit.mjs verify <artifact.html> [--required-block <block-id>]...
 `;
 }
