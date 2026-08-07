@@ -483,6 +483,29 @@ describe("artifact verification", () => {
     expect(Date.now() - started).toBeLessThan(3_000);
   });
 
+  it.each([
+    ["absent", ""],
+    ["empty", ' type=""'],
+    ["text/javascript", ' type="text/javascript"'],
+    ["application/javascript", ' type="application/javascript"'],
+    ["ASCII case and whitespace", ' type=" \tText/JavaScript "'],
+  ])("accepts browser classic MIME semantics for %s runtime and client scripts", (_label, typeAttribute) => {
+    const source = validHtml()
+      .replace(
+        "<script data-402v-runtime>",
+        `<script${typeAttribute} data-402v-runtime>`,
+      )
+      .replace(
+        "</body>",
+        `<script${typeAttribute} data-artifact-script="accepted.js">window.acceptedClassicMime = true;</script></body>`,
+      );
+
+    expect(verifyArtifactHtml(source)).toMatchObject({
+      ok: true,
+      mode: "interactive",
+    });
+  });
+
   it("rejects non-classic declared runtime and client script types", () => {
     const source = validHtml();
     const cases = [
@@ -501,6 +524,10 @@ describe("artifact verification", () => {
       source.replace(
         "</body>",
         '<script type="text/plain" data-artifact-script="plain.js">window.plainWasSkipped = true</script></body>',
+      ),
+      source.replace(
+        "</body>",
+        '<script type="text/javascript; charset=utf-8" data-artifact-script="parameterized.js">window.parameterizedWasSkipped = true</script></body>',
       ),
     ];
 
