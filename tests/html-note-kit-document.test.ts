@@ -55,6 +55,7 @@ function expectArtifactError(run: () => unknown, code: string) {
   } catch (error) {
     expect(error).toBeInstanceOf(ArtifactBuildError);
     expect(error).toMatchObject({ code, name: "ArtifactBuildError" });
+    return error as ArtifactBuildError;
   }
 }
 
@@ -63,15 +64,19 @@ describe("interactive 402v document", () => {
     const dom = new JSDOM(renderInteractiveDocument(model()));
     const document = dom.window.document;
     const navigation = document.querySelector("#artifact-navigation");
+    const navigationSlot = document.querySelector(
+      ".artifact-navigation-slot",
+    );
     const hero = document.querySelector("#hero-extra");
     const main = document.querySelector("#main-extra");
     const rail = document.querySelector("#rail-extra");
     const footer = document.querySelector("#footer-extra");
 
-    expect(navigation?.parentElement).toMatchObject({
+    expect(navigation?.parentElement).toBe(navigationSlot);
+    expect(navigationSlot?.parentElement).toMatchObject({
       className: "artifact-topbar-inner",
     });
-    expect(navigation?.previousElementSibling).toMatchObject({
+    expect(navigationSlot?.previousElementSibling).toMatchObject({
       className: "artifact-path",
     });
     expect(hero?.parentElement).toMatchObject({ className: "artifact-hero" });
@@ -87,6 +92,22 @@ describe("interactive 402v document", () => {
       "402v HTML Note Kit · standalone HTML",
     );
     expect(document.querySelector("[data-artifact-root]")).not.toBeNull();
+    dom.window.close();
+  });
+
+  it("keeps an empty navigation wrapper in the stable topbar slot", () => {
+    const input = model();
+    input.slots.navigation = "";
+    const dom = new JSDOM(renderInteractiveDocument(input));
+    const slot = dom.window.document.querySelector(
+      ".artifact-navigation-slot",
+    );
+
+    expect(slot).not.toBeNull();
+    expect(slot?.childNodes).toHaveLength(0);
+    expect(slot?.previousElementSibling).toMatchObject({
+      className: "artifact-path",
+    });
     dom.window.close();
   });
 
@@ -260,13 +281,17 @@ describe("interactive 402v document", () => {
     input.requiredDataBlocks = ["registry"];
 
     const html = renderInteractiveDocument(input);
-    const document = new JSDOM(html).window.document;
-    const embeddedHash = document
-      .querySelector('meta[name="402v-source-hash"]')
-      ?.getAttribute("content");
+    const dom = new JSDOM(html);
+    try {
+      const embeddedHash = dom.window.document
+        .querySelector('meta[name="402v-source-hash"]')
+        ?.getAttribute("content");
 
-    expect(embeddedHash).toBe(computeSourceHash(extractDataBlocks(html)));
-    expect(descriptorReads).toBe(1);
+      expect(embeddedHash).toBe(computeSourceHash(extractDataBlocks(html)));
+      expect(descriptorReads).toBe(1);
+    } finally {
+      dom.window.close();
+    }
   });
 
   it("assigns page overflow guards and SVG-frame scroll ownership", () => {
@@ -277,6 +302,12 @@ describe("interactive 402v document", () => {
     );
     expect(html).toMatch(
       /\.artifact-svg-frame\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;/s,
+    );
+    expect(html).toMatch(
+      /\.artifact-topbar-inner\s*\{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) minmax\(0, auto\) auto;/s,
+    );
+    expect(html).toMatch(
+      /@media\s*\(max-width:\s*640px\)[^{]*\{[\s\S]*?\.artifact-navigation-slot\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/,
     );
   });
 
@@ -372,6 +403,104 @@ describe("interactive 402v document", () => {
       input.slots.rail = slot;
       expect(() => renderInteractiveDocument(input)).not.toThrow();
     }
+  });
+
+  it("rejects slot markup that escapes any fixed parent context", () => {
+    const escapes = [
+      ["navigation", '</div><div id="escaped-navigation">escape</div>'],
+      ["heroSupplementary", '</header><div id="escaped-hero">escape</div>'],
+      ["mainSections", '</main><div id="escaped-main">escape</div>'],
+      ["rail", '</aside><div id="escaped-rail">escape</div>'],
+      ["footer", '</footer><div id="escaped-footer">escape</div>'],
+    ] as const;
+
+    for (const [slot, html] of escapes) {
+      const input = model();
+      input.slots[slot] = html;
+      expectArtifactError(
+        () => renderInteractiveDocument(input),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
+  });
+
+  it("rejects slot markup that swallows its actual-context end sentinel", () => {
+    const unbalanced = ["<!--", "<template>", "<style>", "<textarea>"];
+
+    for (const html of unbalanced) {
+      const input = model();
+      input.slots.mainSections = html;
+      expectArtifactError(
+        () => renderInteractiveDocument(input),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
+  });
+
+  it("rejects table foster-parenting that moves content beyond the end sentinel", () => {
+    const input = model();
+    input.slots.mainSections =
+      '<table><script>Object.defineProperty(window, "__402vArtifact", { value: "blocked", configurable: false });</script>';
+
+    expectArtifactError(
+      () => renderInteractiveDocument(input),
+      "INVALID_RENDERER_RESULT",
+    );
+  });
+
+  it("rejects slot start tags that mutate synthetic html or body attributes", () => {
+    const rootMutations = [
+      '<html id="registry" data-escape="yes">ok',
+      '<body id="registry" data-escape="yes">ok',
+    ];
+
+    for (const html of rootMutations) {
+      const input = model();
+      input.slots.mainSections = html;
+      expectArtifactError(
+        () => renderInteractiveDocument(input),
+        "INVALID_RENDERER_RESULT",
+      );
+    }
+  });
+
+  it("enforces per-slot and aggregate UTF-8 budgets before contextual parsing", () => {
+    const perSlotBytes = 4 * 1024 * 1024;
+    const aggregateBytes = 8 * 1024 * 1024;
+    const oversized = model();
+    oversized.slots.rail = `<!--${"🙂".repeat(Math.floor(perSlotBytes / 4) + 1)}`;
+
+    const perSlotError = expectArtifactError(
+      () => renderInteractiveDocument(oversized),
+      "INVALID_RENDERER_RESULT",
+    );
+    expect(perSlotError.message).toMatch(/slot.*utf-8 byte limit/i);
+    expect(perSlotError.details).toMatchObject({
+      slot: "rail",
+      maximumBytes: perSlotBytes,
+    });
+
+    const aggregate = model();
+    const chunk = "🙂".repeat(Math.floor(aggregateBytes / 12) + 1);
+    aggregate.slots.navigation = chunk;
+    aggregate.slots.heroSupplementary = chunk;
+    aggregate.slots.mainSections = `<!--${chunk}`;
+
+    const aggregateError = expectArtifactError(
+      () => renderInteractiveDocument(aggregate),
+      "INVALID_RENDERER_RESULT",
+    );
+    expect(aggregateError.message).toMatch(/aggregate.*utf-8 byte limit/i);
+    expect(aggregateError.details).toMatchObject({
+      maximumBytes: aggregateBytes,
+    });
+  });
+
+  it("exposes the shared base styles as an explicit stable constant", async () => {
+    const template = await import("../lib/html-note-kit/template.mjs");
+
+    expect(template.BASE_402V_STYLES).toBe(template.render402vBaseStyles());
+    expect(template.BASE_402V_STYLES).toContain("--note-bg: #0d0e10");
   });
 
   it("keeps note mode byte-stable and free of interactive declarations", () => {
