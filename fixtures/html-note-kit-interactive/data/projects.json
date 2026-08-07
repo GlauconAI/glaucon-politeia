@@ -1,0 +1,19 @@
+{
+  "projects": [
+    {
+      "name": "Agent Atlas",
+      "category": "Coordination",
+      "description": "Maps local agents and the boundaries between their responsibilities."
+    },
+    {
+      "name": "Memory Loom",
+      "category": "Knowledge",
+      "description": "Weaves durable notes into a searchable local knowledge fabric."
+    },
+    {
+      "name": "Local Observer",
+      "category": "Diagnostics",
+      "description": "Summarizes system signals without requiring a network connection."
+    }
+  ]
+}

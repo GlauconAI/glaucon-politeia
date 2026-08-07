@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" width="900" height="260">
+  <rect x="20" y="84" width="220" height="92" rx="12" fill="#1d2026" stroke="#7c3aed" stroke-width="3"/>
+  <rect x="340" y="84" width="220" height="92" rx="12" fill="#1d2026" stroke="#43d38b" stroke-width="3"/>
+  <rect x="660" y="84" width="220" height="92" rx="12" fill="#1d2026" stroke="#f2b84b" stroke-width="3"/>
+  <path d="M240 130H340M560 130H660" fill="none" stroke="#969da9" stroke-width="4"/>
+  <circle cx="290" cy="130" r="7" fill="#a78bfa"/>
+  <circle cx="610" cy="130" r="7" fill="#a78bfa"/>
+  <text x="130" y="124" fill="#ffffff" font-family="ui-monospace, monospace" font-size="20" text-anchor="middle">Agent Atlas</text>
+  <text x="130" y="150" fill="#969da9" font-family="ui-monospace, monospace" font-size="13" text-anchor="middle">coordination</text>
+  <text x="450" y="124" fill="#ffffff" font-family="ui-monospace, monospace" font-size="20" text-anchor="middle">Memory Loom</text>
+  <text x="450" y="150" fill="#969da9" font-family="ui-monospace, monospace" font-size="13" text-anchor="middle">knowledge</text>
+  <text x="770" y="124" fill="#ffffff" font-family="ui-monospace, monospace" font-size="20" text-anchor="middle">Local Observer</text>
+  <text x="770" y="150" fill="#969da9" font-family="ui-monospace, monospace" font-size="13" text-anchor="middle">diagnostics</text>
+</svg>
