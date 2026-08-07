@@ -10,26 +10,153 @@ import {
 } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
+import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
 import { parseMarkdownDocument } from "../lib/html-note-kit/frontmatter.mjs";
+import {
+  buildInteractiveArtifact,
+  verifyArtifact,
+} from "../lib/html-note-kit/index.mjs";
 import { renderMarkdown } from "../lib/html-note-kit/render.mjs";
 import { renderHtmlDocument } from "../lib/html-note-kit/template.mjs";
 
 const values = process.argv.slice(2);
 const command = values[0];
 
-try {
-  if (command === "init") {
-    initNote(values.slice(1));
-  } else if (command === "build") {
-    buildNote(values.slice(1));
-  } else if (command === "--help" || command === "-h" || !command) {
-    process.stdout.write(helpText());
-  } else {
-    throw new Error(`Unknown command: ${command}\n\n${helpText()}`);
+if (command === "build-artifact" || command === "verify") {
+  try {
+    await runArtifactCommand(command, values.slice(1));
+  } catch (error) {
+    printArtifactError(error);
+    process.exitCode = 1;
   }
-} catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+} else {
+  try {
+    if (command === "init") {
+      initNote(values.slice(1));
+    } else if (command === "build") {
+      buildNote(values.slice(1));
+    } else if (command === "--help" || command === "-h" || !command) {
+      process.stdout.write(helpText());
+    } else {
+      throw new Error(`Unknown command: ${command}\n\n${helpText()}`);
+    }
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
+}
+
+async function runArtifactCommand(name, args) {
+  if (name === "build-artifact") {
+    const parsed = parseBuildArtifactArgs(args);
+    const result = await buildInteractiveArtifact({
+      manifestPath: parsed.input,
+      ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
+      force: parsed.force,
+    });
+    printResult({
+      ok: result.ok,
+      command: "build-artifact",
+      mode: result.mode,
+      output: result.output,
+      title: result.title,
+      bytes: result.bytes,
+      sourceHash: result.sourceHash,
+      outputHash: result.outputHash,
+      dataBlockIds: result.dataBlockIds,
+    });
+    return;
+  }
+
+  const parsed = parseVerifyArgs(args);
+  const result = verifyArtifact({
+    path: parsed.input,
+    requiredDataBlocks: parsed.requiredBlocks,
+  });
+  printResult({
+    ok: result.ok,
+    command: "verify",
+    mode: result.mode,
+    sourceHash: result.sourceHash,
+    dataBlockIds: result.dataBlockIds,
+    issues: result.issues,
+  });
+}
+
+function cliFailure(message) {
+  throw new ArtifactBuildError("INVALID_CLI_ARGUMENTS", message);
+}
+
+function requireFlagValue(args, cursor, flagName) {
+  const value = args[cursor + 1];
+  if (value === undefined || value.startsWith("--")) {
+    cliFailure(`${flagName} requires a value`);
+  }
+  return value;
+}
+
+function parseBuildArtifactArgs(args) {
+  let input;
+  let output;
+  let force = false;
+
+  for (let cursor = 0; cursor < args.length; cursor += 1) {
+    const value = args[cursor];
+    if (value === "--output") {
+      if (output !== undefined) cliFailure("--output may only be provided once");
+      output = requireFlagValue(args, cursor, "--output");
+      cursor += 1;
+    } else if (value === "--force") {
+      if (force) cliFailure("--force may only be provided once");
+      force = true;
+    } else if (value.startsWith("-")) {
+      cliFailure(`Unsupported option for build-artifact: ${value}`);
+    } else if (input === undefined) {
+      input = value;
+    } else {
+      cliFailure("build-artifact accepts exactly one manifest path");
+    }
+  }
+
+  if (input === undefined) {
+    cliFailure("build-artifact requires exactly one manifest path");
+  }
+  return { force, input, output };
+}
+
+function parseVerifyArgs(args) {
+  let input;
+  const requiredBlocks = [];
+
+  for (let cursor = 0; cursor < args.length; cursor += 1) {
+    const value = args[cursor];
+    if (value === "--required-block") {
+      requiredBlocks.push(requireFlagValue(args, cursor, "--required-block"));
+      cursor += 1;
+    } else if (value.startsWith("-")) {
+      cliFailure(`Unsupported option for verify: ${value}`);
+    } else if (input === undefined) {
+      input = value;
+    } else {
+      cliFailure("verify accepts exactly one artifact path");
+    }
+  }
+
+  if (input === undefined) {
+    cliFailure("verify requires exactly one artifact path");
+  }
+  return { input, requiredBlocks };
+}
+
+function printArtifactError(error) {
+  const normalized =
+    error instanceof ArtifactBuildError
+      ? error
+      : new ArtifactBuildError(
+          "UNEXPECTED_CLI_ERROR",
+          "HTML artifact command failed unexpectedly",
+        );
+  process.stderr.write(`${JSON.stringify(normalized.toJSON(), null, 2)}\n`);
 }
 
 function initNote(args) {
@@ -189,5 +316,7 @@ function helpText() {
 Usage:
   node scripts/html-note-kit.mjs init <directory> --title <title> [--force]
   node scripts/html-note-kit.mjs build <input.md> [--output <output.html>] [--force]
+  node scripts/html-note-kit.mjs build-artifact <manifest.mjs> [--output <output.html>] [--force]
+  node scripts/html-note-kit.mjs verify <artifact.html> [--required-block <block-id>]...
 `;
 }
