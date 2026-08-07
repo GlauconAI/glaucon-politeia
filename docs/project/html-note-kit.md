@@ -265,6 +265,7 @@ Current bounded inputs are:
 - 8 MiB aggregate CSS, 8 MiB aggregate JavaScript, and 20 MiB aggregate SVG;
 - 5,000 SVG elements and SVG depth 256;
 - 4 MiB per renderer slot and 8 MiB across all slots;
+- 64 MiB maximum generated HTML artifact size in both note and interactive modes;
 - an 8-second default isolated startup check, configurable up to 10 seconds, plus a 30-second CLI worker limit and 1 MiB bounded worker diagnostics.
 
 ## Generic Interactive Fixture

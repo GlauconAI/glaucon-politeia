@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  linkSync,
   lstatSync,
   mkdtempSync,
   mkdirSync,
@@ -164,6 +165,22 @@ describe("interactive artifact build API", () => {
     const root = writeProject();
     const manifestPath = join(root, "artifact.html");
     renameSync(join(root, "artifact.mjs"), manifestPath);
+    const originalManifest = readFileSync(manifestPath, "utf8");
+
+    await expectArtifactRejection(
+      () => buildInteractiveArtifact({ manifestPath, force: true }),
+      "INVALID_BUILD_OPTIONS",
+    );
+
+    expect(readFileSync(manifestPath, "utf8")).toBe(originalManifest);
+  });
+
+  it("rejects a mixed-case implicit output that aliases the manifest", async () => {
+    const root = writeProject();
+    const manifestPath = join(root, "artifact.HTML");
+    const outputPath = join(root, "artifact.html");
+    renameSync(join(root, "artifact.mjs"), manifestPath);
+    if (!existsSync(outputPath)) linkSync(manifestPath, outputPath);
     const originalManifest = readFileSync(manifestPath, "utf8");
 
     await expectArtifactRejection(
