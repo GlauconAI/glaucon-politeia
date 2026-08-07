@@ -535,21 +535,24 @@ html, body { max-width: none !important; overflow-x: visible !important; }
     });
   });
 
-  it("promotes startup throws and bounds infinite loops in an isolated process", () => {
+  it("promotes synchronous startup throws in an isolated process", () => {
     const throwing = validHtml().replace(
       "</body>",
       '<script data-artifact-script="throw.js">throw new Error("startup exploded")</script></body>',
     );
+
+    const thrown = expectArtifactError(
+      () => verifyArtifactStartup(throwing, { timeoutMs: 3_000 }),
+      "ARTIFACT_VERIFICATION_FAILED",
+    );
+    expect(issueCodes(thrown)).toContain("STARTUP_ERROR");
+  });
+
+  it("bounds infinite startup loops in an isolated process", () => {
     const looping = validHtml().replace(
       "</body>",
       '<script data-artifact-script="loop.js">while (true) {}</script></body>',
     );
-
-    const thrown = expectArtifactError(
-      () => verifyArtifactStartup(throwing, { timeoutMs: 1_000 }),
-      "ARTIFACT_VERIFICATION_FAILED",
-    );
-    expect(issueCodes(thrown)).toContain("STARTUP_ERROR");
 
     const started = Date.now();
     const timedOut = expectArtifactError(
