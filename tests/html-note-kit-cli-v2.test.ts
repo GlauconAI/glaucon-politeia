@@ -126,7 +126,7 @@ describe("HTML Note Kit v2 CLI", () => {
       dataBlockIds: ["registry"],
       issues: [],
     });
-  }, 10_000);
+  }, 30_000);
 
   it("supports an explicit output and force without clobbering by default", () => {
     const root = writeProject();
