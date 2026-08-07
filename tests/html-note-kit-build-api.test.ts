@@ -2,11 +2,14 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  lstatSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -193,6 +196,50 @@ describe("interactive artifact build API", () => {
       verifyDeterminism: false,
     });
     expect(readFileSync(output, "utf8")).toMatch(/^<!doctype html>/);
+  });
+
+  it("treats a dangling symlink as an existing destination without replacing it", async () => {
+    const root = writeProject();
+    const output = join(root, "artifact.html");
+    symlinkSync("missing-target.html", output);
+
+    await expectArtifactRejection(
+      () =>
+        buildInteractiveArtifact({
+          manifestPath: join(root, "artifact.mjs"),
+          outputPath: output,
+        }),
+      "OUTPUT_EXISTS",
+    );
+
+    expect(lstatSync(output).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(output)).toBe("missing-target.html");
+    expect(readdirSync(root).filter((name) => name.includes(".tmp-"))).toEqual([]);
+  });
+
+  it("does not clobber a destination created after the initial force check", async () => {
+    const root = writeProject();
+    const output = join(root, "artifact.html");
+    writeFileSync(
+      join(root, "renderer.mjs"),
+      `export function renderArtifact() {
+        process.getBuiltinModule("node:fs").writeFileSync(${JSON.stringify(output)}, "RACE-WINNER");
+        return { mainSections: "<section>Ready</section>" };
+      }`,
+    );
+
+    await expectArtifactRejection(
+      () =>
+        buildInteractiveArtifact({
+          manifestPath: join(root, "artifact.mjs"),
+          outputPath: output,
+          verifyDeterminism: false,
+        }),
+      "OUTPUT_EXISTS",
+    );
+
+    expect(readFileSync(output, "utf8")).toBe("RACE-WINNER");
+    expect(readdirSync(root).filter((name) => name.includes(".tmp-"))).toEqual([]);
   });
 
   it("leaves the destination byte-identical after renderer or verification failure", async () => {
@@ -436,6 +483,36 @@ describe("artifact verification", () => {
     expect(Date.now() - started).toBeLessThan(3_000);
   });
 
+  it("rejects non-classic declared runtime and client script types", () => {
+    const source = validHtml();
+    const cases = [
+      source.replace(
+        "<script data-402v-runtime>",
+        '<script type="module" data-402v-runtime>',
+      ),
+      source.replace(
+        "<script data-402v-runtime>",
+        '<script type="text/plain" data-402v-runtime>',
+      ),
+      source.replace(
+        "</body>",
+        '<script type="module" data-artifact-script="module.js">throw new Error("module was skipped")</script></body>',
+      ),
+      source.replace(
+        "</body>",
+        '<script type="text/plain" data-artifact-script="plain.js">window.plainWasSkipped = true</script></body>',
+      ),
+    ];
+
+    for (const html of cases) {
+      const error = expectArtifactError(
+        () => verifyArtifactHtml(html),
+        "ARTIFACT_VERIFICATION_FAILED",
+      );
+      expect(issueCodes(error)).toContain("INVALID_JAVASCRIPT");
+    }
+  });
+
   it("rejects a locked runtime that does not expose the canonical script data", () => {
     const forgedRuntime = `Object.defineProperty(window, "__402vArtifact", {
       value: Object.freeze({
@@ -574,5 +651,61 @@ describe("atomic I/O and note compatibility", () => {
       ok: true,
       mode: "note",
     });
+  });
+
+  it("buildNote preserves starter Mermaid and supported remote-image behavior", async () => {
+    const root = temporaryRoot();
+    const input = join(root, "feature-note.md");
+    const apiOutput = join(root, "api-feature.html");
+    const cliOutput = join(root, "cli-feature.html");
+    writeFileSync(
+      input,
+      `---
+title: Feature note
+description: Existing note features.
+eyebrow: 402v Knowledge
+---
+
+# Feature note
+
+![Remote diagram](https://example.com/diagram.png)
+
+\`\`\`mermaid
+flowchart LR
+A[Source] --> B{Review}
+B -->|pass| C[Standalone HTML]
+B -->|revise| D[Revise]
+D --> A
+\`\`\`
+`,
+    );
+
+    const cliResult = spawnSync(
+      process.execPath,
+      [cli, "build", input, "--output", cliOutput],
+      { encoding: "utf8" },
+    );
+    expect(cliResult.status).toBe(0);
+
+    const result = await buildNote({ inputPath: input, outputPath: apiOutput });
+    const html = readFileSync(apiOutput, "utf8");
+    expect(result).toMatchObject({ ok: true, mode: "note" });
+    expect(readFileSync(apiOutput)).toEqual(readFileSync(cliOutput));
+    expect(html).toContain('src="https://example.com/diagram.png"');
+    expect(html).toContain('data-diagram="flowchart"');
+    expect(html).toContain("<svg");
+    expect(verifyArtifact({ path: apiOutput })).toMatchObject({
+      ok: true,
+      mode: "note",
+    });
+    const withoutStyles = html.replace(/\s*<style>[\s\S]*?<\/style>/, "");
+    expect(
+      issueCodes(
+        expectArtifactError(
+          () => verifyArtifactHtml(withoutStyles),
+          "ARTIFACT_VERIFICATION_FAILED",
+        ),
+      ),
+    ).toContain("MISSING_INLINE_STYLESHEET");
   });
 });
