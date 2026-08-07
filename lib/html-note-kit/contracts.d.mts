@@ -19,11 +19,11 @@ export interface ArtifactSvgEntry {
 }
 
 export interface ArtifactSlots {
-  navigation: string;
-  heroSupplementary: string;
-  mainSections: string;
-  rail: string;
-  footer: string;
+  navigation?: string;
+  heroSupplementary?: string;
+  mainSections?: string;
+  rail?: string;
+  footer?: string;
 }
 
 export interface InteractiveModel {
@@ -48,8 +48,8 @@ export interface ArtifactManifest {
   svgAssets: Array<{
     id: string;
     source: string;
-    title: string;
-    description: string;
+    title?: string;
+    description?: string;
   }>;
   requiredDataBlocks: string[];
 }

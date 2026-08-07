@@ -28,12 +28,16 @@ export interface BuildNoteOptions {
   force?: boolean;
 }
 
-export interface VerifyArtifactOptions {
-  html?: string;
-  path?: string;
+interface VerifyArtifactSharedOptions {
   requiredDataBlocks?: string[];
   startupTimeoutMs?: number;
 }
+
+export type VerifyArtifactOptions = VerifyArtifactSharedOptions &
+  (
+    | { html: string; path?: never }
+    | { path: string; html?: never }
+  );
 
 export declare function buildInteractiveArtifact(
   options: BuildInteractiveArtifactOptions,

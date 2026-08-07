@@ -75,12 +75,17 @@ describe("interactive 402v document", () => {
     );
     const packageJson = JSON.parse(
       readFileSync(join(process.cwd(), "package.json"), "utf8"),
-    ) as { dependencies?: Record<string, string> };
+    ) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
 
     expect(source).toContain('from "parse5"');
     expect(source).not.toContain('from "jsdom"');
     expect(source.match(/parseHtmlDocument\(/g)).toHaveLength(1);
     expect(packageJson.dependencies?.parse5).toBe("^8.0.0");
+    expect(packageJson.dependencies?.jsdom).toBe("^29.1.1");
+    expect(packageJson.devDependencies?.jsdom).toBeUndefined();
 
     vi.mocked(parseHtmlDocument).mockClear();
     renderInteractiveDocument(model());

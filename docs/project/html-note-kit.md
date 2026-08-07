@@ -123,6 +123,8 @@ npm run html:note -- build-artifact ./artifact.mjs --output ./artifact.html
 npm run html:note -- verify ./artifact.html --required-block project-registry
 ```
 
+`verify` executes deliberately included artifact JavaScript as trusted local code during its bounded startup check. It is not a sandbox for untrusted or third-party scripts.
+
 Rebuild the visual shell while preserving every canonical block already embedded in an artifact:
 
 ```bash
@@ -241,7 +243,7 @@ const blocks = extractDataBlocks(html);
 
 JSON blocks are the only machine-readable declarations in an interactive artifact. Object keys are sorted recursively, array order is preserved, unsafe script-closing characters are escaped, and the emitted block remains strict JSON. IDs match `[A-Za-z][A-Za-z0-9_.:-]{0,127}`. The embedded `402v-source-hash` is a SHA-256 hash of the complete canonical block map; build results also report source and output SHA-256 hashes.
 
-Interactive builds render twice by default and reject byte differences. Output contains no timestamp, random ID, absolute path, or machine-specific value. The complete HTML is verified in memory before a same-directory temporary file is flushed and renamed. Failed parsing, rendering, determinism, verification, or writing leaves an absent destination absent and an existing destination byte-identical. No-clobber writes remain race-safe, including dangling symlinks.
+Interactive builds render twice by default and reject byte differences. Output contains no timestamp, random ID, absolute path, or machine-specific value. The complete HTML is verified in memory before a same-directory temporary file is flushed and renamed. Failed parsing, rendering, determinism, verification, or writing leaves an absent destination absent and an existing destination byte-identical when filesystem rollback succeeds; a rollback failure is returned as a structured error rather than hidden. No-clobber writes remain race-safe, including dangling symlinks.
 
 `--preserve-data-from` overlays every verified source block on manifest data, including extra block IDs no longer declared by the manifest. `update-data` reads and verifies one artifact snapshot, replaces only the requested existing ID, preserves every other block, then performs the same deterministic and atomic rebuild.
 

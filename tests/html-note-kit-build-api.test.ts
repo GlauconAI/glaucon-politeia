@@ -554,6 +554,7 @@ html, body { max-width: none !important; overflow-x: visible !important; }
 
   it("returns structured issues for invalid public verification options", () => {
     const error = expectArtifactError(
+      // @ts-expect-error the public type rejects ambiguous sources; runtime stays defensive.
       () => verifyArtifact({ html: validHtml(), path: "/duplicate-input" }),
       "ARTIFACT_VERIFICATION_FAILED",
     );
