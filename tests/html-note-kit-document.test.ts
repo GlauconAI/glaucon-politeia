@@ -332,7 +332,7 @@ describe("interactive 402v document", () => {
   it("rejects every script element in slots, including case and template variants", () => {
     const hostileSlots = [
       '<SCRIPT>Object.defineProperty(window, "__402vArtifact", { value: "blocked", configurable: false });</SCRIPT>',
-      '<template><script type="text/javascript">window.templateRan = true;</script></template>',
+      '<template><template><template><script type="text/javascript">window.templateRan = true;</script></template></template></template>',
     ];
 
     for (const slot of hostileSlots) {
@@ -348,7 +348,7 @@ describe("interactive 402v document", () => {
   it("rejects slot ids that collide with canonical data ids", () => {
     const collidingSlots = [
       '<section id="registry">shadow</section>',
-      '<template><span id="registry">nested shadow</span></template>',
+      '<template><template><template><span id="registry">nested shadow</span></template></template></template>',
     ];
 
     for (const slot of collidingSlots) {
@@ -358,6 +358,19 @@ describe("interactive 402v document", () => {
         () => renderInteractiveDocument(input),
         "INVALID_RENDERER_RESULT",
       );
+    }
+  });
+
+  it("treats SVG and MathML template elements as inert foreign elements", () => {
+    const foreignTemplates = [
+      '<svg xmlns="http://www.w3.org/2000/svg"><template><g id="svg-template-content"></g></template></svg>',
+      '<math xmlns="http://www.w3.org/1998/Math/MathML"><template><mi id="math-template-content">x</mi></template></math>',
+    ];
+
+    for (const slot of foreignTemplates) {
+      const input = model();
+      input.slots.rail = slot;
+      expect(() => renderInteractiveDocument(input)).not.toThrow();
     }
   });
 
