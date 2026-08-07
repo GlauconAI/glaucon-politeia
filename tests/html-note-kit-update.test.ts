@@ -433,6 +433,94 @@ describe("updateArtifactData", () => {
 });
 
 describe("Task 7 CLI", () => {
+  it("updates the artifact in place when output and force are omitted", () => {
+    const root = fixture();
+    const manifestPath = join(root, "artifact.mjs");
+    const artifactPath = join(root, "artifact.html");
+    const inputPath = join(root, "replacement.json");
+    parseSuccess(run(["build-artifact", manifestPath]));
+    writeFileSync(inputPath, '{"version":2,"items":["in-place"]}');
+
+    const result = parseSuccess(
+      run([
+        "update-data",
+        artifactPath,
+        "--manifest",
+        manifestPath,
+        "--id",
+        "registry",
+        "--input",
+        inputPath,
+      ]),
+    );
+
+    expect(result).toMatchObject({ command: "update-data", output: artifactPath });
+    expect(
+      extractDataBlocks(readFileSync(artifactPath, "utf8")).get("registry"),
+    ).toEqual({ items: ["in-place"], version: 2 });
+  }, 20_000);
+
+  it("does not clobber an alternate output when force is omitted", () => {
+    const root = fixture();
+    const manifestPath = join(root, "artifact.mjs");
+    const artifactPath = join(root, "artifact.html");
+    const inputPath = join(root, "replacement.json");
+    const outputPath = join(root, "copy.html");
+    parseSuccess(run(["build-artifact", manifestPath]));
+    writeFileSync(inputPath, '{"version":2,"items":["blocked"]}');
+    writeFileSync(outputPath, "KEEP");
+
+    const failure = parseFailure(
+      run([
+        "update-data",
+        artifactPath,
+        "--manifest",
+        manifestPath,
+        "--id",
+        "registry",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+      ]),
+    );
+
+    expect(failure.error.code).toBe("OUTPUT_EXISTS");
+    expect(readFileSync(outputPath, "utf8")).toBe("KEEP");
+  }, 20_000);
+
+  it("replaces an alternate output when force is provided", () => {
+    const root = fixture();
+    const manifestPath = join(root, "artifact.mjs");
+    const artifactPath = join(root, "artifact.html");
+    const inputPath = join(root, "replacement.json");
+    const outputPath = join(root, "copy.html");
+    parseSuccess(run(["build-artifact", manifestPath]));
+    writeFileSync(inputPath, '{"version":2,"items":["forced"]}');
+    writeFileSync(outputPath, "KEEP");
+
+    const result = parseSuccess(
+      run([
+        "update-data",
+        artifactPath,
+        "--manifest",
+        manifestPath,
+        "--id",
+        "registry",
+        "--input",
+        inputPath,
+        "--output",
+        outputPath,
+        "--force",
+      ]),
+    );
+
+    expect(result).toMatchObject({ command: "update-data", output: outputPath });
+    expect(
+      extractDataBlocks(readFileSync(outputPath, "utf8")).get("registry"),
+    ).toEqual({ items: ["forced"], version: 2 });
+  }, 20_000);
+
   it("preserves data during shell rebuild and reports one structured result", async () => {
     const root = fixture();
     const manifestPath = join(root, "artifact.mjs");

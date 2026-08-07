@@ -88,7 +88,7 @@ async function runUpdate(options) {
     ...(options.outputPath === undefined
       ? {}
       : { outputPath: options.outputPath }),
-    force: options.force,
+    ...(options.force === undefined ? {} : { force: options.force }),
   });
 }
 

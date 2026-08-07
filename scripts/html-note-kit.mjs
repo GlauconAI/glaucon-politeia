@@ -85,7 +85,9 @@ async function runArtifactCommand(name, args) {
       id: parsed.id,
       inputPath: parsed.input,
       ...(parsed.output === undefined ? {} : { outputPath: parsed.output }),
-      force: parsed.force,
+      ...(parsed.force === undefined && parsed.output === undefined
+        ? {}
+        : { force: parsed.force ?? false }),
     });
     printResult({
       ok: result.ok,
@@ -265,7 +267,7 @@ function parseUpdateDataArgs(args) {
   let id;
   let input;
   let output;
-  let force = false;
+  let force;
 
   for (let cursor = 0; cursor < args.length; cursor += 1) {
     const value = args[cursor];
@@ -285,7 +287,7 @@ function parseUpdateDataArgs(args) {
       else output = flagValue;
       cursor += 1;
     } else if (value === "--force") {
-      if (force) cliFailure("--force may only be provided once");
+      if (force !== undefined) cliFailure("--force may only be provided once");
       force = true;
     } else if (value.startsWith("-")) {
       cliFailure(`Unsupported option for update-data: ${value}`);
