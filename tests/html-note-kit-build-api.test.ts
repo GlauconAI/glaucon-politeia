@@ -8,6 +8,7 @@ import {
   readFileSync,
   readlinkSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -141,6 +142,37 @@ function issueCodes(error: ArtifactBuildError) {
 }
 
 describe("interactive artifact build API", () => {
+  it("derives an extensionless manifest output within its dotted directory", async () => {
+    const root = writeProject();
+    const dottedDirectory = join(root, "nested.with.dot");
+    mkdirSync(dottedDirectory);
+    for (const name of ["artifact.mjs", "data.json", "renderer.mjs"]) {
+      renameSync(join(root, name), join(dottedDirectory, name));
+    }
+    const manifestPath = join(dottedDirectory, "artifact");
+    renameSync(join(dottedDirectory, "artifact.mjs"), manifestPath);
+
+    const result = await buildInteractiveArtifact({ manifestPath });
+
+    expect(result.output).toBe(join(dottedDirectory, "artifact.html"));
+    expect(existsSync(result.output)).toBe(true);
+    expect(readFileSync(manifestPath, "utf8")).toContain("contractVersion: 1");
+  });
+
+  it("rejects an implicit output path that equals the manifest even with force", async () => {
+    const root = writeProject();
+    const manifestPath = join(root, "artifact.html");
+    renameSync(join(root, "artifact.mjs"), manifestPath);
+    const originalManifest = readFileSync(manifestPath, "utf8");
+
+    await expectArtifactRejection(
+      () => buildInteractiveArtifact({ manifestPath, force: true }),
+      "INVALID_BUILD_OPTIONS",
+    );
+
+    expect(readFileSync(manifestPath, "utf8")).toBe(originalManifest);
+  });
+
   it("builds, verifies, hashes, and reports deterministic standalone HTML", async () => {
     const root = writeProject();
     const output = join(root, "artifact.html");
