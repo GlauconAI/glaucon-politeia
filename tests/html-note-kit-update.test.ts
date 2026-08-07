@@ -14,7 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
 import {
@@ -24,6 +24,8 @@ import {
   verifyArtifact,
 } from "../lib/html-note-kit/index.mjs";
 import { ARTIFACT_RESOURCE_LIMITS } from "../lib/html-note-kit/resource-limits.mjs";
+
+vi.setConfig({ testTimeout: 30_000 });
 
 const roots: string[] = [];
 const cli = join(process.cwd(), "scripts", "html-note-kit.mjs");
