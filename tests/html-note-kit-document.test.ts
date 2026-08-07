@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
+import { parse as parseHtmlDocument } from "parse5";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderInteractiveDocument } from "../lib/html-note-kit/document.mjs";
 import {
@@ -11,6 +14,11 @@ import {
 import { ArtifactBuildError } from "../lib/html-note-kit/errors.mjs";
 import { renderInteractiveRuntime } from "../lib/html-note-kit/runtime.mjs";
 import { renderHtmlDocument } from "../lib/html-note-kit/template.mjs";
+
+vi.mock("parse5", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("parse5")>();
+  return { ...actual, parse: vi.fn(actual.parse) };
+});
 
 function model() {
   return {
@@ -60,6 +68,25 @@ function expectArtifactError(run: () => unknown, code: string) {
 }
 
 describe("interactive 402v document", () => {
+  it("uses one direct parse5 lifecycle without production JSDOM", () => {
+    const source = readFileSync(
+      join(process.cwd(), "lib", "html-note-kit", "document.mjs"),
+      "utf8",
+    );
+    const packageJson = JSON.parse(
+      readFileSync(join(process.cwd(), "package.json"), "utf8"),
+    ) as { dependencies?: Record<string, string> };
+
+    expect(source).toContain('from "parse5"');
+    expect(source).not.toContain('from "jsdom"');
+    expect(source.match(/parseHtmlDocument\(/g)).toHaveLength(1);
+    expect(packageJson.dependencies?.parse5).toBe("^8.0.0");
+
+    vi.mocked(parseHtmlDocument).mockClear();
+    renderInteractiveDocument(model());
+    expect(parseHtmlDocument).toHaveBeenCalledTimes(1);
+  });
+
   it("assembles every fixed slot at its contract location", () => {
     const dom = new JSDOM(renderInteractiveDocument(model()));
     const document = dom.window.document;
