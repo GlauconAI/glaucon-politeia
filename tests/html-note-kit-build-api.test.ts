@@ -548,6 +548,26 @@ html, body { max-width: none !important; overflow-x: visible !important; }
     expect(issueCodes(thrown)).toContain("STARTUP_ERROR");
   });
 
+  it("uses bounded default startup headroom for an infinite loop", () => {
+    const looping = validHtml().replace(
+      "</body>",
+      '<script data-artifact-script="loop.js">while (true) {}</script></body>',
+    );
+
+    const timedOut = expectArtifactError(
+      () => verifyArtifactStartup(looping),
+      "ARTIFACT_VERIFICATION_FAILED",
+    );
+    expect(timedOut.details).toMatchObject({
+      issues: [
+        {
+          code: "STARTUP_TIMEOUT",
+          details: { timeoutMs: 8_000 },
+        },
+      ],
+    });
+  }, 12_000);
+
   it("bounds infinite startup loops in an isolated process", () => {
     const looping = validHtml().replace(
       "</body>",
