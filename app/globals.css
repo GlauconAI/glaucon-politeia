@@ -5431,6 +5431,18 @@ body {
   color: var(--strong);
 }
 
+@media (max-width: 1500px) {
+  .header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .site-nav,
+  .search-form {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 960px) {
   .project-execution-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5442,6 +5454,26 @@ body {
 }
 
 @media (max-width: 520px) {
+  .header-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .header-actions,
+  .user-menu {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .header-actions {
+    grid-column: 1 / -1;
+  }
+
+  .user-menu span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
   .project-execution-portfolio {
     padding: 16px;
   }
