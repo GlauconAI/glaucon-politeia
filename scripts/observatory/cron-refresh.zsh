@@ -7,8 +7,9 @@ registry_path=${OBSERVATORY_REGISTRY_PATH:-}
 workspace_root=${OBSERVATORY_WORKSPACE_ROOT:-}
 vault_root=${OBSERVATORY_VAULT_ROOT:-}
 config_path=${OPENCLAW_CONFIG_PATH:-}
+project_execution_path=${OBSERVATORY_PROJECT_EXECUTION_PATH:-}
 
-if [[ -z $repo_root || -z $registry_path || -z $workspace_root || -z $vault_root || -z $config_path ]]; then
+if [[ -z $repo_root || -z $registry_path || -z $workspace_root || -z $vault_root || -z $config_path || -z $project_execution_path ]]; then
   print -r -- "OBSERVATORY_REFRESH_UNEXPECTED_FAILURE"
   exit 0
 fi
@@ -38,7 +39,8 @@ refresh_output=$(npm run observatory:refresh -- \
   "$registry_path" \
   "$workspace_root" \
   "$vault_root" \
-  "$config_path" 2>&1)
+  "$config_path" \
+  "$project_execution_path" 2>&1)
 refresh_status=$?
 snapshot_mtime_after=$(stat -f '%m' "$snapshot_path" 2>/dev/null || print -r -- "missing")
 

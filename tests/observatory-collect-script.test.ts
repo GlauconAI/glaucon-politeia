@@ -11,11 +11,21 @@ const verifierSource = readFileSync(
   join(process.cwd(), "scripts/observatory/verify-snapshot.ts"),
   "utf8",
 );
+const refreshSource = readFileSync(
+  join(process.cwd(), "scripts/observatory/refresh.ts"),
+  "utf8",
+);
+const cronSource = readFileSync(
+  join(process.cwd(), "scripts/observatory/cron-refresh.zsh"),
+  "utf8",
+);
 
 describe("Observatory collection script", () => {
-  it("upgrades explicit-root collections to v4 with both approved repository roots", () => {
+  it("upgrades explicit-root collections to v5 with the bounded Project execution export", () => {
     expect(source).toContain("collectSourceRepositories");
     expect(source).toContain("upgradeObservatorySnapshotToV4");
+    expect(source).toContain("collectProjectExecutionSnapshot");
+    expect(source).toContain("upgradeObservatorySnapshotToV5");
     expect(source).toContain(
       "workspaceRoot: resolve(options.systemRoots.workspaceRoot)",
     );
@@ -26,20 +36,33 @@ describe("Observatory collection script", () => {
     expect(source).toContain(
       "projectGroups: governanceSnapshot.registry.project_groups",
     );
+    expect(source).toContain(
+      "exportPath: resolve(options.systemRoots.projectExecutionPath)",
+    );
   });
 
   it("keeps legacy no-root collection on the existing core path", () => {
     expect(source).toContain("collectAndWriteObservatorySnapshot");
     expect(source).toContain("if (options.systemRoots)");
   });
+
+  it("threads the explicit sanitized export through refresh without hard-coded host paths", () => {
+    expect(refreshSource).toContain('"--project-execution-path"');
+    expect(refreshSource).toContain("resolve(projectExecutionPath)");
+    expect(cronSource).toContain("OBSERVATORY_PROJECT_EXECUTION_PATH");
+    expect(cronSource).not.toContain("/Users/");
+  });
 });
 
 describe("Observatory Snapshot verifier", () => {
-  it("accepts v4 and verifies the seventh source domain and repository count", () => {
-    expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV4Schema");
-    expect(verifierSource).toContain("source_health.length === 7");
+  it("accepts v5 and verifies the eighth source domain and Project count", () => {
+    expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV5Schema");
+    expect(verifierSource).toContain("source_health.length === 8");
     expect(verifierSource).toContain(
       "source_repositories.repositories.length",
+    );
+    expect(verifierSource).toContain(
+      "project_executions?.summary.project_count",
     );
   });
 });

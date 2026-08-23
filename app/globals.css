@@ -5228,3 +5228,233 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Project Flow parallel execution */
+
+.project-execution-portfolio {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(18, 20, 25, 0.88);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+}
+
+.project-execution-source {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.project-execution-source-fresh,
+.freshness-fresh {
+  color: #86efac;
+}
+
+.project-execution-source-stale,
+.freshness-stale {
+  color: #fbbf24;
+}
+
+.project-execution-source-unknown,
+.freshness-unknown {
+  color: var(--muted);
+}
+
+.project-execution-callout {
+  margin: 18px 0 0;
+  padding: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.project-execution-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.project-execution-summary div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.project-execution-summary dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-execution-summary dd {
+  margin: 8px 0 0;
+  color: var(--strong);
+  font-weight: 650;
+}
+
+.project-execution-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.project-execution-filters label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.project-execution-filters select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  background: rgba(7, 9, 12, 0.78);
+  color: var(--strong);
+}
+
+.project-execution-grid,
+.project-execution-lanes {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-execution-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.project-execution-project {
+  min-width: 0;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.project-execution-project > header,
+.project-execution-lane-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-execution-project h3,
+.project-execution-lane h4 {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--strong);
+}
+
+.project-execution-freshness,
+.project-execution-status {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-execution-match,
+.project-execution-control-note {
+  color: #c4b5fd;
+  font-size: 0.78rem;
+}
+
+.project-execution-project-meta,
+.project-execution-lane dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-execution-project-meta div,
+.project-execution-lane dl div {
+  min-width: 0;
+}
+
+.project-execution-project-meta dt,
+.project-execution-lane dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.project-execution-project-meta dd,
+.project-execution-lane dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.project-execution-lanes {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.project-execution-lane {
+  min-width: 0;
+  padding: 13px;
+  border-left: 3px solid #7c3aed;
+  border-radius: 4px;
+  background: rgba(7, 9, 12, 0.5);
+}
+
+.project-execution-dependencies,
+.project-execution-evidence,
+.project-execution-no-lines {
+  margin: 9px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.project-execution-evidence span {
+  color: var(--strong);
+}
+
+@media (max-width: 960px) {
+  .project-execution-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .project-execution-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .project-execution-portfolio {
+    padding: 16px;
+  }
+
+  .project-execution-source {
+    align-items: flex-start;
+  }
+
+  .project-execution-summary,
+  .project-execution-filters,
+  .project-execution-grid,
+  .project-execution-project-meta,
+  .project-execution-lane dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

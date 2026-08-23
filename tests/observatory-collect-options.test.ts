@@ -22,6 +22,8 @@ describe("parseObservatoryCollectOptions", () => {
         "/explicit/vault",
         "--config-path",
         "/explicit/openclaw.json",
+        "--project-execution-path",
+        "/explicit/exports/project-execution-snapshot.json",
       ]),
     ).toEqual({
       registryPath: "registry.html",
@@ -29,7 +31,9 @@ describe("parseObservatoryCollectOptions", () => {
       systemRoots: {
         workspaceRoot: "/explicit/workspace",
         vaultRoot: "/explicit/vault",
-        configPath: "/explicit/openclaw.json",
+            configPath: "/explicit/openclaw.json",
+            projectExecutionPath:
+              "/explicit/exports/project-execution-snapshot.json",
       },
     });
     expect(() =>
@@ -40,6 +44,19 @@ describe("parseObservatoryCollectOptions", () => {
         "/explicit/workspace",
       ]),
     ).toThrow(/both/u);
+  });
+
+  it("requires an explicit project execution export path for full v5 collection", () => {
+    expect(() =>
+      parseObservatoryCollectOptions([
+        "registry.html",
+        "snapshot.json",
+        "--workspace-root",
+        "/explicit/workspace",
+        "--vault-root",
+        "/explicit/vault",
+      ]),
+    ).toThrow(/project-execution-path/u);
   });
 
   it("rejects missing registry and unknown flags", () => {

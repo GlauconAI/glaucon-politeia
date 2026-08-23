@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ObservatoryCollectionEnvelope } from "@/lib/observatory/collection-schema";
 import type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
+import { projectExecutionFixture } from "./observatory-project-execution-schema.test";
 
 const mocks = vi.hoisted(() => ({
   currentAdmin: {
@@ -138,8 +139,39 @@ describe("Dashboard directory pages", () => {
       .toHaveValue("Plato");
     expect(screen.getByRole("heading", { name: "Dashboard" }))
       .toBeInTheDocument();
+    expect(screen.getByText(/project execution data unavailable/i))
+      .toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to dashboard/i }))
       .toHaveAttribute("href", "/dashboard");
+  });
+
+  it("renders validated v5 Project execution data above the canonical directory", async () => {
+    mocks.overviewState = {
+      status: "ready",
+      snapshot: {
+        ...snapshot,
+        schema_version: "5.0.0",
+        collector_version: "5.0.0",
+        project_executions: projectExecutionFixture(),
+        source_health: [
+          {
+            domain: "project_executions",
+            status: "fresh",
+            health: "healthy",
+            collected_at: "2026-08-23T20:00:00Z",
+            last_success_at: "2026-08-23T20:00:00Z",
+            asset_count: 1,
+          },
+        ],
+      } as unknown as ObservatoryCollectionEnvelope,
+    };
+
+    render(await ProjectsPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { name: /project execution/i }))
+      .toBeInTheDocument();
+    expect(screen.getByText("Build Dashboard")).toBeInTheDocument();
+    expect(screen.getAllByText("Returns to PM")).toHaveLength(2);
   });
 
   it("renders de-duplicated Skills with URL-derived filters", async () => {

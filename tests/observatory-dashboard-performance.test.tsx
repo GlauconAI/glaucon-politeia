@@ -5,6 +5,7 @@ import {
   ProjectDirectory,
   type ProjectDirectoryFilters,
 } from "@/components/observatory/ProjectDirectory";
+import { ProjectExecutionPortfolio } from "@/components/observatory/ProjectExecutionPortfolio";
 import {
   SkillDirectory,
   type SkillDirectoryFilters,
@@ -13,6 +14,7 @@ import { SystemInventory } from "@/components/observatory/SystemInventory";
 import { SystemTopology } from "@/components/observatory/SystemTopology";
 import type {
   DashboardProjectEntry,
+  DashboardProjectExecutionEntry,
   DashboardSkillEntry,
 } from "@/lib/observatory/dashboard-directory";
 import type {
@@ -104,6 +106,50 @@ function project(index: number): DashboardProjectEntry {
   };
 }
 
+function projectExecution(index: number): DashboardProjectExecutionEntry {
+  const executionLines = Array.from({ length: 3 }, (_, lineIndex) => ({
+    line_id: `line-${index}-${lineIndex}`,
+    stage_id: `stage-${lineIndex}`,
+    run_id: `run-${index}-${lineIndex}`,
+    title: `Execution line ${lineIndex}`,
+    owner_agent_id: `agent-${lineIndex}`,
+    transfer_mode: "project_executor" as const,
+    status: "active" as const,
+    dependencies: lineIndex === 0 ? [] : [`line-${index}-${lineIndex - 1}`],
+    return_trigger: "terminal_signal" as const,
+    execution_line_returns_to_originating_agent: true,
+    artifact_ref: null,
+    verification_summary: null,
+    started_at: "2026-08-23T18:00:00.000Z",
+    handed_off_at: null,
+    updated_at: "2026-08-23T18:00:00.000Z",
+    completed_at: null,
+    user_returned_at: null,
+    canonical_result_ref: null,
+  }));
+  return {
+    projectKey: `plato/project-${index}`,
+    title: `Project ${index}`,
+    owner: "Plato",
+    status: "active",
+    currentStage: "Execution",
+    currentGate: "Gate 3",
+    updatedAt: "2026-08-23T18:00:00.000Z",
+    collectedAt: "2026-08-23T18:00:00.000Z",
+    freshness: "fresh",
+    match: "matched",
+    executionLines,
+    summary: {
+      executionLineCount: executionLines.length,
+      activeCount: executionLines.length,
+      waitingCount: 0,
+      blockedCount: 0,
+      completedCount: 0,
+      independentOwnerLineCount: 0,
+    },
+  };
+}
+
 describe("Dashboard initial render budgets", () => {
   it("keeps heavy Dashboard inventory and topology below 5,000 DOM nodes", () => {
     render(
@@ -145,5 +191,20 @@ describe("Dashboard initial render budgets", () => {
     );
 
     expect(document.querySelectorAll("*").length).toBeLessThan(2_000);
+  });
+
+  it("keeps the Project execution portfolio below 5,000 DOM nodes", () => {
+    render(
+      <ProjectExecutionPortfolio
+        projects={Array.from({ length: 32 }, (_, index) =>
+          projectExecution(index),
+        )}
+        sourceAvailable
+        sourceStatus="fresh"
+        collectedAt="2026-08-23T18:00:00.000Z"
+      />,
+    );
+
+    expect(document.querySelectorAll("*").length).toBeLessThan(5_000);
   });
 });

@@ -138,10 +138,16 @@ async function readSnapshotIfPresent(path: string): Promise<unknown | null> {
 }
 
 async function main(): Promise<void> {
-  const [registryPath, workspaceRoot, vaultRoot, configPath] = process.argv.slice(2);
-  if (!registryPath || !workspaceRoot || !vaultRoot) {
+  const [
+    registryPath,
+    workspaceRoot,
+    vaultRoot,
+    configPath,
+    projectExecutionPath,
+  ] = process.argv.slice(2);
+  if (!registryPath || !workspaceRoot || !vaultRoot || !projectExecutionPath) {
     process.stderr.write(
-      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, and Vault roots.\n",
+      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, Vault, and Project execution export paths.\n",
     );
     process.exitCode = 2;
     return;
@@ -171,6 +177,8 @@ async function main(): Promise<void> {
       resolve(workspaceRoot),
       "--vault-root",
       resolve(vaultRoot),
+      "--project-execution-path",
+      resolve(projectExecutionPath),
       ...(configPath ? ["--config-path", resolve(configPath)] : []),
     ];
     const collected = await runStep(

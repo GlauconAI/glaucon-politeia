@@ -7,21 +7,25 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
   OBSERVATORY_COLLECTOR_VERSION_V2,
   OBSERVATORY_COLLECTOR_VERSION_V3,
   OBSERVATORY_COLLECTOR_VERSION_V4,
+  OBSERVATORY_COLLECTOR_VERSION_V5,
   ObservatoryAgentSchema,
   ObservatoryCollectionEnvelopeSchema,
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
   ObservatoryCollectionEnvelopeV3Schema,
   ObservatoryCollectionEnvelopeV4Schema,
+  ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryRuntimeSchema,
   type ObservatoryAgent,
   type ObservatoryCollectionEnvelope,
   type ObservatoryCollectionEnvelopeV2,
   type ObservatoryCollectionEnvelopeV3,
   type ObservatoryCollectionEnvelopeV4,
+  type ObservatoryCollectionEnvelopeV5,
   type ObservatoryRuntime,
 } from "#observatory-collection-schema";
 import {
@@ -39,6 +43,7 @@ import {
   ObservatorySourceRepositoryInventorySchema,
   type ObservatorySourceRepositoryInventory,
 } from "#observatory-source-repository-schema";
+import type { ProjectExecutionCollectionResult } from "#observatory-project-execution-collector";
 
 export const OBSERVATORY_CLI_STDOUT_MAX_BYTES = 5 * 1024 * 1024;
 export const OBSERVATORY_REGISTRY_HTML_MAX_BYTES = 10 * 1024 * 1024;
@@ -624,6 +629,46 @@ export function upgradeObservatorySnapshotToV4(
   });
   const digest = computeObservatorySnapshotDigest(draft);
   return ObservatoryCollectionEnvelopeV4Schema.parse({
+    ...draft,
+    source_digest: digest,
+    registry: {
+      ...draft.registry,
+      source: { ...draft.registry.source, digest },
+    },
+  });
+}
+
+export function upgradeObservatorySnapshotToV5(
+  repositorySnapshotInput: unknown,
+  projectExecutionInput: ProjectExecutionCollectionResult,
+): ObservatoryCollectionEnvelopeV5 {
+  const repositorySnapshot = ObservatoryCollectionEnvelopeV4Schema.parse(
+    repositorySnapshotInput,
+  );
+  const sourceHealth = [
+    ...repositorySnapshot.source_health.filter(
+      (source) => source.domain !== "project_executions",
+    ),
+    projectExecutionInput.sourceHealth,
+  ];
+  const placeholderDigest = "0".repeat(64);
+  const draft = ObservatoryCollectionEnvelopeV5Schema.parse({
+    ...repositorySnapshot,
+    schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
+    collector_version: OBSERVATORY_COLLECTOR_VERSION_V5,
+    source_digest: placeholderDigest,
+    registry: {
+      ...repositorySnapshot.registry,
+      source: {
+        ...repositorySnapshot.registry.source,
+        digest: placeholderDigest,
+      },
+    },
+    source_health: sourceHealth,
+    project_executions: projectExecutionInput.snapshot,
+  });
+  const digest = computeObservatorySnapshotDigest(draft);
+  return ObservatoryCollectionEnvelopeV5Schema.parse({
     ...draft,
     source_digest: digest,
     registry: {

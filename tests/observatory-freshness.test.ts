@@ -16,6 +16,20 @@ describe("deriveFreshness", () => {
       deriveFreshness("operations", "2026-07-22T22:14:59.000Z", now),
     ).toBe("stale");
     expect(
+      deriveFreshness(
+        "project_executions",
+        "2026-07-22T22:16:00.000Z",
+        now,
+      ),
+    ).toBe("fresh");
+    expect(
+      deriveFreshness(
+        "project_executions",
+        "2026-07-22T22:14:59.000Z",
+        now,
+      ),
+    ).toBe("stale");
+    expect(
       deriveFreshness("skills", "2026-07-21T22:30:01.000Z", now),
     ).toBe("fresh");
     expect(

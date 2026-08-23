@@ -5,9 +5,13 @@ import {
   ProjectDirectory,
   type ProjectDirectoryFilters,
 } from "@/components/observatory/ProjectDirectory";
+import { ProjectExecutionPortfolio } from "@/components/observatory/ProjectExecutionPortfolio";
 import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
-import { buildProjectDirectory } from "@/lib/observatory/dashboard-directory";
+import {
+  buildProjectDirectory,
+  buildProjectExecutionDirectory,
+} from "@/lib/observatory/dashboard-directory";
 import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +75,23 @@ export default async function ProjectsPage({
             : [],
         )
       : [];
+  const projectExecutionSnapshot =
+    state.status === "ready" && "project_executions" in state.snapshot
+      ? state.snapshot.project_executions
+      : null;
+  const projectExecutionSource =
+    state.status === "ready" && "source_health" in state.snapshot
+      ? state.snapshot.source_health.find(
+          (source) => source.domain === "project_executions",
+        )
+      : undefined;
+  const projectExecutionEntries =
+    state.status === "ready"
+      ? buildProjectExecutionDirectory(
+          state.snapshot.registry,
+          projectExecutionSnapshot,
+        )
+      : [];
 
   return (
     <section className="observatory-page dashboard-directory-page">
@@ -85,10 +106,30 @@ export default async function ProjectsPage({
         </Link>
       </header>
       {state.status === "ready" ? (
-        <ProjectDirectory
-          projects={projects}
-          initialFilters={filtersFrom(params)}
-        />
+        <>
+          <ProjectExecutionPortfolio
+            projects={projectExecutionEntries}
+            sourceAvailable={
+              "project_executions" in state.snapshot &&
+              state.snapshot.project_executions !== null
+            }
+            sourceStatus={
+              projectExecutionSource?.status === "fresh" ||
+              projectExecutionSource?.status === "stale"
+                ? projectExecutionSource.status
+                : "unknown"
+            }
+            collectedAt={
+              projectExecutionSnapshot?.collected_at ??
+              projectExecutionSource?.collected_at ??
+              null
+            }
+          />
+          <ProjectDirectory
+            projects={projects}
+            initialFilters={filtersFrom(params)}
+          />
+        </>
       ) : (
         <SourceStatus {...state} />
       )}

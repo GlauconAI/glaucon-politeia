@@ -5,6 +5,7 @@ export interface ObservatoryCollectOptions {
     workspaceRoot: string;
     vaultRoot: string;
     configPath?: string;
+    projectExecutionPath: string;
   } | null;
 }
 
@@ -14,7 +15,7 @@ export function parseObservatoryCollectOptions(
   const [registryPath, outputPath, ...flags] = argv;
   if (!registryPath) {
     throw new Error(
-      "Usage: observatory:collect <registry-path> [output-path] [--workspace-root PATH --vault-root PATH [--config-path PATH]]",
+      "Usage: observatory:collect <registry-path> [output-path] [--workspace-root PATH --vault-root PATH --project-execution-path PATH [--config-path PATH]]",
     );
   }
   const values = new Map<string, string>();
@@ -23,7 +24,12 @@ export function parseObservatoryCollectOptions(
     const value = flags[index + 1];
     if (
       !flag ||
-      !["--workspace-root", "--vault-root", "--config-path"].includes(flag)
+      ![
+        "--workspace-root",
+        "--vault-root",
+        "--config-path",
+        "--project-execution-path",
+      ].includes(flag)
     ) {
       throw new Error(`Unknown System Observatory collection option: ${flag ?? "missing"}.`);
     }
@@ -39,6 +45,12 @@ export function parseObservatoryCollectOptions(
       "System Observatory v2 requires both --workspace-root and --vault-root.",
     );
   }
+  const projectExecutionPath = values.get("--project-execution-path");
+  if (workspaceRoot && !projectExecutionPath) {
+    throw new Error(
+      "System Observatory v5 requires --project-execution-path with explicit roots.",
+    );
+  }
   return {
     registryPath,
     ...(outputPath ? { outputPath } : {}),
@@ -47,6 +59,7 @@ export function parseObservatoryCollectOptions(
         ? {
             workspaceRoot,
             vaultRoot,
+            projectExecutionPath: projectExecutionPath!,
             ...(values.get("--config-path")
               ? { configPath: values.get("--config-path") }
               : {}),

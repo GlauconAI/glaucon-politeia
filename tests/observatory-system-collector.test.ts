@@ -11,6 +11,7 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
   ObservatoryCollectionEnvelopeSchema,
 } from "@/lib/observatory/collection-schema";
 import {
@@ -18,9 +19,11 @@ import {
   upgradeObservatorySnapshotToV2,
   upgradeObservatorySnapshotToV3,
   upgradeObservatorySnapshotToV4,
+  upgradeObservatorySnapshotToV5,
   type CommandInvocation,
 } from "@/lib/observatory/collector";
 import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
+import { projectExecutionFixture } from "./observatory-project-execution-schema.test";
 
 const generatedAt = "2026-07-22T22:00:00.000Z";
 
@@ -347,5 +350,27 @@ describe("v2 collection envelope", () => {
     expect(upgraded.source_digest).toBe(computeObservatorySnapshotDigest(upgraded));
     expect(upgraded.registry.source.digest).toBe(upgraded.source_digest);
     expect(ObservatoryCollectionEnvelopeSchema.parse(upgraded)).toEqual(upgraded);
+
+    const v5 = upgradeObservatorySnapshotToV5(upgraded, {
+      snapshot: projectExecutionFixture(),
+      sourceHealth: {
+        domain: "project_executions",
+        status: "fresh",
+        health: "healthy",
+        collected_at: generatedAt,
+        last_success_at: generatedAt,
+        asset_count: 1,
+      },
+    });
+    expect(v5.schema_version).toBe(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5);
+    expect(v5.collector_version).toBe("5.0.0");
+    expect(v5.project_executions?.summary.project_count).toBe(1);
+    expect(v5.source_health).toHaveLength(8);
+    expect(v5.source_health.at(-1)).toMatchObject({
+      domain: "project_executions",
+      status: "fresh",
+    });
+    expect(v5.source_digest).toBe(computeObservatorySnapshotDigest(v5));
+    expect(ObservatoryCollectionEnvelopeSchema.parse(v5)).toEqual(v5);
   });
 });

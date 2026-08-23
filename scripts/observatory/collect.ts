@@ -17,6 +17,7 @@ import {
   upgradeObservatorySnapshotToV2,
   upgradeObservatorySnapshotToV3,
   upgradeObservatorySnapshotToV4,
+  upgradeObservatorySnapshotToV5,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
@@ -30,6 +31,10 @@ import {
   GovernanceCollectionError,
   collectDashboardGovernance,
 } from "#observatory-governance-collector";
+import {
+  ObservatoryProjectExecutionCollectionError,
+  collectProjectExecutionSnapshot,
+} from "#observatory-project-execution-collector";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {
@@ -60,7 +65,10 @@ const files: AtomicFileAdapter = {
   },
 };
 
-async function readTextFileBounded(path: string): Promise<string> {
+async function readTextFileBounded(
+  path: string,
+  maxBytes = OBSERVATORY_REGISTRY_HTML_MAX_BYTES,
+): Promise<string> {
   const handle = await open(path, "r");
   const chunks: Buffer[] = [];
   let totalBytes = 0;
@@ -69,7 +77,7 @@ async function readTextFileBounded(path: string): Promise<string> {
       const buffer = Buffer.alloc(
         Math.min(
           64 * 1024,
-          OBSERVATORY_REGISTRY_HTML_MAX_BYTES + 1 - totalBytes,
+          maxBytes + 1 - totalBytes,
         ),
       );
       const { bytesRead } = await handle.read(
@@ -80,10 +88,10 @@ async function readTextFileBounded(path: string): Promise<string> {
       );
       if (bytesRead === 0) break;
       totalBytes += bytesRead;
-      if (totalBytes > OBSERVATORY_REGISTRY_HTML_MAX_BYTES) {
+      if (totalBytes > maxBytes) {
         throw new ObservatoryCollectorError(
           "RESOURCE_LIMIT_EXCEEDED",
-          `The canonical registry source exceeded the ${OBSERVATORY_REGISTRY_HTML_MAX_BYTES}-byte input limit.`,
+          `The configured source exceeded the ${maxBytes}-byte input limit.`,
         );
       }
       chunks.push(buffer.subarray(0, bytesRead));
@@ -178,7 +186,7 @@ async function main(): Promise<void> {
         },
       ),
     );
-    snapshot = upgradeObservatorySnapshotToV4(
+    const repositorySnapshot = upgradeObservatorySnapshotToV4(
       governanceSnapshot,
       await collectSourceRepositories(
         {
@@ -188,6 +196,19 @@ async function main(): Promise<void> {
           projectGroups: governanceSnapshot.registry.project_groups,
         },
         { now: () => new Date() },
+      ),
+    );
+    snapshot = upgradeObservatorySnapshotToV5(
+      repositorySnapshot,
+      await collectProjectExecutionSnapshot(
+        {
+          exportPath: resolve(options.systemRoots.projectExecutionPath),
+        },
+        {
+          realpath,
+          readTextFile: readTextFileBounded,
+          now: () => new Date(),
+        },
       ),
     );
     await writeObservatorySnapshotWithSourceProtection(
@@ -212,7 +233,8 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   if (
     error instanceof ObservatoryCollectorError ||
-    error instanceof GovernanceCollectionError
+    error instanceof GovernanceCollectionError ||
+    error instanceof ObservatoryProjectExecutionCollectionError
   ) {
     process.stderr.write(`${error.code}: ${error.message}\n`);
   } else {

@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { ObservatoryCollectionEnvelopeV4Schema } from "#observatory-collection-schema";
+import { ObservatoryCollectionEnvelopeV5Schema } from "#observatory-collection-schema";
 import { computeObservatorySnapshotDigest } from "#observatory-collector";
 import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
 
@@ -10,7 +10,7 @@ async function main(): Promise<void> {
     process.argv[2] ?? ".observatory/observatory-snapshot.json",
   );
   const metadata = await stat(snapshotPath);
-  const snapshot = ObservatoryCollectionEnvelopeV4Schema.parse(
+  const snapshot = ObservatoryCollectionEnvelopeV5Schema.parse(
     JSON.parse(await readFile(snapshotPath, "utf8")),
   );
   const privacyCategoryCounts = scanObservatoryPrivacy(snapshot);
@@ -20,7 +20,7 @@ async function main(): Promise<void> {
       snapshot.source_digest === computeObservatorySnapshotDigest(snapshot) &&
       snapshot.registry.source.digest === snapshot.source_digest,
     successful: snapshot.status === "success",
-    all_domains_present: snapshot.source_health.length === 7,
+    all_domains_present: snapshot.source_health.length === 8,
     no_dangling_relationships: snapshot.relationships.every(
       (relationship) =>
         snapshot.core_endpoint_ids.includes(relationship.from) ||
@@ -44,6 +44,8 @@ async function main(): Promise<void> {
           source_health: snapshot.source_health.length,
           source_repositories:
             snapshot.source_repositories.repositories.length,
+          project_executions:
+            snapshot.project_executions?.summary.project_count ?? 0,
           milestones: snapshot.delivery_governance.summary.milestone_count,
           features: snapshot.delivery_governance.summary.feature_count,
           tasks: snapshot.delivery_governance.summary.task_count,

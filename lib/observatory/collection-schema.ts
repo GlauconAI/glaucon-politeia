@@ -4,17 +4,20 @@ import { ObservatoryAssetInventorySchema } from "#observatory-asset-schema";
 import { DeliveryGovernanceSchema } from "#observatory-governance-schema";
 import { ObservatoryRegistrySnapshotSchema } from "#observatory-schema";
 import { ObservatorySourceRepositoryInventorySchema } from "#observatory-source-repository-schema";
+import { ProjectExecutionSnapshotSchema } from "#observatory-project-execution-schema";
 
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1 = "1.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2 = "2.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4 = "4.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION =
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V2 = "2.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V4 = "4.0.0" as const;
+export const OBSERVATORY_COLLECTOR_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_AGENT_MAX_COUNT = 256;
 export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
@@ -196,11 +199,74 @@ export const ObservatoryCollectionEnvelopeV4Schema = z
     }
   });
 
+export const ObservatoryCollectionEnvelopeV5Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION_V5),
+    ...CollectionEnvelopeBaseShape,
+    ...ObservatoryAssetInventorySchema.shape,
+    delivery_governance: DeliveryGovernanceSchema,
+    source_repositories: ObservatorySourceRepositoryInventorySchema,
+    project_executions: ProjectExecutionSnapshotSchema.nullable(),
+  })
+  .superRefine((snapshot, context) => {
+    validateSummary(snapshot, context);
+    const inventoryResult = ObservatoryAssetInventorySchema.safeParse({
+      assets: snapshot.assets,
+      core_endpoint_ids: snapshot.core_endpoint_ids,
+      relationships: snapshot.relationships,
+      source_health: snapshot.source_health,
+    });
+    if (!inventoryResult.success) {
+      inventoryResult.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        }),
+      );
+    }
+    const projectSource = snapshot.source_health.find(
+      (source) => source.domain === "project_executions",
+    );
+    if (!projectSource) {
+      context.addIssue({
+        code: "custom",
+        path: ["source_health"],
+        message: "Expected Project execution source health.",
+      });
+    }
+    if (
+      snapshot.project_executions === null &&
+      projectSource &&
+      projectSource.status !== "unknown"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["project_executions"],
+        message: "Unavailable Project execution data must report unknown source status.",
+      });
+    }
+    if (
+      snapshot.project_executions &&
+      projectSource &&
+      projectSource.asset_count !==
+        snapshot.project_executions.summary.project_count
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["source_health"],
+        message: "Project execution source count does not match its snapshot.",
+      });
+    }
+  });
+
 export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
   ObservatoryCollectionEnvelopeV3Schema,
   ObservatoryCollectionEnvelopeV4Schema,
+  ObservatoryCollectionEnvelopeV5Schema,
 ]);
 
 export type ObservatoryCollectionEnvelope = z.infer<
@@ -217,6 +283,9 @@ export type ObservatoryCollectionEnvelopeV3 = z.infer<
 >;
 export type ObservatoryCollectionEnvelopeV4 = z.infer<
   typeof ObservatoryCollectionEnvelopeV4Schema
+>;
+export type ObservatoryCollectionEnvelopeV5 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV5Schema
 >;
 export type ObservatoryAgent = z.infer<typeof ObservatoryAgentSchema>;
 export type ObservatoryRuntime = z.infer<typeof ObservatoryRuntimeSchema>;

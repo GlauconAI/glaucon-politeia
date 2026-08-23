@@ -1,6 +1,10 @@
 import type { ObservatoryAsset } from "@/lib/observatory/asset-schema";
 import type { ObservatoryRegistrySnapshot } from "@/lib/observatory/schema";
 import type { ObservatorySourceRepository } from "@/lib/observatory/source-repository-schema";
+import type {
+  ProjectExecutionLine,
+  ProjectExecutionSnapshot,
+} from "@/lib/observatory/project-execution-schema";
 
 export type DashboardProjectEntry = {
   projectKey: string;
@@ -14,6 +18,116 @@ export type DashboardProjectEntry = {
   repositories: string[];
   lastActivityAt: string | null;
 };
+
+export type DashboardProjectExecutionEntry = {
+  projectKey: string;
+  title: string;
+  owner: string;
+  status: string;
+  currentStage: string | null;
+  currentGate: string | null;
+  updatedAt: string | null;
+  collectedAt: string | null;
+  freshness: "fresh" | "stale" | "unknown";
+  match: "matched" | "catalog_only" | "runtime_only";
+  executionLines: ProjectExecutionLine[];
+  summary: {
+    executionLineCount: number;
+    activeCount: number;
+    waitingCount: number;
+    blockedCount: number;
+    completedCount: number;
+    independentOwnerLineCount: number;
+  };
+};
+
+const emptyExecutionSummary = {
+  executionLineCount: 0,
+  activeCount: 0,
+  waitingCount: 0,
+  blockedCount: 0,
+  completedCount: 0,
+  independentOwnerLineCount: 0,
+};
+
+function executionSummary(
+  summary: ProjectExecutionSnapshot["projects"][number]["summary"],
+): DashboardProjectExecutionEntry["summary"] {
+  return {
+    executionLineCount: summary.execution_line_count,
+    activeCount: summary.active_count,
+    waitingCount: summary.waiting_count,
+    blockedCount: summary.blocked_count,
+    completedCount: summary.completed_count,
+    independentOwnerLineCount: summary.independent_owner_line_count,
+  };
+}
+
+export function buildProjectExecutionDirectory(
+  registry: ObservatoryRegistrySnapshot,
+  snapshot: ProjectExecutionSnapshot | null,
+): DashboardProjectExecutionEntry[] {
+  const runtimeByKey = new Map(
+    (snapshot?.projects ?? []).map((project) => [
+      project.project.project_key,
+      project,
+    ]),
+  );
+  const catalogKeys = new Set<string>();
+  const catalogEntries = registry.project_groups.flatMap((group) =>
+    group.projects.map((project) => {
+      catalogKeys.add(project.project_key);
+      const runtime = runtimeByKey.get(project.project_key);
+      if (!runtime) {
+        return {
+          projectKey: project.project_key,
+          title: project.title ?? project.name,
+          owner: group.owner,
+          status: project.status,
+          currentStage: null,
+          currentGate: null,
+          updatedAt: null,
+          collectedAt: snapshot?.collected_at ?? null,
+          freshness: "unknown" as const,
+          match: "catalog_only" as const,
+          executionLines: [],
+          summary: { ...emptyExecutionSummary },
+        };
+      }
+      return {
+        projectKey: project.project_key,
+        title: project.title ?? runtime.project.title,
+        owner: runtime.project.owner_agent_id,
+        status: runtime.project.status,
+        currentStage: runtime.project.current_stage,
+        currentGate: runtime.project.current_gate,
+        updatedAt: runtime.project.updated_at,
+        collectedAt: runtime.collected_at,
+        freshness: runtime.project.freshness,
+        match: "matched" as const,
+        executionLines: runtime.execution_lines,
+        summary: executionSummary(runtime.summary),
+      };
+    }),
+  );
+  const runtimeOnlyEntries = (snapshot?.projects ?? [])
+    .filter((runtime) => !catalogKeys.has(runtime.project.project_key))
+    .map((runtime) => ({
+      projectKey: runtime.project.project_key,
+      title: runtime.project.title,
+      owner: runtime.project.owner_agent_id,
+      status: runtime.project.status,
+      currentStage: runtime.project.current_stage,
+      currentGate: runtime.project.current_gate,
+      updatedAt: runtime.project.updated_at,
+      collectedAt: runtime.collected_at,
+      freshness: runtime.project.freshness,
+      match: "runtime_only" as const,
+      executionLines: runtime.execution_lines,
+      summary: executionSummary(runtime.summary),
+    }));
+  return [...catalogEntries, ...runtimeOnlyEntries];
+}
 
 export type DashboardSkillInstance = {
   id: string;

@@ -65,8 +65,20 @@ async function unlinkIfPresent(path: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const [registryPath, workspaceRoot, vaultRoot, configPath] = process.argv.slice(2);
-  if (!registryPath || !workspaceRoot || !vaultRoot || !configPath) {
+  const [
+    registryPath,
+    workspaceRoot,
+    vaultRoot,
+    configPath,
+    projectExecutionPath,
+  ] = process.argv.slice(2);
+  if (
+    !registryPath ||
+    !workspaceRoot ||
+    !vaultRoot ||
+    !configPath ||
+    !projectExecutionPath
+  ) {
     throw new Error("Missing local refresh verification roots.");
   }
   const local = await localConfig();
@@ -94,7 +106,15 @@ async function main(): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const result = await spawnBounded(
       process.execPath,
-      [commonArgs[0], commonArgs[1], missing, workspaceRoot, vaultRoot, configPath],
+      [
+        commonArgs[0],
+        commonArgs[1],
+        missing,
+        workspaceRoot,
+        vaultRoot,
+        configPath,
+        projectExecutionPath,
+      ],
       environment,
       30_000,
     );
@@ -110,6 +130,7 @@ async function main(): Promise<void> {
       workspaceRoot,
       vaultRoot,
       configPath,
+      projectExecutionPath,
     ],
     environment,
     6 * 60 * 1000,

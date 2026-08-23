@@ -23,7 +23,9 @@
     "#observatory-privacy-scan": "./lib/observatory/privacy-scan.ts",
     "#observatory-collector": "./lib/observatory/collector.ts",
     "#observatory-command-runner": "./scripts/observatory/run-command.ts",
-    "#observatory-publisher": "./lib/observatory/publisher.ts"
+    "#observatory-publisher": "./lib/observatory/publisher.ts",
+    "#observatory-project-execution-schema": "./lib/observatory/project-execution-schema.ts",
+    "#observatory-project-execution-collector": "./lib/observatory/project-execution-collector.ts"
   },
   "scripts": {
     "dev": "next dev",
