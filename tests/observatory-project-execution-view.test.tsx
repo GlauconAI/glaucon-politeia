@@ -89,6 +89,9 @@ describe("ProjectExecutionPortfolio", () => {
     );
 
     expect(screen.getByRole("heading", { name: /project execution/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: /project execution filters/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("1 active Project")).toBeInTheDocument();
     expect(screen.getByText("1 active Agent line")).toBeInTheDocument();
     expect(screen.getByText("1 independent Owner line")).toBeInTheDocument();

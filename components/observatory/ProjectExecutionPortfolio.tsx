@@ -167,7 +167,11 @@ export function ProjectExecutionPortfolio({
 
           {projects.length ? (
             <>
-              <div className="project-execution-filters" aria-label="Project execution filters">
+              <div
+                className="project-execution-filters"
+                role="group"
+                aria-label="Project execution filters"
+              >
                 <label>
                   <span>Execution Project</span>
                   <select value={filters.project} onChange={(event) => setFilter("project", event.target.value)}>
