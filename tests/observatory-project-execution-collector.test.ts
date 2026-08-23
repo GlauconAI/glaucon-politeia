@@ -104,4 +104,16 @@ describe("collectProjectExecutionSnapshot", () => {
       ),
     ).rejects.toMatchObject({ code: "PROJECT_EXECUTION_PATH_ESCAPE" });
   });
+
+  it("fails closed before digest verification when public text contains a private path", async () => {
+    const privatePath = projectExecutionFixture();
+    privatePath.projects[0].project.title = "C:\\Users\\private\\secret.md";
+
+    await expect(
+      collectProjectExecutionSnapshot(
+        { exportPath },
+        dependencies(JSON.stringify(privatePath)),
+      ),
+    ).rejects.toMatchObject({ code: "PROJECT_EXECUTION_SOURCE_INVALID" });
+  });
 });

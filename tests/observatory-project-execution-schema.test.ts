@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
@@ -115,6 +116,22 @@ describe("ProjectExecutionSnapshotSchema", () => {
     expect(computeProjectExecutionDigest(snapshot)).toBe(snapshot.digest);
   });
 
+  it("loads through the native Node runtime used by Observatory scripts", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        "--input-type=module",
+        "--eval",
+        'import("./lib/observatory/project-execution-schema.ts")',
+      ],
+      { cwd: process.cwd(), encoding: "utf8" },
+    );
+
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
   it("rejects private fields and unsafe logical references", () => {
     const privateField = fixture() as ReturnType<typeof fixture> & {
       owner_session_key?: string;
@@ -132,6 +149,107 @@ describe("ProjectExecutionSnapshotSchema", () => {
     privateSummary.projects[0].execution_lines[0].verification_summary =
       "Evidence at /Users/private/work_0123456789abcdef01234567";
     expect(ProjectExecutionSnapshotSchema.safeParse(privateSummary).success).toBe(false);
+  });
+
+  it("rejects POSIX, Windows, UNC, home, and file paths in every public text field", () => {
+    const unsafeValues = [
+      "/private/secret.md",
+      "Read /opt/private/secret.md",
+      "C:\\Users\\private\\secret.md",
+      "D:/private/secret.md",
+      "\\\\server\\share\\secret.md",
+      "//server/share/secret.md",
+      "~/private/secret.md",
+      "file:///private/secret.md",
+      "path:/private/secret.md",
+      ".openclaw/private/config.json",
+      "Obsidian/Private Vault/secret.md",
+      "Glaucon's Vault/private/secret.md",
+      "See./etc/passwd",
+      "See!/etc/passwd",
+      "See?/etc/passwd",
+      "See—/etc/passwd",
+      "**/etc/passwd**",
+      "See:C:\\Users\\private\\secret.md",
+      "**C:\\Users\\private\\secret.md**",
+      "See:\\\\server\\share\\secret.md",
+      "file://server/share/secret.md",
+      "file://localhost/etc/passwd",
+    ];
+    const mutatePublicText = [
+      (snapshot: ReturnType<typeof fixture>, value: string) => {
+        snapshot.projects[0].project.title = value;
+      },
+      (snapshot: ReturnType<typeof fixture>, value: string) => {
+        snapshot.projects[0].project.status = value;
+      },
+      (snapshot: ReturnType<typeof fixture>, value: string) => {
+        snapshot.projects[0].project.current_stage = value;
+      },
+      (snapshot: ReturnType<typeof fixture>, value: string) => {
+        snapshot.projects[0].project.current_gate = value;
+      },
+      (snapshot: ReturnType<typeof fixture>, value: string) => {
+        snapshot.projects[0].execution_lines[0].title = value;
+      },
+    ];
+
+    for (const unsafeValue of unsafeValues) {
+      for (const mutate of mutatePublicText) {
+        const snapshot = fixture();
+        mutate(snapshot, unsafeValue);
+        expect(
+          ProjectExecutionSnapshotSchema.safeParse(snapshot).success,
+          unsafeValue,
+        ).toBe(false);
+      }
+
+      const logicalReference = fixture();
+      logicalReference.projects[0].execution_lines[0].artifact_ref = unsafeValue;
+      expect(
+        ProjectExecutionSnapshotSchema.safeParse(logicalReference).success,
+        unsafeValue,
+      ).toBe(false);
+
+      const summary = fixture();
+      summary.projects[0].execution_lines[0].verification_summary = unsafeValue;
+      expect(
+        ProjectExecutionSnapshotSchema.safeParse(summary).success,
+        unsafeValue,
+      ).toBe(false);
+    }
+  });
+
+  it("preserves normal labels and relative logical references", () => {
+    const snapshot = fixture();
+    snapshot.projects[0].project.title = "Design / Review";
+    snapshot.projects[0].project.status = "C: Drive compatibility";
+    snapshot.projects[0].project.current_stage = "iOS/Android";
+    snapshot.projects[0].project.current_gate = "Gate 2 (A/B)";
+    snapshot.projects[0].execution_lines[0].title = "Compare desktop/mobile";
+    snapshot.projects[0].execution_lines[1].title = "Glaucon Vault";
+    snapshot.projects[0].execution_lines[0].artifact_ref = "docs/result.md";
+    snapshot.projects[0].execution_lines[0].verification_summary =
+      "Compared iOS/Android layouts.";
+
+    expect(ProjectExecutionSnapshotSchema.safeParse(snapshot).success).toBe(true);
+
+    snapshot.projects[0].project.title = "https://example.com/public/path";
+    snapshot.projects[0].execution_lines[0].title = "A//B comparison";
+    expect(ProjectExecutionSnapshotSchema.safeParse(snapshot).success).toBe(true);
+
+    for (const relativeReference of [
+      "./docs/result.md",
+      "../docs/result.md",
+      ".\\docs\\result.md",
+      "..\\docs\\result.md",
+    ]) {
+      snapshot.projects[0].execution_lines[0].artifact_ref = relativeReference;
+      expect(
+        ProjectExecutionSnapshotSchema.safeParse(snapshot).success,
+        relativeReference,
+      ).toBe(true);
+    }
   });
 
   it("rejects summary drift and transfer-mode semantic drift", () => {

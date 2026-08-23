@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import path from "node:path";
 
 import { z } from "zod";
+
+import { containsAbsoluteOrPrivatePath } from "#observatory-privacy-path";
 
 export const PROJECT_EXECUTION_SCHEMA_VERSION = "1.0.0" as const;
 export const PROJECT_EXECUTION_MAX_PROJECTS = 512;
@@ -17,9 +18,12 @@ const SafeTextSchema = z
   .string()
   .min(1)
   .max(PROJECT_EXECUTION_MAX_TEXT_LENGTH)
-  .refine((value) => !/[\u0000-\u001f\u007f]/u.test(value), {
-    message: "Control characters are not allowed.",
-  });
+  .refine(
+    (value) =>
+      !/[\u0000-\u001f\u007f]/u.test(value) &&
+      !containsAbsoluteOrPrivatePath(value),
+    { message: "Expected privacy-safe public text." },
+  );
 const SafeIdSchema = z
   .string()
   .min(1)
@@ -41,8 +45,7 @@ const LogicalReferenceSchema = z
   .max(PROJECT_EXECUTION_MAX_SUMMARY_LENGTH)
   .refine(
     (value) =>
-      !path.isAbsolute(value) &&
-      !/^[a-z]:[\\/]/iu.test(value) &&
+      !containsAbsoluteOrPrivatePath(value) &&
       !ForbiddenReference.test(value),
     { message: "Expected a privacy-safe logical reference." },
   )
@@ -54,8 +57,7 @@ const SafeSummarySchema = z
     (value) =>
       !/[\u0000-\u001f\u007f]/u.test(value) &&
       !ForbiddenReference.test(value) &&
-      !/(?:^|\s)\/(?:Users|home|private|var|etc)\//u.test(value) &&
-      !/[a-z]:[\\/]/iu.test(value),
+      !containsAbsoluteOrPrivatePath(value),
     { message: "Expected a privacy-safe Verification summary." },
   );
 
