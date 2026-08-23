@@ -62,13 +62,13 @@ Relative to `origin/main` at `9527b4fd8c3ff3c49180516440f715a6d1798c8f`, the cor
 - Desktop viewport `1440×1000`: document width `1440`, no horizontal overflow.
 - Mobile viewport `390×844`: document width `390`, one-column Project/filter grids, no horizontal overflow.
 - Production options exposed both transfer-mode labels as text.
-- Scoped axe-core audit: 0 violations; the filters expose an accessible named `group`.
+- Scoped axe-core audit at 1440×1000 and 390×844: 0 violations; the filters expose an accessible named `group`. Axe left two rules incomplete: gradient color contrast and the pre-existing `aria-label` on the Project directory count `div`.
 - One-time browser credential profile was deleted and the verification session was closed.
 
 ## Known limitations
 
 1. The producer projection contained zero execution records at release time. Production therefore proves v5 publication plus fresh/unmatched/empty-line behavior; live lane content for both transfer modes is proven by strict schema, collector, component, integration, and performance fixtures. Integration may add only synthetic/new Project data; the paused Asgard Project remains out of scope.
-2. Axe marked color contrast as `incomplete` because the existing page uses layered gradient backgrounds whose effective color it could not calculate. It reported no contrast violation.
+2. Axe marked two checks as `incomplete`: color contrast because the existing page uses layered gradient backgrounds whose effective color it could not calculate, and `aria-prohibited-attr` for the pre-existing Project directory count `div` carrying `aria-label` without an explicit role. It reported no accessibility violation.
 3. Agent-browser records React production error `#418` on `/`, `/dashboard`, and `/dashboard/projects`. Route comparison proves this is a pre-existing shared-shell hydration mismatch, not specific to Project execution. The page remains functional, but the shared-shell hydration issue should be handled in a separate bounded fix.
 4. `npm install` reports 9 existing dependency audit findings (1 low, 8 high) and three install scripts not yet covered by `allowScripts`; this feature adds no dependency.
 5. The repository's default parallel Vitest mode can exceed the 5-second timeout of unrelated HTML Note Kit tests under constrained host load. The documented serialized release command is stable and passed the complete 751-test suite.
