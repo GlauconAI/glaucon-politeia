@@ -49,7 +49,10 @@ describe("Observatory collection script", () => {
   it("threads the explicit sanitized export through refresh without hard-coded host paths", () => {
     expect(refreshSource).toContain('"--project-execution-path"');
     expect(refreshSource).toContain("resolve(projectExecutionPath)");
+    expect(refreshSource).toContain('"--project-control-path"');
+    expect(refreshSource).toContain("resolve(projectControlPath)");
     expect(cronSource).toContain("OBSERVATORY_PROJECT_EXECUTION_PATH");
+    expect(cronSource).toContain("OBSERVATORY_PROJECT_CONTROL_PATH");
     expect(cronSource).not.toContain("/Users/");
   });
 
@@ -63,14 +66,18 @@ describe("Observatory collection script", () => {
 });
 
 describe("Observatory Snapshot verifier", () => {
-  it("accepts v5 and verifies the eighth source domain and Project count", () => {
+  it("accepts v5/v6 and verifies the versioned source domains and Project counts", () => {
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV5Schema");
-    expect(verifierSource).toContain("source_health.length === 8");
+    expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV6Schema");
+    expect(verifierSource).toContain('snapshot.schema_version === "6.0.0" ? 9 : 8');
     expect(verifierSource).toContain(
       "source_repositories.repositories.length",
     );
     expect(verifierSource).toContain(
       "project_executions?.summary.project_count",
+    );
+    expect(verifierSource).toContain(
+      "project_controls?.summary.project_count",
     );
   });
 });

@@ -144,6 +144,7 @@ async function main(): Promise<void> {
     vaultRoot,
     configPath,
     projectExecutionPath,
+    projectControlPath,
   ] = process.argv.slice(2);
   if (!registryPath || !workspaceRoot || !vaultRoot || !projectExecutionPath) {
     process.stderr.write(
@@ -179,6 +180,9 @@ async function main(): Promise<void> {
       resolve(vaultRoot),
       "--project-execution-path",
       resolve(projectExecutionPath),
+      ...(projectControlPath
+        ? ["--project-control-path", resolve(projectControlPath)]
+        : []),
       ...(configPath ? ["--config-path", resolve(configPath)] : []),
     ];
     const collected = await runStep(

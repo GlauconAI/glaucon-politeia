@@ -233,7 +233,7 @@ If resources are constrained, Vitest can be serialized with `npm test -- --maxWo
 
 ### One-shot refresh
 
-The refresh command takes the registry, workspace root, Vault root, config path, and explicit Project execution snapshot path as positional arguments. It acquires `.observatory/refresh.lock` exclusively, collects into the local last-known-good file, validates and publishes it idempotently, and writes only bounded state to `.observatory/refresh-state.json`. Lock and state files are mode `0600`; raw stderr is discarded.
+The refresh command takes the registry, workspace root, Vault root, config path, explicit Project execution snapshot path, and explicit Project Control snapshot path as positional arguments. It acquires `.observatory/refresh.lock` exclusively, collects into the local last-known-good file, validates and publishes it idempotently, and writes only bounded state to `.observatory/refresh-state.json`. Lock and state files are mode `0600`; raw stderr is discarded. A missing canonical Project Control export produces v6 with `project_controls=null` and an `unknown` source-health entry; it never falls back to a v5 write.
 
 The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory while remaining below the 15-minute schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
 
@@ -245,7 +245,8 @@ npm run observatory:refresh -- \
   "$OBSERVATORY_WORKSPACE_ROOT" \
   "$OBSERVATORY_VAULT_ROOT" \
   "$OBSERVATORY_CONFIG_PATH" \
-  "$OBSERVATORY_PROJECT_EXECUTION_PATH"
+  "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
+  "$OBSERVATORY_PROJECT_CONTROL_PATH"
 ```
 
 Safe machine-readable results are:
@@ -269,14 +270,16 @@ for attempt in 1 2 3; do
     "$OBSERVATORY_WORKSPACE_ROOT" \
     "$OBSERVATORY_VAULT_ROOT" \
     "$OBSERVATORY_CONFIG_PATH" \
-    "$OBSERVATORY_PROJECT_EXECUTION_PATH" || true
+    "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
+    "$OBSERVATORY_PROJECT_CONTROL_PATH" || true
 done
 npm run observatory:refresh -- \
   "$OBSERVATORY_REGISTRY_PATH" \
   "$OBSERVATORY_WORKSPACE_ROOT" \
   "$OBSERVATORY_VAULT_ROOT" \
   "$OBSERVATORY_CONFIG_PATH" \
-  "$OBSERVATORY_PROJECT_EXECUTION_PATH"
+  "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
+  "$OBSERVATORY_PROJECT_CONTROL_PATH"
 ```
 
 ### Release evidence and retention
