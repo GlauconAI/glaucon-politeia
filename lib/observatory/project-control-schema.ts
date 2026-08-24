@@ -254,18 +254,28 @@ const ExecutionLineSchema = z
     updated_at: IsoTimestampSchema,
   })
   .superRefine((line, context) => {
-    if (
-      line.transfer_mode === "independent_owner_line" &&
-      (line.return_trigger !== "explicit_user_return" ||
-        !["user_and_owner", "user"].includes(line.current_controller))
-    ) {
-      context.addIssue({ code: "custom", message: "Independent line semantics are invalid." });
+    if (line.transfer_mode === "independent_owner_line") {
+      const returned = line.status === "returned";
+      if (
+        line.return_trigger !== "explicit_user_return" ||
+        (returned && line.current_controller !== "user") ||
+        (!returned && line.current_controller !== "user_and_owner")
+      ) {
+        context.addIssue({ code: "custom", message: "Independent line semantics are invalid." });
+      }
     }
-    if (
-      line.transfer_mode === "project_executor" &&
-      line.return_trigger !== "terminal_signal"
-    ) {
-      context.addIssue({ code: "custom", message: "Project executor line semantics are invalid." });
+    if (line.transfer_mode === "project_executor") {
+      const agentControlled = ["active", "waiting_input", "verifying"].includes(line.status);
+      const managerControlled = ["planned", "ready", "blocked", "completed", "cancelled"].includes(line.status);
+      if (
+        line.return_trigger !== "terminal_signal" ||
+        (!agentControlled && !managerControlled) ||
+        (agentControlled && line.current_controller !== "executing_agent") ||
+        (managerControlled && line.current_controller !== "project_manager") ||
+        (agentControlled && !line.executing_agent_id)
+      ) {
+        context.addIssue({ code: "custom", message: "Project executor line semantics are invalid." });
+      }
     }
     if ((line.status === "returned") !== Boolean(line.user_returned_at)) {
       context.addIssue({ code: "custom", path: ["user_returned_at"], message: "User return facts drift." });
@@ -525,7 +535,9 @@ const ProjectSchema = z
     const gateById = new Map(value.gates.map((gate) => [gate.gate_id, gate]));
     const decisionById = new Map(value.user_decisions.map((decision) => [decision.decision_id, decision]));
     const artifactIds = new Set(value.artifacts.map((artifact) => artifact.artifact_id));
+    const dependencyIds = new Set(value.dependencies.map((dependency) => dependency.dependency_id));
     const verificationIds = new Set(value.verifications.map((verification) => verification.verification_id));
+    const executionLineIds = new Set(value.execution_lines.map((line) => line.execution_line_id));
     const workPackagesById = new Map(
       value.work_packages.map((workPackage) => [workPackage.work_package_id, workPackage]),
     );
@@ -598,7 +610,17 @@ const ProjectSchema = z
           executionLinesById.get(stage.execution_line_id)?.stage_id !== stage.stage_id) ||
         stage.artifact_contract_ids.some((id) => !artifactContractIds.has(id)) ||
         stage.verification_ids.some((id) => !verificationIds.has(id)) ||
-        stage.gate_ids.some((id) => !gateIds.has(id))
+        stage.gate_ids.some((id) => !gateIds.has(id)) ||
+        stage.admission.missing_dependency_ids.some(
+          (id) => !stageIds.has(id) && !dependencyIds.has(id),
+        ) ||
+        stage.admission.missing_artifact_contract_ids.some(
+          (id) => !artifactContractIds.has(id),
+        ) ||
+        stage.admission.missing_verification_ids.some(
+          (id) => !verificationIds.has(id),
+        ) ||
+        stage.admission.missing_gate_ids.some((id) => !gateIds.has(id))
       ) {
         context.addIssue({
           code: "custom",
@@ -632,9 +654,20 @@ const ProjectSchema = z
       }
     }
     for (const dependency of value.dependencies) {
+      const requiredReferenceExists =
+        dependency.dependency_type === "stage"
+          ? stageIds.has(dependency.required_ref_id)
+          : dependency.dependency_type === "artifact"
+            ? artifactContractIds.has(dependency.required_ref_id) || artifactIds.has(dependency.required_ref_id)
+            : dependency.dependency_type === "verification"
+              ? verificationIds.has(dependency.required_ref_id)
+              : dependency.dependency_type === "gate"
+                ? gateIds.has(dependency.required_ref_id)
+                : executionLineIds.has(dependency.required_ref_id) || decisionById.has(dependency.required_ref_id);
       if (
         !stageIds.has(dependency.from_stage_id) ||
         !stageIds.has(dependency.to_stage_id) ||
+        !requiredReferenceExists ||
         !byStage.get(dependency.to_stage_id)?.dependency_ids.includes(
           dependency.from_stage_id,
         )
@@ -715,6 +748,7 @@ const ProjectSchema = z
       const decision = gate.decision_id ? decisionById.get(gate.decision_id) : null;
       if (
         (gate.stage_id && !stageIds.has(gate.stage_id)) ||
+        !planRevisionIds.has(gate.plan_revision) ||
         gate.required_artifact_contract_ids.some((id) => !artifactContractIds.has(id)) ||
         gate.missing_artifact_contract_ids.some(
           (id) => !artifactContractIds.has(id) || !gate.required_artifact_contract_ids.includes(id),

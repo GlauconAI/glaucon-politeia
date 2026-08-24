@@ -150,6 +150,45 @@ describe("ProjectControlSnapshotSchema", () => {
     expect(ProjectControlSnapshotSchema.safeParse(mismatchedDecision).success).toBe(false);
   });
 
+  it("rejects invalid execution-line controller and return states", () => {
+    const transferredToUser = asgardProjectControlFixture();
+    transferredToUser.projects[0].execution_lines[0].current_controller = "user";
+    expect(ProjectControlSnapshotSchema.safeParse(transferredToUser).success).toBe(false);
+
+    const returnedToOwnerLine = asgardProjectControlFixture();
+    const returnedLine = returnedToOwnerLine.projects[0].execution_lines[0];
+    returnedLine.status = "returned";
+    (returnedLine as { user_returned_at: string | null }).user_returned_at =
+      "2026-08-23T20:30:00Z";
+    expect(ProjectControlSnapshotSchema.safeParse(returnedToOwnerLine).success).toBe(false);
+
+    const activeExecutorControlledByManager = asgardProjectControlFixture();
+    const executorLine = activeExecutorControlledByManager.projects[0].execution_lines[0];
+    executorLine.transfer_mode = "project_executor";
+    executorLine.return_trigger = "terminal_signal";
+    executorLine.status = "active";
+    executorLine.current_controller = "project_manager";
+    expect(
+      ProjectControlSnapshotSchema.safeParse(activeExecutorControlledByManager).success,
+    ).toBe(false);
+  });
+
+  it("rejects dangling Admission, typed Dependency, and Gate Plan references", () => {
+    const danglingAdmission = asgardProjectControlFixture();
+    danglingAdmission.projects[0].stages[3].admission.missing_dependency_ids = [
+      "unknown-dependency",
+    ];
+    expect(ProjectControlSnapshotSchema.safeParse(danglingAdmission).success).toBe(false);
+
+    const danglingDependency = asgardProjectControlFixture();
+    danglingDependency.projects[0].dependencies[0].required_ref_id = "bogus";
+    expect(ProjectControlSnapshotSchema.safeParse(danglingDependency).success).toBe(false);
+
+    const danglingGatePlan = asgardProjectControlFixture();
+    danglingGatePlan.projects[0].gates[0].plan_revision = 999;
+    expect(ProjectControlSnapshotSchema.safeParse(danglingGatePlan).success).toBe(false);
+  });
+
   it("rejects Work Packages with dangling Stage references", () => {
     const danglingWorkPackage = asgardProjectControlFixture();
     danglingWorkPackage.projects[0].work_packages[0].stage_id = "missing-stage";
