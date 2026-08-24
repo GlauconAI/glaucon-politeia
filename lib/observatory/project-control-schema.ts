@@ -704,7 +704,8 @@ const ProjectSchema = z
         stage.return_trigger !== line.return_trigger ||
         stage.current_controller !== line.current_controller ||
         stage.accountable_owner_agent_id !== line.accountable_owner_agent_id ||
-        stage.executing_agent_id !== line.executing_agent_id
+        stage.executing_agent_id !== line.executing_agent_id ||
+        stage.functional_role !== line.functional_role
       ) {
         context.addIssue({
           code: "custom",

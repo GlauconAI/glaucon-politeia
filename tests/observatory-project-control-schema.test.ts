@@ -182,6 +182,11 @@ describe("ProjectControlSnapshotSchema", () => {
 
     contradictoryReturn.projects[0].stages[1].current_controller = "user";
     expect(ProjectControlSnapshotSchema.safeParse(contradictoryReturn).success).toBe(true);
+
+    const roleDrift = asgardProjectControlFixture();
+    (roleDrift.projects[0].execution_lines[0] as { functional_role: string | null })
+      .functional_role = "scientific-editor";
+    expect(ProjectControlSnapshotSchema.safeParse(roleDrift).success).toBe(false);
   });
 
   it("rejects dangling Admission, typed Dependency, and Gate Plan references", () => {
