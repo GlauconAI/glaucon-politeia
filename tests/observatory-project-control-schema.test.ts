@@ -128,6 +128,28 @@ describe("ProjectControlSnapshotSchema", () => {
     expect(ProjectControlSnapshotSchema.safeParse(danglingGateContract).success).toBe(false);
   });
 
+  it("rejects evidence-incomplete ready Gates and Decisions", () => {
+    const readyGateWithMissingEvidence = asgardProjectControlFixture();
+    readyGateWithMissingEvidence.projects[0].gates[1].status = "ready";
+    expect(
+      ProjectControlSnapshotSchema.safeParse(readyGateWithMissingEvidence).success,
+    ).toBe(false);
+
+    const readyDecisionWithMissingEvidence = asgardProjectControlFixture();
+    const decision = readyDecisionWithMissingEvidence.projects[0].user_decisions[1];
+    decision.status = "ready";
+    decision.evidence_complete = true;
+    expect(
+      ProjectControlSnapshotSchema.safeParse(readyDecisionWithMissingEvidence).success,
+    ).toBe(false);
+  });
+
+  it("rejects a Gate linked to a recorded Decision for another Gate", () => {
+    const mismatchedDecision = asgardProjectControlFixture();
+    mismatchedDecision.projects[0].user_decisions[0].gate_id = "gate-3";
+    expect(ProjectControlSnapshotSchema.safeParse(mismatchedDecision).success).toBe(false);
+  });
+
   it("rejects Work Packages with dangling Stage references", () => {
     const danglingWorkPackage = asgardProjectControlFixture();
     danglingWorkPackage.projects[0].work_packages[0].stage_id = "missing-stage";

@@ -414,7 +414,10 @@ const DecisionSchema = z
     if (recorded && !decision.options.some((option) => option.option_id === decision.selected_option_id)) {
       context.addIssue({ code: "custom", path: ["selected_option_id"], message: "Unknown decision option." });
     }
-    if (decision.status === "ready" && !decision.evidence_complete) {
+    if (
+      decision.status === "ready" &&
+      (!decision.evidence_complete || decision.missing_evidence_refs.length > 0)
+    ) {
       context.addIssue({ code: "custom", message: "Ready Decision requires complete evidence." });
     }
   });
@@ -722,6 +725,24 @@ const ProjectSchema = z
         )
       ) {
         context.addIssue({ code: "custom", path: ["gates"], message: "Gate reference mismatch." });
+      }
+      if (
+        gate.status === "ready" &&
+        (gate.missing_artifact_contract_ids.length > 0 ||
+          gate.missing_verification_ids.length > 0)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["gates"],
+          message: "Ready Gate requires complete evidence.",
+        });
+      }
+      if (gate.decision_id && (!decision || decision.gate_id !== gate.gate_id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["gates"],
+          message: "Gate Decision binding is invalid.",
+        });
       }
       if (gate.decision_authority === "user" && ["passed", "failed"].includes(gate.status) && decision?.status !== "recorded") {
         context.addIssue({ code: "custom", path: ["gates"], message: "User Gate requires a recorded Decision." });
