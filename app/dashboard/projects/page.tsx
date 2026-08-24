@@ -6,6 +6,7 @@ import {
   type ProjectDirectoryFilters,
 } from "@/components/observatory/ProjectDirectory";
 import { ProjectExecutionPortfolio } from "@/components/observatory/ProjectExecutionPortfolio";
+import { ProjectControlPortfolio } from "@/components/observatory/ProjectControlPortfolio";
 import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import {
@@ -107,6 +108,13 @@ export default async function ProjectsPage({
       </header>
       {state.status === "ready" ? (
         <>
+          <ProjectControlPortfolio
+            snapshot={
+              "project_controls" in state.snapshot
+                ? state.snapshot.project_controls
+                : null
+            }
+          />
           <ProjectExecutionPortfolio
             projects={projectExecutionEntries}
             sourceAvailable={

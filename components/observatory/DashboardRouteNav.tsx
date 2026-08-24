@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 const routes = [
   { href: "/dashboard", label: "Dashboard", exact: true },
   { href: "/dashboard/projects", label: "Projects", exact: false },
+  { href: "/dashboard/decisions", label: "Decisions", exact: false },
   { href: "/dashboard/skills", label: "Skills", exact: false },
 ] as const;
 
