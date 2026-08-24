@@ -58,7 +58,15 @@ function DecisionList({ title, decisions }: { title: string; decisions: Decision
   );
 }
 
-export function DecisionCenter({ decisions }: { decisions: Decision[] }) {
+export function DecisionCenter({
+  decisions,
+  sourceStatus = "unknown",
+  collectedAt = null,
+}: {
+  decisions: Decision[];
+  sourceStatus?: "fresh" | "stale" | "unknown";
+  collectedAt?: string | null;
+}) {
   const projects = [...new Set(decisions.map((decision) => decision.projectSlug))];
   const gates = [...new Set(decisions.map((decision) => decision.gate_id).filter(Boolean))] as string[];
   const owners = [...new Set(decisions.map((decision) => decision.ownerAgentId))];
@@ -80,6 +88,12 @@ export function DecisionCenter({ decisions }: { decisions: Decision[] }) {
       <div className="dashboard-directory-heading">
         <div><p className="eyebrow">User authority</p><h1>Decision Center</h1></div>
       </div>
+      {sourceStatus === "stale" ? (
+        <p className="project-execution-callout" role="status">
+          Showing last-known-good Project Control decisions. Source refresh is stale
+          {collectedAt ? ` as of ${collectedAt}` : ""}.
+        </p>
+      ) : null}
       <div className="decision-center-filters">
         <label className="decision-center-filter"><span>Project</span><select value={project} onChange={(event) => setProject(event.target.value)}><option value="all">All Projects</option>{projects.map((slug) => <option key={slug} value={slug}>{decisions.find((decision) => decision.projectSlug === slug)?.projectTitle ?? slug}</option>)}</select></label>
         <label className="decision-center-filter"><span>Decision status</span><select aria-label="Decision status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option>{["evidence_blocked", "pending", "ready", "recorded"].map((value) => <option key={value} value={value}>{words(value)}</option>)}</select></label>

@@ -3,16 +3,26 @@ import Link from "next/link";
 import type { ProjectControlSnapshot } from "@/lib/observatory/project-control-schema";
 
 type SourceStatus = "fresh" | "stale" | "unknown";
+type RegistryProject = { projectKey: string; title: string };
 
 export function ProjectControlPortfolio({
   snapshot,
   sourceStatus = "unknown",
   collectedAt = null,
+  registryProjects = [],
 }: {
   snapshot: ProjectControlSnapshot | null;
   sourceStatus?: SourceStatus;
   collectedAt?: string | null;
+  registryProjects?: RegistryProject[];
 }) {
+  const registryKeys = new Set(registryProjects.map((project) => project.projectKey));
+  const controlKeys = new Set(
+    snapshot?.projects.map((project) => project.project.project_key) ?? [],
+  );
+  const unmatchedRegistryProjects = registryProjects.filter(
+    (project) => !controlKeys.has(project.projectKey),
+  );
   return (
     <section className="project-control-portfolio" aria-labelledby="project-control-portfolio-heading">
       <div className="dashboard-directory-heading">
@@ -44,6 +54,9 @@ export function ProjectControlPortfolio({
                     <div><p className="eyebrow">{project.project_key}</p><h3>{project.title}</h3></div>
                     <span className={`project-execution-freshness freshness-${freshness}`}>{freshness}</span>
                   </header>
+                  {!registryKeys.has(project.project_key) ? (
+                    <p className="project-control-match-state">Registry match unavailable</p>
+                  ) : null}
                   <dl>
                     <div><dt>Plan</dt><dd>Revision {project.approved_plan_revision}</dd></div>
                     <div><dt>Stages</dt><dd>{summary.completed_stage_count}/{summary.stage_count}</dd></div>
@@ -60,6 +73,22 @@ export function ProjectControlPortfolio({
       ) : (
         <p className="project-execution-callout">No Project Control records published yet.</p>
       )}
+      {snapshot && unmatchedRegistryProjects.length ? (
+        <ul className="project-control-card-grid" aria-label="Unmatched registry Projects">
+          {unmatchedRegistryProjects.map((project) => (
+            <li key={project.projectKey}>
+              <article className="project-control-card">
+                <header>
+                  <div><p className="eyebrow">{project.projectKey}</p><h3>{project.title}</h3></div>
+                  <span className="project-execution-freshness freshness-unknown">unknown</span>
+                </header>
+                <p className="project-control-match-state">Unmatched Project</p>
+                <p>No Project Control Plan, Stage, or Gate facts were published.</p>
+              </article>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

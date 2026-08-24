@@ -5525,6 +5525,15 @@ body {
   color: var(--strong);
 }
 
+.project-control-match-state {
+  margin: 10px 0;
+  color: #fbbf24;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .project-control-view {
   display: grid;
   gap: 20px;

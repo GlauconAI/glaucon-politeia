@@ -131,6 +131,10 @@ export default async function ProjectsPage({
               projectControlSource?.collected_at ??
               null
             }
+            registryProjects={projects.map((project) => ({
+              projectKey: project.projectKey,
+              title: project.title,
+            }))}
           />
           <ProjectExecutionPortfolio
             projects={projectExecutionEntries}

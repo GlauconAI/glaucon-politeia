@@ -91,6 +91,43 @@ describe("ProjectControlSnapshotSchema", () => {
     expect(ProjectControlSnapshotSchema.safeParse(twoCurrentPlans).success).toBe(false);
   });
 
+  it("accepts historical approval facts on a superseded Plan revision", () => {
+    const historicalPlan = asgardProjectControlFixture();
+    historicalPlan.projects[0].plan_revisions.push({
+      ...historicalPlan.projects[0].plan_revisions[0],
+      plan_revision: 2,
+      canonical_hash: "c".repeat(64),
+      approval_status: "superseded",
+      source_revision: 2,
+      current: false,
+    } as unknown as (typeof historicalPlan.projects)[number]["plan_revisions"][number]);
+    expect(ProjectControlSnapshotSchema.safeParse(historicalPlan).success).toBe(true);
+  });
+
+  it("rejects duplicate IDs inside reference arrays", () => {
+    const duplicateReference = asgardProjectControlFixture();
+    duplicateReference.projects[0].project.current_stage_ids.push("stage-05a");
+    expect(ProjectControlSnapshotSchema.safeParse(duplicateReference).success).toBe(false);
+  });
+
+  it("rejects expected Artifacts carrying a digest", () => {
+    const expectedWithDigest = asgardProjectControlFixture();
+    expectedWithDigest.projects[0].artifacts[1].sha256 = "d".repeat(64);
+    expect(ProjectControlSnapshotSchema.safeParse(expectedWithDigest).success).toBe(false);
+  });
+
+  it("rejects unaudited Dependency waivers and dangling Gate contracts", () => {
+    const unauditedWaiver = asgardProjectControlFixture();
+    unauditedWaiver.projects[0].dependencies[0].status = "waived";
+    expect(ProjectControlSnapshotSchema.safeParse(unauditedWaiver).success).toBe(false);
+
+    const danglingGateContract = asgardProjectControlFixture();
+    danglingGateContract.projects[0].gates[0].required_artifact_contract_ids = [
+      "missing-contract",
+    ];
+    expect(ProjectControlSnapshotSchema.safeParse(danglingGateContract).success).toBe(false);
+  });
+
   it("rejects Work Packages with dangling Stage references", () => {
     const danglingWorkPackage = asgardProjectControlFixture();
     danglingWorkPackage.projects[0].work_packages[0].stage_id = "missing-stage";

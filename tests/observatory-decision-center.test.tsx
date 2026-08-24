@@ -25,9 +25,18 @@ describe("DecisionCenter", () => {
       status: "ready" as const,
       missing_evidence_refs: [],
     };
-    render(<DecisionCenter decisions={[...decisions, pending, ready]} />);
+    render(
+      <DecisionCenter
+        decisions={[...decisions, pending, ready]}
+        sourceStatus="stale"
+        collectedAt="2026-08-23T20:10:00Z"
+      />,
+    );
 
     expect(screen.getByRole("heading", { name: "Decision Center" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "last-known-good Project Control decisions",
+    );
     expect(screen.getByRole("heading", { name: "Needs evidence" })).toBeInTheDocument();
     expect(screen.getByText("Freeze prototype interfaces")).toBeInTheDocument();
     expect(screen.getByText("2 missing evidence records")).toBeInTheDocument();

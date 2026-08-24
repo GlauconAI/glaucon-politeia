@@ -13,6 +13,7 @@ describe("ProjectControlPortfolio", () => {
         snapshot={snapshot}
         sourceStatus="stale"
         collectedAt="2026-08-23T20:10:00Z"
+        registryProjects={[{ projectKey: "plato/dashboard", title: "Dashboard" }]}
       />,
     );
 
@@ -20,5 +21,8 @@ describe("ProjectControlPortfolio", () => {
       "last-known-good Project Control facts",
     );
     expect(screen.getByText("stale")).toBeInTheDocument();
+    expect(screen.getByText("Registry match unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Unmatched Project")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
   });
 });

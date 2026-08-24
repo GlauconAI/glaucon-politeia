@@ -39,7 +39,15 @@ const safeString = (max: number, allowEmpty = false) =>
 const SafeTextSchema = safeString(1024);
 const SafeSummarySchema = safeString(4096, true);
 const LogicalRefSchema = safeString(1024);
-const ids = () => z.array(SafeIdSchema).max(PROJECT_CONTROL_MAX_RECORDS);
+const ids = () =>
+  z
+    .array(SafeIdSchema)
+    .max(PROJECT_CONTROL_MAX_RECORDS)
+    .superRefine((values, context) => {
+      if (new Set(values).size !== values.length) {
+        context.addIssue({ code: "custom", message: "Reference IDs must be unique." });
+      }
+    });
 
 const PlanRevisionSchema = z.strictObject({
   plan_revision: z.number().int().nonnegative(),
@@ -50,8 +58,13 @@ const PlanRevisionSchema = z.strictObject({
   source_revision: z.number().int().nonnegative(),
   current: z.boolean(),
 }).superRefine((plan, context) => {
-  const approvedFacts = Boolean(plan.approved_at && plan.approved_by);
-  if ((plan.approval_status === "approved") !== approvedFacts) {
+  const approvalFacts = [plan.approved_at, plan.approved_by];
+  const completeApproval = approvalFacts.every(Boolean);
+  const emptyApproval = approvalFacts.every((fact) => fact === null);
+  if (
+    (plan.approval_status === "approved" && !completeApproval) ||
+    (!completeApproval && !emptyApproval)
+  ) {
     context.addIssue({ code: "custom", message: "Plan approval facts drift." });
   }
 });
@@ -297,8 +310,11 @@ const ArtifactSchema = z
     if (artifact.status === "current_canonical" && !complete) {
       context.addIssue({ code: "custom", message: "Canonical Artifact requires complete provenance." });
     }
-    if (artifact.status === "expected" && complete) {
-      context.addIssue({ code: "custom", message: "Expected Artifact cannot be accepted." });
+    if (
+      artifact.status === "expected" &&
+      (artifact.sha256 || artifact.accepted_by_agent_id || artifact.accepted_at)
+    ) {
+      context.addIssue({ code: "custom", message: "Expected Artifact cannot carry digest or acceptance facts." });
     }
   });
 
@@ -368,7 +384,12 @@ const DecisionSchema = z
         }),
       )
       .min(1)
-      .max(16),
+      .max(16)
+      .superRefine((options, context) => {
+        if (new Set(options.map((option) => option.option_id)).size !== options.length) {
+          context.addIssue({ code: "custom", message: "Decision option IDs must be unique." });
+        }
+      }),
     evidence_complete: z.boolean(),
     missing_evidence_refs: ids(),
     downstream_stage_ids: ids(),
@@ -498,6 +519,7 @@ const ProjectSchema = z
     const stageIds = new Set(value.stages.map((stage) => stage.stage_id));
     const planRevisionIds = new Set(value.plan_revisions.map((plan) => plan.plan_revision));
     const gateIds = new Set(value.gates.map((gate) => gate.gate_id));
+    const gateById = new Map(value.gates.map((gate) => [gate.gate_id, gate]));
     const decisionById = new Map(value.user_decisions.map((decision) => [decision.decision_id, decision]));
     const artifactIds = new Set(value.artifacts.map((artifact) => artifact.artifact_id));
     const verificationIds = new Set(value.verifications.map((verification) => verification.verification_id));
@@ -620,6 +642,21 @@ const ProjectSchema = z
           message: "Dependency Stage binding is invalid.",
         });
       }
+      if (dependency.status === "waived") {
+        const directDecision = decisionById.get(dependency.required_ref_id);
+        const gateDecisionId = gateById.get(dependency.required_ref_id)?.decision_id;
+        const gateDecision = gateDecisionId ? decisionById.get(gateDecisionId) : null;
+        if (
+          directDecision?.status !== "recorded" &&
+          gateDecision?.status !== "recorded"
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["dependencies"],
+            message: "Waived Dependency requires a recorded Decision.",
+          });
+        }
+      }
     }
     for (const decision of value.user_decisions) {
       if (
@@ -649,7 +686,14 @@ const ProjectSchema = z
     }
     const canonicalContracts = new Set<string>();
     for (const artifact of value.artifacts) {
-      if (!stageIds.has(artifact.stage_id) || (artifact.predecessor_artifact_id && !artifactIds.has(artifact.predecessor_artifact_id))) {
+      const predecessor = artifact.predecessor_artifact_id
+        ? value.artifacts.find((candidate) => candidate.artifact_id === artifact.predecessor_artifact_id)
+        : null;
+      if (
+        !stageIds.has(artifact.stage_id) ||
+        (artifact.predecessor_artifact_id && !artifactIds.has(artifact.predecessor_artifact_id)) ||
+        (predecessor && predecessor.artifact_contract_id !== artifact.artifact_contract_id)
+      ) {
         context.addIssue({ code: "custom", path: ["artifacts"], message: "Artifact reference mismatch." });
       }
       if (artifact.status === "current_canonical") {
@@ -666,7 +710,17 @@ const ProjectSchema = z
     }
     for (const gate of value.gates) {
       const decision = gate.decision_id ? decisionById.get(gate.decision_id) : null;
-      if ((gate.stage_id && !stageIds.has(gate.stage_id)) || gate.required_verification_ids.some((id) => !verificationIds.has(id))) {
+      if (
+        (gate.stage_id && !stageIds.has(gate.stage_id)) ||
+        gate.required_artifact_contract_ids.some((id) => !artifactContractIds.has(id)) ||
+        gate.missing_artifact_contract_ids.some(
+          (id) => !artifactContractIds.has(id) || !gate.required_artifact_contract_ids.includes(id),
+        ) ||
+        gate.required_verification_ids.some((id) => !verificationIds.has(id)) ||
+        gate.missing_verification_ids.some(
+          (id) => !verificationIds.has(id) || !gate.required_verification_ids.includes(id),
+        )
+      ) {
         context.addIssue({ code: "custom", path: ["gates"], message: "Gate reference mismatch." });
       }
       if (gate.decision_authority === "user" && ["passed", "failed"].includes(gate.status) && decision?.status !== "recorded") {
