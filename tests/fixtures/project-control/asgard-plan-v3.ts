@@ -150,16 +150,27 @@ export function asgardProjectControlFixture() {
       };
     }),
     dependencies: stages.flatMap((record) =>
-      record.dependency_ids.map((from) => ({
-        dependency_id: "dep-" + from + "-" + record.stage_id,
-        from_stage_id: from,
-        to_stage_id: record.stage_id,
-        dependency_type: "stage",
-        required_ref_id: from,
-        status: stages.find((candidate) => candidate.stage_id === from)?.status === "completed" ? "satisfied" : "pending",
-        reason_summary: "Requires " + from + ".",
-        updated_at: at,
-      })),
+      record.dependency_ids.map((from) => {
+        const requiresUserReturn =
+          (from === "stage-05a" && ["stage-06a", "stage-06b"].includes(record.stage_id)) ||
+          (from === "stage-05b" && record.stage_id === "stage-06c");
+        return {
+          dependency_id: "dep-" + from + "-" + record.stage_id,
+          from_stage_id: from,
+          to_stage_id: record.stage_id,
+          dependency_type: requiresUserReturn ? "user_return" : "stage",
+          required_ref_id: requiresUserReturn ? "line-" + from : from,
+          status: requiresUserReturn
+            ? "pending"
+            : stages.find((candidate) => candidate.stage_id === from)?.status === "completed"
+              ? "satisfied"
+              : "pending",
+          reason_summary: requiresUserReturn
+            ? "Requires explicit User return from " + from + "."
+            : "Requires " + from + ".",
+          updated_at: at,
+        };
+      }),
     ),
     artifacts,
     verifications: [],

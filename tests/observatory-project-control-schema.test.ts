@@ -171,6 +171,17 @@ describe("ProjectControlSnapshotSchema", () => {
     expect(
       ProjectControlSnapshotSchema.safeParse(activeExecutorControlledByManager).success,
     ).toBe(false);
+
+    const contradictoryReturn = asgardProjectControlFixture();
+    const contradictoryLine = contradictoryReturn.projects[0].execution_lines[0];
+    contradictoryLine.status = "returned";
+    contradictoryLine.current_controller = "user";
+    (contradictoryLine as { user_returned_at: string | null }).user_returned_at =
+      "2026-08-23T20:30:00Z";
+    expect(ProjectControlSnapshotSchema.safeParse(contradictoryReturn).success).toBe(false);
+
+    contradictoryReturn.projects[0].stages[1].current_controller = "user";
+    expect(ProjectControlSnapshotSchema.safeParse(contradictoryReturn).success).toBe(true);
   });
 
   it("rejects dangling Admission, typed Dependency, and Gate Plan references", () => {
@@ -199,6 +210,92 @@ describe("ProjectControlSnapshotSchema", () => {
     const danglingExecutionLine = asgardProjectControlFixture();
     danglingExecutionLine.projects[0].execution_lines[0].stage_id = "missing-stage";
     expect(ProjectControlSnapshotSchema.safeParse(danglingExecutionLine).success).toBe(false);
+  });
+
+  it("rejects fabricated imported-baseline starts", () => {
+    const fabricatedStart = asgardProjectControlFixture();
+    fabricatedStart.projects[0].stages[0].started_at = "2026-08-23T19:00:00Z";
+    expect(ProjectControlSnapshotSchema.safeParse(fabricatedStart).success).toBe(false);
+  });
+
+  it("requires Artifact and Verification membership in their owning Stage", () => {
+    const unlistedArtifact = asgardProjectControlFixture();
+    unlistedArtifact.projects[0].stages[0].artifact_contract_ids = [];
+    expect(ProjectControlSnapshotSchema.safeParse(unlistedArtifact).success).toBe(false);
+
+    const unlistedVerification = asgardProjectControlFixture();
+    unlistedVerification.projects[0].verifications.push({
+      verification_id: "verification-stage-01-04d",
+      stage_id: "stage-01-04d",
+      artifact_ids: ["artifact-stage-01-04d"],
+      mode: "machine",
+      verifier_agent_id: null,
+      status: "pending",
+      evidence_summary: "",
+      failure_reason: null,
+      verified_at: null,
+    } as never);
+    expect(ProjectControlSnapshotSchema.safeParse(unlistedVerification).success).toBe(false);
+
+    const foreignArtifact = asgardProjectControlFixture();
+    foreignArtifact.projects[0].artifacts[0].stage_id = "stage-05a";
+    expect(ProjectControlSnapshotSchema.safeParse(foreignArtifact).success).toBe(false);
+  });
+
+  it("reconciles Stage DAG edges and Admission missing facts with Dependency records", () => {
+    const missingLedgerEdge = asgardProjectControlFixture();
+    missingLedgerEdge.projects[0].dependencies = missingLedgerEdge.projects[0].dependencies.filter(
+      (dependency) =>
+        !(dependency.from_stage_id === "stage-05a" && dependency.to_stage_id === "stage-06a"),
+    );
+    expect(ProjectControlSnapshotSchema.safeParse(missingLedgerEdge).success).toBe(false);
+
+    const unrelatedMissingDependency = asgardProjectControlFixture();
+    unrelatedMissingDependency.projects[0].stages[3].admission.missing_dependency_ids = [
+      "stage-05b",
+    ];
+    expect(ProjectControlSnapshotSchema.safeParse(unrelatedMissingDependency).success).toBe(false);
+  });
+
+  it("fails closed when the current Plan drifts from the approved revision", () => {
+    const drift = asgardProjectControlFixture();
+    drift.projects[0].plan_revisions[0].current = false;
+    drift.projects[0].plan_revisions.push({
+      ...drift.projects[0].plan_revisions[0],
+      plan_revision: 4,
+      canonical_hash: "b".repeat(64),
+      approval_status: "draft",
+      approved_at: null,
+      approved_by: null,
+      source_revision: 4,
+      current: true,
+    } as unknown as (typeof drift.projects)[number]["plan_revisions"][number]);
+    drift.projects[0].project.current_plan_revision = 4;
+    drift.projects[0].project.source_revision = 4;
+    drift.projects[0].project.revision_drift = true;
+    expect(ProjectControlSnapshotSchema.safeParse(drift).success).toBe(false);
+
+    drift.projects[0].project.freshness = "stale";
+    expect(ProjectControlSnapshotSchema.safeParse(drift).success).toBe(true);
+  });
+
+  it("rejects a superseded Artifact without a successor", () => {
+    const orphanedHistory = asgardProjectControlFixture();
+    orphanedHistory.projects[0].artifacts[0].status = "superseded";
+    expect(ProjectControlSnapshotSchema.safeParse(orphanedHistory).success).toBe(false);
+  });
+
+  it("models Asgard 05A/05B returns as typed User-return dependencies", () => {
+    const snapshot = asgardProjectControlFixture();
+    const dependencyTypes = new Map(
+      snapshot.projects[0].dependencies.map((dependency) => [
+        dependency.from_stage_id + "->" + dependency.to_stage_id,
+        dependency.dependency_type,
+      ]),
+    );
+    expect(dependencyTypes.get("stage-05a->stage-06a")).toBe("user_return");
+    expect(dependencyTypes.get("stage-05a->stage-06b")).toBe("user_return");
+    expect(dependencyTypes.get("stage-05b->stage-06c")).toBe("user_return");
   });
 
   it("rejects Decisions that claim a foreign Project", () => {

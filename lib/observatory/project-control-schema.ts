@@ -165,7 +165,8 @@ const StageSchema = z
     if (
       stage.transfer_mode === "independent_owner_line" &&
       (stage.return_trigger !== "explicit_user_return" ||
-        stage.current_controller !== "user_and_owner")
+        !["user_and_owner", "user"].includes(stage.current_controller) ||
+        !stage.execution_line_id)
     ) {
       context.addIssue({ code: "custom", message: "Independent owner control semantics are invalid." });
     }
@@ -210,6 +211,13 @@ const StageSchema = z
     }
     if ((stage.status === "completed") !== Boolean(stage.completed_at)) {
       context.addIssue({ code: "custom", path: ["completed_at"], message: "Completed timestamp drift." });
+    }
+    if (stage.provenance === "imported_baseline" && stage.started_at) {
+      context.addIssue({
+        code: "custom",
+        path: ["started_at"],
+        message: "Imported baseline cannot claim a current Run start.",
+      });
     }
   });
 
@@ -535,7 +543,6 @@ const ProjectSchema = z
     const gateById = new Map(value.gates.map((gate) => [gate.gate_id, gate]));
     const decisionById = new Map(value.user_decisions.map((decision) => [decision.decision_id, decision]));
     const artifactIds = new Set(value.artifacts.map((artifact) => artifact.artifact_id));
-    const dependencyIds = new Set(value.dependencies.map((dependency) => dependency.dependency_id));
     const verificationIds = new Set(value.verifications.map((verification) => verification.verification_id));
     const executionLineIds = new Set(value.execution_lines.map((line) => line.execution_line_id));
     const workPackagesById = new Map(
@@ -544,6 +551,12 @@ const ProjectSchema = z
     const executionLinesById = new Map(
       value.execution_lines.map((line) => [line.execution_line_id, line]),
     );
+    const dependenciesByTarget = new Map<string, typeof value.dependencies>();
+    for (const dependency of value.dependencies) {
+      const existing = dependenciesByTarget.get(dependency.to_stage_id) ?? [];
+      existing.push(dependency);
+      dependenciesByTarget.set(dependency.to_stage_id, existing);
+    }
     const artifactContractIds = new Set(
       value.artifacts.map((artifact) => artifact.artifact_contract_id),
     );
@@ -580,6 +593,18 @@ const ProjectSchema = z
     ) {
       context.addIssue({ code: "custom", path: ["project", "revision_drift"], message: "Revision drift mismatch." });
     }
+    if (
+      value.project.revision_drift &&
+      (value.project.freshness !== "stale" ||
+        value.project.next_admissible_stage_ids.length > 0 ||
+        value.stages.some((stage) => stage.admission.eligible))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["project", "revision_drift"],
+        message: "Revision drift must fail closed for freshness and admission.",
+      });
+    }
     const approved = value.plan_revisions.find(
       (plan) => plan.plan_revision === value.project.approved_plan_revision,
     );
@@ -602,25 +627,52 @@ const ProjectSchema = z
       });
     }
     for (const stage of value.stages) {
+      const stageDependencies = dependenciesByTarget.get(stage.stage_id) ?? [];
+      const declaredDependencyIds = new Set([
+        ...stage.dependency_ids,
+        ...stageDependencies.map((dependency) => dependency.dependency_id),
+      ]);
+      const declaredArtifactRequirements = new Set([
+        ...stage.artifact_contract_ids,
+        ...stageDependencies
+          .filter((dependency) => dependency.dependency_type === "artifact")
+          .map((dependency) => dependency.required_ref_id),
+      ]);
+      const declaredVerificationRequirements = new Set([
+        ...stage.verification_ids,
+        ...stageDependencies
+          .filter((dependency) => dependency.dependency_type === "verification")
+          .map((dependency) => dependency.required_ref_id),
+      ]);
       if (
         !planRevisionIds.has(stage.plan_revision) ||
         stage.work_package_ids.some((id) =>
           workPackagesById.get(id)?.stage_id !== stage.stage_id) ||
         (stage.execution_line_id &&
           executionLinesById.get(stage.execution_line_id)?.stage_id !== stage.stage_id) ||
-        stage.artifact_contract_ids.some((id) => !artifactContractIds.has(id)) ||
-        stage.verification_ids.some((id) => !verificationIds.has(id)) ||
+        stage.artifact_contract_ids.some((id) =>
+          !value.artifacts.some(
+            (artifact) => artifact.artifact_contract_id === id && artifact.stage_id === stage.stage_id,
+          )) ||
+        stage.verification_ids.some((id) =>
+          !value.verifications.some(
+            (verification) => verification.verification_id === id && verification.stage_id === stage.stage_id,
+          )) ||
         stage.gate_ids.some((id) => !gateIds.has(id)) ||
         stage.admission.missing_dependency_ids.some(
-          (id) => !stageIds.has(id) && !dependencyIds.has(id),
+          (id) => !declaredDependencyIds.has(id),
         ) ||
         stage.admission.missing_artifact_contract_ids.some(
-          (id) => !artifactContractIds.has(id),
+          (id) => !declaredArtifactRequirements.has(id),
         ) ||
         stage.admission.missing_verification_ids.some(
-          (id) => !verificationIds.has(id),
+          (id) => !declaredVerificationRequirements.has(id),
         ) ||
-        stage.admission.missing_gate_ids.some((id) => !gateIds.has(id))
+        stage.admission.missing_gate_ids.some((id) => !stage.gate_ids.includes(id)) ||
+        stage.dependency_ids.some(
+          (fromStageId) =>
+            !stageDependencies.some((dependency) => dependency.from_stage_id === fromStageId),
+        )
       ) {
         context.addIssue({
           code: "custom",
@@ -645,7 +697,15 @@ const ProjectSchema = z
     }
     for (const line of value.execution_lines) {
       const stage = byStage.get(line.stage_id);
-      if (!stage || stage.execution_line_id !== line.execution_line_id) {
+      if (
+        !stage ||
+        stage.execution_line_id !== line.execution_line_id ||
+        stage.transfer_mode !== line.transfer_mode ||
+        stage.return_trigger !== line.return_trigger ||
+        stage.current_controller !== line.current_controller ||
+        stage.accountable_owner_agent_id !== line.accountable_owner_agent_id ||
+        stage.executing_agent_id !== line.executing_agent_id
+      ) {
         context.addIssue({
           code: "custom",
           path: ["execution_lines"],
@@ -726,7 +786,9 @@ const ProjectSchema = z
         ? value.artifacts.find((candidate) => candidate.artifact_id === artifact.predecessor_artifact_id)
         : null;
       if (
-        !stageIds.has(artifact.stage_id) ||
+        !byStage.get(artifact.stage_id)?.artifact_contract_ids.includes(
+          artifact.artifact_contract_id,
+        ) ||
         (artifact.predecessor_artifact_id && !artifactIds.has(artifact.predecessor_artifact_id)) ||
         (predecessor && predecessor.artifact_contract_id !== artifact.artifact_contract_id)
       ) {
@@ -738,9 +800,26 @@ const ProjectSchema = z
         }
         canonicalContracts.add(artifact.artifact_contract_id);
       }
+      if (
+        artifact.status === "superseded" &&
+        !value.artifacts.some(
+          (candidate) => candidate.predecessor_artifact_id === artifact.artifact_id,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["artifacts"],
+          message: "Superseded Artifact requires a successor relation.",
+        });
+      }
     }
     for (const verification of value.verifications) {
-      if (!stageIds.has(verification.stage_id) || verification.artifact_ids.some((id) => !artifactIds.has(id))) {
+      if (
+        !byStage.get(verification.stage_id)?.verification_ids.includes(
+          verification.verification_id,
+        ) ||
+        verification.artifact_ids.some((id) => !artifactIds.has(id))
+      ) {
         context.addIssue({ code: "custom", path: ["verifications"], message: "Verification reference mismatch." });
       }
     }
