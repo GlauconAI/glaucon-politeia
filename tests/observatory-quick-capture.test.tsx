@@ -71,6 +71,42 @@ describe("QuickCapture", () => {
     );
   });
 
+  it("submits once through the visible capture button", async () => {
+    const action = vi.fn(
+      async (
+        _previousState: ObservatoryQuickCaptureActionState,
+        _formData: FormData,
+      ): Promise<ObservatoryQuickCaptureActionState> => ({
+        status: "success",
+        workItemId: "work-item-button",
+      }),
+    );
+    const initialKey =
+      "observatory-capture-66666666-6666-4666-8666-666666666666";
+
+    render(
+      <QuickCapture action={action} initialIdempotencyKey={initialKey} />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Hydration regression" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /capture work item/i }),
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /captured in inbox/i,
+    );
+    expect(action).toHaveBeenCalledTimes(1);
+    expect((action.mock.calls[0][1] as FormData).get("title")).toBe(
+      "Hydration regression",
+    );
+    expect((action.mock.calls[0][1] as FormData).get("idempotencyKey")).toBe(
+      initialKey,
+    );
+  });
+
   it("preserves values and key across an error, then resets and rotates only after success", async () => {
     let attempt = 0;
     const action = vi.fn(
