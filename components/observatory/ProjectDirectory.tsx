@@ -42,7 +42,10 @@ function displayDate(value: string | null): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "No linked activity"
-    : new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" }).format(date);
+    : new Intl.DateTimeFormat("en-CA", {
+        dateStyle: "medium",
+        timeZone: "UTC",
+      }).format(date);
 }
 
 export function ProjectDirectory({

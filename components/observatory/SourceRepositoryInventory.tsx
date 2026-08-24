@@ -21,6 +21,7 @@ function displayDate(value: string | null): string {
     : new Intl.DateTimeFormat("en-CA", {
         dateStyle: "medium",
         timeStyle: "short",
+        timeZone: "UTC",
       }).format(date);
 }
 
