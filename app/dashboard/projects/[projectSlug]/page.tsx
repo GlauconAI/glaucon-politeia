@@ -59,6 +59,9 @@ export default async function ProjectControlPage({
     );
   }
   const snapshot = "project_controls" in state.snapshot ? state.snapshot.project_controls : null;
+  const projectControlSource = "source_health" in state.snapshot
+    ? state.snapshot.source_health.find((source) => source.domain === "project_controls")
+    : undefined;
   if (!snapshot) {
     return (
       <section className="observatory-page">
@@ -84,6 +87,12 @@ export default async function ProjectControlPage({
         project={project}
         boundWorkItems={boundWork.items}
         workTrackerAvailable={boundWork.available}
+        sourceStatus={
+          projectControlSource?.status === "fresh" ||
+          projectControlSource?.status === "stale"
+            ? projectControlSource.status
+            : "unknown"
+        }
       />
     </section>
   );

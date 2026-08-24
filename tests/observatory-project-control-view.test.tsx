@@ -44,6 +44,7 @@ describe("ProjectControlView", () => {
         project={snapshot.projects[0]}
         boundWorkItems={[boundWorkItem]}
         workTrackerAvailable
+        sourceStatus="stale"
       />,
     );
 
@@ -76,5 +77,9 @@ describe("ProjectControlView", () => {
     );
     expect(screen.getByRole("heading", { name: "Outcome reviews" })).toBeInTheDocument();
     expect(screen.getByText("Prototype outcome")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "last-known-good Project Control facts",
+    );
+    expect(screen.getByText("Stale")).toBeInTheDocument();
   });
 });

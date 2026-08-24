@@ -49,6 +49,11 @@ const PlanRevisionSchema = z.strictObject({
   approved_by: z.literal("user").nullable(),
   source_revision: z.number().int().nonnegative(),
   current: z.boolean(),
+}).superRefine((plan, context) => {
+  const approvedFacts = Boolean(plan.approved_at && plan.approved_by);
+  if ((plan.approval_status === "approved") !== approvedFacts) {
+    context.addIssue({ code: "custom", message: "Plan approval facts drift." });
+  }
 });
 
 export const StageStatusSchema = z.enum([
@@ -97,17 +102,9 @@ const AdmissionSchema = z
     if (admission.eligible && missing > 0) {
       context.addIssue({ code: "custom", message: "Eligible admission cannot have missing contracts." });
     }
-    const blockingReasons = new Set([
-      "dependency_missing",
-      "artifact_missing",
-      "verification_missing",
-      "gate_missing",
-      "user_return_missing",
-      "revision_drift",
-    ]);
     if (
       admission.eligible &&
-      admission.reason_codes.some((reason) => blockingReasons.has(reason))
+      admission.reason_codes.length > 0
     ) {
       context.addIssue({
         code: "custom",
@@ -415,7 +412,10 @@ const OutcomeReviewSchema = z
   })
   .superRefine((review, context) => {
     const recorded = review.status === "recorded";
-    if (recorded !== Boolean(review.decision && review.reviewed_by && review.reviewed_at)) {
+    const reviewFacts = [review.decision, review.reviewed_by, review.reviewed_at];
+    const completeReview = reviewFacts.every(Boolean);
+    const emptyReview = reviewFacts.every((fact) => fact === null);
+    if ((recorded && !completeReview) || (!recorded && !emptyReview)) {
       context.addIssue({ code: "custom", message: "Outcome review facts drift." });
     }
   });
@@ -496,10 +496,20 @@ const ProjectSchema = z
       }
     }
     const stageIds = new Set(value.stages.map((stage) => stage.stage_id));
+    const planRevisionIds = new Set(value.plan_revisions.map((plan) => plan.plan_revision));
     const gateIds = new Set(value.gates.map((gate) => gate.gate_id));
     const decisionById = new Map(value.user_decisions.map((decision) => [decision.decision_id, decision]));
     const artifactIds = new Set(value.artifacts.map((artifact) => artifact.artifact_id));
     const verificationIds = new Set(value.verifications.map((verification) => verification.verification_id));
+    const workPackagesById = new Map(
+      value.work_packages.map((workPackage) => [workPackage.work_package_id, workPackage]),
+    );
+    const executionLinesById = new Map(
+      value.execution_lines.map((line) => [line.execution_line_id, line]),
+    );
+    const artifactContractIds = new Set(
+      value.artifacts.map((artifact) => artifact.artifact_contract_id),
+    );
     for (const stage of value.stages) {
       if (stage.dependency_ids.some((id) => !stageIds.has(id))) {
         context.addIssue({ code: "custom", path: ["stages"], message: "Dangling Stage dependency." });
@@ -542,6 +552,100 @@ const ProjectSchema = z
       approved.canonical_hash !== value.project.approved_plan_hash
     ) {
       context.addIssue({ code: "custom", path: ["plan_revisions"], message: "Approved Plan mismatch." });
+    }
+    const currentPlans = value.plan_revisions.filter((plan) => plan.current);
+    if (
+      currentPlans.length !== 1 ||
+      currentPlans[0]?.plan_revision !== value.project.current_plan_revision
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["plan_revisions"],
+        message: "Exactly one current Plan revision must match the Project.",
+      });
+    }
+    for (const stage of value.stages) {
+      if (
+        !planRevisionIds.has(stage.plan_revision) ||
+        stage.work_package_ids.some((id) =>
+          workPackagesById.get(id)?.stage_id !== stage.stage_id) ||
+        (stage.execution_line_id &&
+          executionLinesById.get(stage.execution_line_id)?.stage_id !== stage.stage_id) ||
+        stage.artifact_contract_ids.some((id) => !artifactContractIds.has(id)) ||
+        stage.verification_ids.some((id) => !verificationIds.has(id)) ||
+        stage.gate_ids.some((id) => !gateIds.has(id))
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["stages"],
+          message: "Stage carries dangling control references.",
+        });
+      }
+    }
+    for (const workPackage of value.work_packages) {
+      const stage = byStage.get(workPackage.stage_id);
+      if (
+        !stage ||
+        workPackage.plan_revision !== stage.plan_revision ||
+        !stage.work_package_ids.includes(workPackage.work_package_id)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["work_packages"],
+          message: "Work Package Stage binding is invalid.",
+        });
+      }
+    }
+    for (const line of value.execution_lines) {
+      const stage = byStage.get(line.stage_id);
+      if (!stage || stage.execution_line_id !== line.execution_line_id) {
+        context.addIssue({
+          code: "custom",
+          path: ["execution_lines"],
+          message: "Execution Line Stage binding is invalid.",
+        });
+      }
+    }
+    for (const dependency of value.dependencies) {
+      if (
+        !stageIds.has(dependency.from_stage_id) ||
+        !stageIds.has(dependency.to_stage_id) ||
+        !byStage.get(dependency.to_stage_id)?.dependency_ids.includes(
+          dependency.from_stage_id,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["dependencies"],
+          message: "Dependency Stage binding is invalid.",
+        });
+      }
+    }
+    for (const decision of value.user_decisions) {
+      if (
+        decision.project_key !== value.project.project_key ||
+        (decision.stage_id && !stageIds.has(decision.stage_id)) ||
+        (decision.gate_id && !gateIds.has(decision.gate_id)) ||
+        decision.downstream_stage_ids.some((id) => !stageIds.has(id))
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["user_decisions"],
+          message: "Decision control references are invalid.",
+        });
+      }
+    }
+    for (const review of value.outcome_reviews) {
+      if (
+        (review.stage_id && !stageIds.has(review.stage_id)) ||
+        review.follow_up_stage_ids.some((id) => !stageIds.has(id))
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["outcome_reviews"],
+          message: "Outcome Review Stage references are invalid.",
+        });
+      }
     }
     const canonicalContracts = new Set<string>();
     for (const artifact of value.artifacts) {

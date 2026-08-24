@@ -14,6 +14,7 @@ import {
   ObservatoryCollectorError,
   collectAndWriteObservatorySnapshot,
   collectObservatorySnapshot,
+  computeObservatorySnapshotDigest,
   upgradeObservatorySnapshotToV2,
   upgradeObservatorySnapshotToV3,
   upgradeObservatorySnapshotToV4,
@@ -26,6 +27,7 @@ import {
 import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
 import { ObservatoryCollectionEnvelopeV6Schema } from "#observatory-collection-schema";
+import { computeProjectControlDigest } from "#observatory-project-control-schema";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
 import { collectSourceRepositories } from "#observatory-source-repository-discovery";
@@ -137,6 +139,13 @@ async function readPreviousProjectControl(
   }
   const previous = ObservatoryCollectionEnvelopeV6Schema.safeParse(candidate);
   if (!previous.success || !previous.data.project_controls) return undefined;
+  if (
+    computeObservatorySnapshotDigest(previous.data) !==
+      previous.data.source_digest ||
+    previous.data.registry.source.digest !== previous.data.source_digest ||
+    computeProjectControlDigest(previous.data.project_controls) !==
+      previous.data.project_controls.digest
+  ) return undefined;
   const sourceHealth = previous.data.source_health.find(
     (source) => source.domain === "project_controls",
   );

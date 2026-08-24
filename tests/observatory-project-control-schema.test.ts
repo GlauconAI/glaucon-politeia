@@ -48,6 +48,7 @@ describe("ProjectControlSnapshotSchema", () => {
 
   it("rejects contradictory Stage admission and controller facts", () => {
     const eligibleButBlocked = asgardProjectControlFixture();
+    eligibleButBlocked.projects[0].stages[1].admission.eligible = true;
     eligibleButBlocked.projects[0].stages[1].admission.reason_codes = [
       "dependency_missing",
     ];
@@ -74,6 +75,44 @@ describe("ProjectControlSnapshotSchema", () => {
       ProjectControlSnapshotSchema.safeParse(activeExecutorControlledByManager)
         .success,
     ).toBe(false);
+  });
+
+  it("rejects multiple current Plan revisions", () => {
+    const twoCurrentPlans = asgardProjectControlFixture();
+    twoCurrentPlans.projects[0].plan_revisions.push({
+      ...twoCurrentPlans.projects[0].plan_revisions[0],
+      plan_revision: 4,
+      canonical_hash: "b".repeat(64),
+      approval_status: "draft",
+      approved_at: null,
+      approved_by: null,
+      current: true,
+    } as unknown as (typeof twoCurrentPlans.projects)[number]["plan_revisions"][number]);
+    expect(ProjectControlSnapshotSchema.safeParse(twoCurrentPlans).success).toBe(false);
+  });
+
+  it("rejects Work Packages with dangling Stage references", () => {
+    const danglingWorkPackage = asgardProjectControlFixture();
+    danglingWorkPackage.projects[0].work_packages[0].stage_id = "missing-stage";
+    expect(ProjectControlSnapshotSchema.safeParse(danglingWorkPackage).success).toBe(false);
+  });
+
+  it("rejects execution lines with dangling Stage references", () => {
+    const danglingExecutionLine = asgardProjectControlFixture();
+    danglingExecutionLine.projects[0].execution_lines[0].stage_id = "missing-stage";
+    expect(ProjectControlSnapshotSchema.safeParse(danglingExecutionLine).success).toBe(false);
+  });
+
+  it("rejects Decisions that claim a foreign Project", () => {
+    const foreignDecision = asgardProjectControlFixture();
+    foreignDecision.projects[0].user_decisions[0].project_key = "other/project";
+    expect(ProjectControlSnapshotSchema.safeParse(foreignDecision).success).toBe(false);
+  });
+
+  it("rejects partial planned Outcome Review facts", () => {
+    const partialOutcome = asgardProjectControlFixture();
+    (partialOutcome.projects[0].outcome_reviews[0] as { decision: string | null }).decision = "continue";
+    expect(ProjectControlSnapshotSchema.safeParse(partialOutcome).success).toBe(false);
   });
 
   it("rejects partial Decision audit facts and secret-bearing public text", () => {

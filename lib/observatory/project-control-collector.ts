@@ -47,7 +47,11 @@ export function retainProjectControlLastKnownGood(
   candidate: ProjectControlCollectionResult,
   previous?: ProjectControlCollectionResult,
 ): ProjectControlCollectionResult {
-  if (candidate.snapshot || !previous?.snapshot) return candidate;
+  if (
+    candidate.snapshot ||
+    !previous?.snapshot ||
+    computeProjectControlDigest(previous.snapshot) !== previous.snapshot.digest
+  ) return candidate;
   return {
     snapshot: previous.snapshot,
     sourceHealth: {

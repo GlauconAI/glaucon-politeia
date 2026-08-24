@@ -5644,6 +5644,18 @@ body {
 .decision-center-options { display: grid; gap: 6px; margin: 12px 0; padding: 0; list-style: none; }
 .decision-center-options li { display: grid; gap: 3px; padding: 9px; border-left: 2px solid rgba(56, 189, 248, 0.5); }
 .decision-center-options span { color: var(--muted); }
+.decision-center-suggested-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.decision-center-suggested-actions > strong,
+.decision-center-suggested-actions span { color: var(--strong); }
+.decision-center-suggested-actions ul { display: grid; gap: 5px; margin: 0; padding-left: 18px; }
 .decision-center-list article > p { overflow-wrap: anywhere; color: var(--muted); }
 .decision-center-list footer { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-top: 12px; }
 .decision-center-list a { color: #7dd3fc; }

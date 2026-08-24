@@ -25,10 +25,12 @@ export function ProjectControlView({
   project,
   boundWorkItems = [],
   workTrackerAvailable = true,
+  sourceStatus = "unknown",
 }: {
   project: ProjectControlProject;
   boundWorkItems?: ObservatoryWorkItemRow[];
   workTrackerAvailable?: boolean;
+  sourceStatus?: "fresh" | "stale" | "unknown";
 }) {
   const stages = topologicallyOrderProjectStages(project);
   const stagesById = new Map(project.stages.map((stage) => [stage.stage_id, stage]));
@@ -55,6 +57,7 @@ export function ProjectControlView({
       project.work_packages.filter((workPackage) => workPackage.stage_id === stage.stage_id),
     ]),
   );
+  const freshness = sourceStatus === "stale" ? "stale" : project.project.freshness;
 
   return (
     <div className="project-control-view">
@@ -67,10 +70,16 @@ export function ProjectControlView({
         <dl className="project-control-meta">
           <div><dt>Authority</dt><dd>OpenClaw Orchestrator</dd></div>
           <div><dt>Plan</dt><dd>Plan revision {project.project.approved_plan_revision}</dd></div>
-          <div><dt>Freshness</dt><dd>{words(project.project.freshness)}</dd></div>
+          <div><dt>Freshness</dt><dd>{words(freshness)}</dd></div>
           <div><dt>Updated</dt><dd>{formatTime(project.project.updated_at)} UTC</dd></div>
         </dl>
       </header>
+
+      {sourceStatus === "stale" ? (
+        <p className="project-execution-callout" role="status">
+          Showing last-known-good Project Control facts. Source refresh is stale.
+        </p>
+      ) : null}
 
       {project.project.revision_drift ? (
         <p className="project-control-alert" role="alert">

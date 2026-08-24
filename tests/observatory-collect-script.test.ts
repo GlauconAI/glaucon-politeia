@@ -57,6 +57,8 @@ describe("Observatory collection script", () => {
     expect(source).toContain("readPreviousProjectControl");
     expect(source).toContain("retainProjectControlLastKnownGood");
     expect(source).toContain("ObservatoryCollectionEnvelopeV6Schema.safeParse");
+    expect(source).toContain("computeObservatorySnapshotDigest(previous.data)");
+    expect(source).toContain("computeProjectControlDigest(previous.data.project_controls)");
   });
 });
 

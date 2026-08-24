@@ -34,6 +34,16 @@ function DecisionList({ title, decisions }: { title: string; decisions: Decision
                   </ul>
                   <p>Downstream Stages: {decision.downstream_stage_ids.length ? decision.downstream_stage_ids.join(", ") : "none"}</p>
                   {decision.audit_summary ? <small>{decision.audit_summary}</small> : null}
+                  {decision.status !== "recorded" ? (
+                    <div className="decision-center-suggested-actions">
+                      <strong>Suggested actions</strong>
+                      <ul>
+                        <li><span>Accept</span> — record the selected option through the Orchestrator command boundary.</li>
+                        <li><span>Request evidence</span> — keep the Gate closed and request the missing proof.</li>
+                        <li><span>Return minimal work package</span> — return only the affected scope for correction.</li>
+                      </ul>
+                    </div>
+                  ) : null}
                   <footer>
                     <span>{decision.gateTitle ?? "No Gate"}</span>
                     <Link href={`/dashboard/projects/${decision.projectSlug}${decision.stage_id ? `#${decision.stage_id}` : decision.gate_id ? `#${decision.gate_id}` : ""}`}>Open Project context →</Link>
@@ -78,7 +88,8 @@ export function DecisionCenter({ decisions }: { decisions: Decision[] }) {
       </div>
       <p className="project-control-notice">This view is read-only. Decisions become authoritative only through the Orchestrator command boundary.</p>
       <DecisionList title="Needs evidence" decisions={filtered.filter((decision) => decision.status === "evidence_blocked")} />
-      <DecisionList title="Ready for decision" decisions={filtered.filter((decision) => decision.status === "ready" || decision.status === "pending")} />
+      <DecisionList title="Pending decisions" decisions={filtered.filter((decision) => decision.status === "pending")} />
+      <DecisionList title="Ready decision packages" decisions={filtered.filter((decision) => decision.status === "ready")} />
       <DecisionList title="Decision audit" decisions={filtered.filter((decision) => decision.status === "recorded")} />
     </div>
   );

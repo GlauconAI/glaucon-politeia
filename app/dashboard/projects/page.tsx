@@ -86,6 +86,16 @@ export default async function ProjectsPage({
           (source) => source.domain === "project_executions",
         )
       : undefined;
+  const projectControlSource =
+    state.status === "ready" && "source_health" in state.snapshot
+      ? state.snapshot.source_health.find(
+          (source) => source.domain === "project_controls",
+        )
+      : undefined;
+  const projectControlSnapshot =
+    state.status === "ready" && "project_controls" in state.snapshot
+      ? state.snapshot.project_controls
+      : null;
   const projectExecutionEntries =
     state.status === "ready"
       ? buildProjectExecutionDirectory(
@@ -109,10 +119,17 @@ export default async function ProjectsPage({
       {state.status === "ready" ? (
         <>
           <ProjectControlPortfolio
-            snapshot={
-              "project_controls" in state.snapshot
-                ? state.snapshot.project_controls
-                : null
+            snapshot={projectControlSnapshot}
+            sourceStatus={
+              projectControlSource?.status === "fresh" ||
+              projectControlSource?.status === "stale"
+                ? projectControlSource.status
+                : "unknown"
+            }
+            collectedAt={
+              projectControlSnapshot?.collected_at ??
+              projectControlSource?.collected_at ??
+              null
             }
           />
           <ProjectExecutionPortfolio

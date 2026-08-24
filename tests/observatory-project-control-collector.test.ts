@@ -165,4 +165,37 @@ describe("collectProjectControlSnapshot", () => {
       error_code: "PROJECT_CONTROL_SOURCE_MISSING",
     });
   });
+
+  it("does not retain a digest-invalid prior Project Control projection", async () => {
+    const previousSnapshot = ProjectControlSnapshotSchema.parse(
+      asgardProjectControlFixture(),
+    );
+    previousSnapshot.digest = "f".repeat(64);
+    const candidate = {
+      snapshot: null,
+      sourceHealth: {
+        domain: "project_controls" as const,
+        status: "unknown" as const,
+        health: "degraded" as const,
+        collected_at: "2026-08-23T20:10:00.000Z",
+        last_success_at: null,
+        asset_count: 0,
+        error_code: "PROJECT_CONTROL_SOURCE_MISSING",
+      },
+    };
+
+    expect(
+      retainProjectControlLastKnownGood(candidate, {
+        snapshot: previousSnapshot,
+        sourceHealth: {
+          domain: "project_controls",
+          status: "fresh",
+          health: "healthy",
+          collected_at: previousSnapshot.collected_at,
+          last_success_at: previousSnapshot.collected_at,
+          asset_count: 1,
+        },
+      }),
+    ).toEqual(candidate);
+  });
 });

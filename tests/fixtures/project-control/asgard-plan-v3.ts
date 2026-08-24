@@ -60,7 +60,7 @@ function stage(seed: Seed) {
     verification_ids: [],
     gate_ids: seed.id === "stage-07a" ? ["gate-3"] : [],
     admission: {
-      eligible: seed.status === "active",
+      eligible: false,
       evaluation: completed ? "terminal" : blocked ? "blocked" : "admitted",
       reason_codes: completed ? ["terminal"] : blocked ? ["dependency_missing"] : ["already_admitted"],
       missing_dependency_ids: blocked ? seed.deps : [],
