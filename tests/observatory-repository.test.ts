@@ -409,6 +409,10 @@ describe("Observatory repository", () => {
         ownerId: "22222222-2222-4222-8222-222222222222",
         projectRef: "dashboard",
         milestoneRef: "OBS-M3",
+        projectKey: "asgard/archaea-gacha-game",
+        planRevision: 3,
+        stageId: "stage-05b",
+        workPackageId: "wp-05b-coordinate-slice",
       }),
     ).rejects.toMatchObject({
       code: "VERSION_CONFLICT",
@@ -426,6 +430,10 @@ describe("Observatory repository", () => {
         p_owner_id: "22222222-2222-4222-8222-222222222222",
         p_project_ref: "dashboard",
         p_milestone_ref: "OBS-M3",
+        p_project_key: "asgard/archaea-gacha-game",
+        p_plan_revision: 3,
+        p_stage_id: "stage-05b",
+        p_work_package_id: "wp-05b-coordinate-slice",
       },
     );
   });
@@ -452,6 +460,10 @@ describe("Observatory repository", () => {
         ownerId: null,
         projectRef: null,
         milestoneRef: null,
+        projectKey: null,
+        planRevision: null,
+        stageId: null,
+        workPackageId: null,
       }),
     ).rejects.toMatchObject({ code: "WORK_ITEM_NOT_FOUND" });
   });
@@ -485,6 +497,10 @@ describe("Observatory repository", () => {
               ownerId: null,
               projectRef: null,
               milestoneRef: null,
+              projectKey: null,
+              planRevision: null,
+              stageId: null,
+              workPackageId: null,
             });
 
       await expect(promise).rejects.toMatchObject({

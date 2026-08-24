@@ -43,6 +43,12 @@ const NullableReferenceSchema = QuickCaptureTextSchema.max(
 )
   .nullable()
   .transform((value) => value || null);
+const NullableProjectKeySchema = QuickCaptureTextSchema.max(256)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/u)
+  .nullable();
+const NullableControlIdSchema = QuickCaptureTextSchema.max(128)
+  .regex(/^[a-z0-9][a-z0-9._:-]{0,127}$/iu)
+  .nullable();
 
 export const ObservatoryQuickCaptureInputSchema = z.strictObject({
   type: z.enum(OBSERVATORY_WORK_ITEM_TYPES),
@@ -133,6 +139,20 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   ownerId: NullableOwnerSchema,
   projectRef: NullableReferenceSchema,
   milestoneRef: NullableReferenceSchema,
+  projectKey: NullableProjectKeySchema,
+  planRevision: z.number().int().nonnegative().nullable(),
+  stageId: NullableControlIdSchema,
+  workPackageId: NullableControlIdSchema,
+}).superRefine((input, context) => {
+  const binding = [input.projectKey, input.planRevision, input.stageId, input.workPackageId];
+  const present = binding.filter((value) => value !== null).length;
+  if (present !== 0 && present !== binding.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["projectKey"],
+      message: "Project Control binding must be fully specified or fully empty.",
+    });
+  }
 });
 
 export const ObservatoryWorkItemTransitionInputSchema = z.strictObject({

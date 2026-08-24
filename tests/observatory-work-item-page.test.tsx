@@ -43,6 +43,9 @@ vi.mock("@/lib/observatory/repository", () => ({
     listWorkItemClaims: mocks.listWorkItemClaims,
   }),
 }));
+vi.mock("@/lib/observatory/dashboard-state", () => ({
+  loadObservatoryOverviewState: async () => ({ status: "empty" }),
+}));
 
 import WorkItemPage from "@/app/dashboard/work-items/[id]/page";
 
@@ -57,6 +60,10 @@ const item = {
   acceptance_criteria: "",
   project_ref: null,
   milestone_ref: null,
+  project_key: null,
+  plan_revision: null,
+  stage_id: null,
+  work_package_id: null,
   idempotency_key: "capture-1",
   version: 1,
   created_by: "22222222-2222-4222-8222-222222222222",

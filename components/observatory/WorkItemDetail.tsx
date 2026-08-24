@@ -18,6 +18,8 @@ import type {
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
 } from "@/lib/observatory/repository";
+import type { ProjectControlSnapshot } from "@/lib/observatory/project-control-schema";
+import { classifyProjectControlBinding } from "@/lib/observatory/project-control";
 import {
   OBSERVATORY_AGENT_ACTION_CLASSES,
   OBSERVATORY_AGENT_RISK_LEVELS,
@@ -52,6 +54,7 @@ type WorkItemDetailProps = {
   claimPolicyAction?: MutationAction;
   cancelClaimAction?: MutationAction;
   evaluatedAt?: string;
+  projectControls?: ProjectControlSnapshot | null;
 };
 
 const stateLabels = {
@@ -147,6 +150,7 @@ export function WorkItemDetail({
   claimPolicyAction = configureObservatoryAgentClaimPolicyAction,
   cancelClaimAction = cancelObservatoryAgentClaimAction,
   evaluatedAt = item.updated_at,
+  projectControls = null,
 }: WorkItemDetailProps) {
   const [updateState, updateFormAction, updating] = useActionState(
     updateAction,
@@ -172,6 +176,37 @@ export function WorkItemDetail({
   );
   const [priority, setPriority] = useState(item.priority ?? "");
   const [ownerId, setOwnerId] = useState(item.owner_id ?? "");
+  const bindingOptions = projectControls?.projects.flatMap((project) =>
+    project.work_packages.map((workPackage) => {
+      const stage = project.stages.find((candidate) => candidate.stage_id === workPackage.stage_id);
+      return {
+        key: `${project.project.project_key}\u001f${project.project.approved_plan_revision}\u001f${workPackage.stage_id}\u001f${workPackage.work_package_id}`,
+        projectKey: project.project.project_key,
+        planRevision: project.project.approved_plan_revision,
+        stageId: workPackage.stage_id,
+        workPackageId: workPackage.work_package_id,
+        label: `${project.project.title} · Plan ${project.project.approved_plan_revision} · ${stage?.title ?? workPackage.stage_id} · ${workPackage.title}`,
+      };
+    }),
+  ) ?? [];
+  const currentBinding = item.project_key && item.plan_revision !== null && item.stage_id && item.work_package_id
+    ? {
+        key: `${item.project_key}\u001f${item.plan_revision}\u001f${item.stage_id}\u001f${item.work_package_id}`,
+        projectKey: item.project_key,
+        planRevision: item.plan_revision,
+        stageId: item.stage_id,
+        workPackageId: item.work_package_id,
+        label: `${item.project_key} · Plan ${item.plan_revision} · ${item.stage_id} · ${item.work_package_id}`,
+      }
+    : null;
+  const allBindingOptions = currentBinding && !bindingOptions.some((option) => option.key === currentBinding.key)
+    ? [currentBinding, ...bindingOptions]
+    : bindingOptions;
+  const [bindingKey, setBindingKey] = useState(currentBinding?.key ?? "");
+  const selectedBinding = allBindingOptions.find((option) => option.key === bindingKey) ?? null;
+  const bindingStatus = currentBinding
+    ? classifyProjectControlBinding(currentBinding, projectControls)
+    : null;
   const [, syncControlledFields] = useReducer((version: number) => version + 1, 0);
   useEffect(() => {
     if (updateState.status !== "idle") {
@@ -319,6 +354,29 @@ export function WorkItemDetail({
               maxLength={160}
             />
           </label>
+          <label className="work-item-wide-field">
+            <span>Project Control binding</span>
+            <select
+              aria-describedby="project-control-binding-help"
+              value={bindingKey}
+              onChange={(event) => setBindingKey(event.target.value)}
+            >
+              <option value="">Not bound</option>
+              {allBindingOptions.map((option) => (
+                <option key={option.key} value={option.key}>{option.label}</option>
+              ))}
+            </select>
+            <small id="project-control-binding-help">
+              {projectControls
+                ? "A Work Item may update only its Work Package workflow; parent Stage and Gate remain Orchestrator-owned."
+                : "Project Control source unavailable. Existing binding is preserved unless explicitly cleared."}
+              {bindingStatus ? ` Current status: ${bindingStatus.status.replaceAll("_", " ")}.` : ""}
+            </small>
+          </label>
+          <input type="hidden" name="projectKey" value={selectedBinding?.projectKey ?? ""} />
+          <input type="hidden" name="planRevision" value={selectedBinding?.planRevision ?? ""} />
+          <input type="hidden" name="stageId" value={selectedBinding?.stageId ?? ""} />
+          <input type="hidden" name="workPackageId" value={selectedBinding?.workPackageId ?? ""} />
           <button className="button-primary" type="submit" disabled={updating}>
             {updating ? "Saving…" : "Save fields"}
           </button>

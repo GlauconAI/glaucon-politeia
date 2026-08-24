@@ -209,10 +209,9 @@ export function WorkTrackerBoard({
                           {item.title}
                         </Link>
                         <small>
-                          {item.project_ref ?? "No project"}
-                          {item.milestone_ref
-                            ? ` · ${item.milestone_ref}`
-                            : ""}
+                          {item.project_key && item.plan_revision !== null
+                            ? `${item.project_key} · Plan ${item.plan_revision} · ${item.stage_id} · ${item.work_package_id}`
+                            : `${item.project_ref ?? "No project"}${item.milestone_ref ? ` · ${item.milestone_ref}` : ""}`}
                         </small>
                         {targets.length > 0 ? (
                           <form

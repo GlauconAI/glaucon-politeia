@@ -252,6 +252,10 @@ describe("Work Tracker mutation actions", () => {
     formData.set("ownerId", ownerId);
     formData.set("projectRef", "  dashboard  ");
     formData.set("milestoneRef", "");
+    formData.set("projectKey", "asgard/archaea-gacha-game");
+    formData.set("planRevision", "3");
+    formData.set("stageId", "stage-05b");
+    formData.set("workPackageId", "wp-05b-coordinate-slice");
 
     await expect(
       updateObservatoryWorkItemAction({ status: "idle" }, formData),
@@ -267,6 +271,10 @@ describe("Work Tracker mutation actions", () => {
       ownerId,
       projectRef: "dashboard",
       milestoneRef: null,
+      projectKey: "asgard/archaea-gacha-game",
+      planRevision: 3,
+      stageId: "stage-05b",
+      workPackageId: "wp-05b-coordinate-slice",
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(

@@ -8,6 +8,7 @@ import {
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 export const dynamic = "force-dynamic";
 
@@ -58,11 +59,13 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
   let evidence;
   let events;
   let claims;
+  let overviewState;
   try {
-    [evidence, events, claims] = await Promise.all([
+    [evidence, events, claims, overviewState] = await Promise.all([
       repository.listWorkItemEvidence(id),
       repository.listWorkItemEvents(id),
       repository.listWorkItemClaims(id),
+      loadObservatoryOverviewState(),
     ]);
   } catch {
     return unavailableState();
@@ -76,6 +79,11 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
       claims={claims}
       evaluatedAt={new Date().toISOString()}
       currentAdmin={currentAdmin}
+      projectControls={
+        overviewState.status === "ready" && "project_controls" in overviewState.snapshot
+          ? overviewState.snapshot.project_controls
+          : null
+      }
     />
   );
 }

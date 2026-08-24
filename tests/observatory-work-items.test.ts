@@ -196,6 +196,10 @@ describe("Work Tracker workflow contract", () => {
       ownerId: "22222222-2222-4222-8222-222222222222",
       projectRef: null,
       milestoneRef: "OBS-M3",
+      projectKey: "asgard/archaea-gacha-game",
+      planRevision: 3,
+      stageId: "stage-05b",
+      workPackageId: "wp-05b-coordinate-slice",
     });
 
     expect(result.success).toBe(true);
@@ -214,8 +218,39 @@ describe("Work Tracker workflow contract", () => {
         ownerId: null,
         projectRef: null,
         milestoneRef: null,
+        projectKey: null,
+        planRevision: null,
+        stageId: null,
+        workPackageId: null,
         isAdmin: true,
       }).success,
+    ).toBe(false);
+  });
+
+  it("requires Project Control bindings to be complete and stable", () => {
+    const base = {
+      workItemId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      type: "feature",
+      title: "Bind the coordinate slice",
+      description: "",
+      acceptanceCriteria: "The binding is visible.",
+      priority: "high",
+      ownerId: "22222222-2222-4222-8222-222222222222",
+      projectRef: null,
+      milestoneRef: null,
+      projectKey: "asgard/archaea-gacha-game",
+      planRevision: 3,
+      stageId: "stage-05b",
+      workPackageId: "wp-05b-coordinate-slice",
+    };
+
+    expect(ObservatoryWorkItemUpdateInputSchema.safeParse(base).success).toBe(true);
+    expect(
+      ObservatoryWorkItemUpdateInputSchema.safeParse({ ...base, workPackageId: null }).success,
+    ).toBe(false);
+    expect(
+      ObservatoryWorkItemUpdateInputSchema.safeParse({ ...base, projectKey: "/private/project" }).success,
     ).toBe(false);
   });
 

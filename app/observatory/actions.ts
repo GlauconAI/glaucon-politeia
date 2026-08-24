@@ -135,6 +135,8 @@ function mutationFormError(error: unknown): string {
       return "Only owner-approved Low-risk Features or Bugs with bounded paths can be claimed.";
     case "CLAIM_VERSION_CONFLICT":
       return "This Agent Claim changed. Refresh before trying again.";
+    case "PROJECT_CONTROL_BINDING_INVALID":
+      return "Choose one complete Project, Plan, Stage, and Work Package binding.";
     default:
       return "The work item could not be changed. Try again.";
   }
@@ -254,6 +256,12 @@ export async function updateObservatoryWorkItemAction(
     ownerId: nullableText(formData, "ownerId"),
     projectRef: nullableText(formData, "projectRef"),
     milestoneRef: nullableText(formData, "milestoneRef"),
+    projectKey: nullableText(formData, "projectKey"),
+    planRevision: nullableText(formData, "planRevision") === null
+      ? null
+      : Number(nullableText(formData, "planRevision")),
+    stageId: nullableText(formData, "stageId"),
+    workPackageId: nullableText(formData, "workPackageId"),
   });
   if (!validation.success) {
     return fieldErrorState(validation.error.flatten().fieldErrors);

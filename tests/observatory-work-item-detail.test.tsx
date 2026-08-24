@@ -8,6 +8,8 @@ import type {
   ObservatoryWorkItemRow,
   ObservatoryWorkItemClaimRow,
 } from "@/lib/observatory/repository";
+import { ProjectControlSnapshotSchema } from "@/lib/observatory/project-control-schema";
+import { asgardProjectControlFixture } from "./fixtures/project-control/asgard-plan-v3";
 
 const item: ObservatoryWorkItemRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -20,6 +22,10 @@ const item: ObservatoryWorkItemRow = {
   acceptance_criteria: "The item can reach Done.",
   project_ref: "dashboard",
   milestone_ref: "OBS-M3",
+  project_key: null,
+  plan_revision: null,
+  stage_id: null,
+  work_package_id: null,
   idempotency_key: "capture-1",
   version: 3,
   created_by: "22222222-2222-4222-8222-222222222222",
@@ -89,6 +95,27 @@ const activeClaim: ObservatoryWorkItemClaimRow = {
 };
 
 describe("WorkItemDetail", () => {
+  it("offers only validated Project Control Work Package bindings", () => {
+    render(
+      <WorkItemDetail
+        item={item}
+        evidence={evidence}
+        events={events}
+        projectControls={ProjectControlSnapshotSchema.parse(asgardProjectControlFixture())}
+        currentAdmin={{ user_id: item.created_by, display_name: "Glaucon", username: "glaucon" }}
+        updateAction={successAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+
+    expect(screen.getByLabelText(/project control binding/i)).toHaveTextContent(
+      "Coordinate interaction slice",
+    );
+    expect(screen.getByText(/parent Stage and Gate remain Orchestrator-owned/i)).toBeInTheDocument();
+  });
+
   it("renders editable fields, Ready Gate guidance, and allowed transitions", () => {
     render(
       <WorkItemDetail

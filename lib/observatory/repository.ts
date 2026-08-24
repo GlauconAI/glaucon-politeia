@@ -41,6 +41,10 @@ export interface ObservatoryWorkItemRow {
   acceptance_criteria: string;
   project_ref: string | null;
   milestone_ref: string | null;
+  project_key: string | null;
+  plan_revision: number | null;
+  stage_id: string | null;
+  work_package_id: string | null;
   idempotency_key: string;
   version: number;
   created_by: string;
@@ -185,6 +189,7 @@ export type ObservatoryRepositoryErrorCode =
   | "EVIDENCE_NOT_FOUND"
   | "CLAIM_ACTIVE"
   | "CLAIM_POLICY_INVALID"
+  | "PROJECT_CONTROL_BINDING_INVALID"
   | "CLAIM_VERSION_CONFLICT";
 
 export class ObservatoryRepositoryError extends Error {
@@ -268,6 +273,12 @@ function mutationError(
       "The Agent Claim policy is invalid.",
     );
   }
+  if (marker.includes("OBSERVATORY_PROJECT_CONTROL_BINDING_INVALID")) {
+    return new ObservatoryRepositoryError(
+      "PROJECT_CONTROL_BINDING_INVALID",
+      "The Project Control binding must be fully specified or empty.",
+    );
+  }
 
   return operation === "create"
     ? new ObservatoryRepositoryError(
@@ -335,7 +346,7 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_items")
           .select(
-            "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+            "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,project_key,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
           )
           .order("updated_at", { ascending: false }),
       );
@@ -345,7 +356,7 @@ export function createObservatoryRepository(
       const { data, error } = await client
         .from("observatory_work_items")
         .select(
-          "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+          "id,type,title,description,state,priority,owner_id,acceptance_criteria,project_ref,milestone_ref,project_key,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -457,6 +468,10 @@ export function createObservatoryRepository(
           p_owner_id: input.ownerId,
           p_project_ref: input.projectRef,
           p_milestone_ref: input.milestoneRef,
+          p_project_key: input.projectKey,
+          p_plan_revision: input.planRevision,
+          p_stage_id: input.stageId,
+          p_work_package_id: input.workPackageId,
         },
       );
 
