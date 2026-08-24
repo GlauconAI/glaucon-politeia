@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
@@ -11,10 +12,8 @@ const verifierSource = readFileSync(
   join(process.cwd(), "scripts/observatory/verify-snapshot.ts"),
   "utf8",
 );
-const refreshSource = readFileSync(
-  join(process.cwd(), "scripts/observatory/refresh.ts"),
-  "utf8",
-);
+const refreshScriptPath = join(process.cwd(), "scripts/observatory/refresh.ts");
+const refreshSource = readFileSync(refreshScriptPath, "utf8");
 const cronSource = readFileSync(
   join(process.cwd(), "scripts/observatory/cron-refresh.zsh"),
   "utf8",
@@ -54,6 +53,24 @@ describe("Observatory collection script", () => {
     expect(cronSource).toContain("OBSERVATORY_PROJECT_EXECUTION_PATH");
     expect(cronSource).toContain("OBSERVATORY_PROJECT_CONTROL_PATH");
     expect(cronSource).not.toContain("/Users/");
+  });
+
+  it("fails closed instead of writing v5 when Project Control configuration is omitted", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        refreshScriptPath,
+        "registry.html",
+        "workspace",
+        "vault",
+        "config.json",
+        "project-execution-snapshot.json",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("OBSERVATORY_REFRESH_CONFIG_INVALID");
   });
 
   it("retains a validated Project Control last-known-good when the source disappears", () => {

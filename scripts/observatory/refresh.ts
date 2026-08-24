@@ -146,9 +146,15 @@ async function main(): Promise<void> {
     projectExecutionPath,
     projectControlPath,
   ] = process.argv.slice(2);
-  if (!registryPath || !workspaceRoot || !vaultRoot || !projectExecutionPath) {
+  if (
+    !registryPath ||
+    !workspaceRoot ||
+    !vaultRoot ||
+    !projectExecutionPath ||
+    !projectControlPath
+  ) {
     process.stderr.write(
-      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, Vault, and Project execution export paths.\n",
+      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, Vault, Project execution, and Project Control export paths.\n",
     );
     process.exitCode = 2;
     return;
@@ -180,9 +186,8 @@ async function main(): Promise<void> {
       resolve(vaultRoot),
       "--project-execution-path",
       resolve(projectExecutionPath),
-      ...(projectControlPath
-        ? ["--project-control-path", resolve(projectControlPath)]
-        : []),
+      "--project-control-path",
+      resolve(projectControlPath),
       ...(configPath ? ["--config-path", resolve(configPath)] : []),
     ];
     const collected = await runStep(
