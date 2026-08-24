@@ -29,14 +29,6 @@ create index observatory_work_items_project_control_binding_idx
 on public.observatory_work_items(project_key, plan_revision, stage_id, work_package_id)
 where project_key is not null;
 
-revoke all privileges on function public.update_observatory_work_item(
-  uuid, integer, text, text, text, text, text, uuid, text, text
-) from public, anon, authenticated, service_role;
-
-drop function public.update_observatory_work_item(
-  uuid, integer, text, text, text, text, text, uuid, text, text
-);
-
 create or replace function public.update_observatory_work_item(
   p_work_item_id uuid,
   p_expected_version integer,

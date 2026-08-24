@@ -28,5 +28,6 @@ describe("Project Control Work Item binding migration", () => {
     expect(source).toContain("'project_key', current_item.project_key");
     expect(source).toContain("'work_package_id', updated_item.work_package_id");
     expect(source).not.toContain("update public.project_control");
+    expect(source).not.toContain("drop function public.update_observatory_work_item");
   });
 });
