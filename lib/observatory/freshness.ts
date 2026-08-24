@@ -15,6 +15,7 @@ const thresholdByDomain: Record<ObservatorySourceDomain, number> = {
   operations: FIFTEEN_MINUTES_MS,
   source_repositories: TWENTY_FOUR_HOURS_MS,
   project_executions: FIFTEEN_MINUTES_MS,
+  project_controls: FIFTEEN_MINUTES_MS,
 };
 
 export function deriveFreshness(

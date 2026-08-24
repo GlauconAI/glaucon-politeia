@@ -186,6 +186,6 @@ export function asgardProjectControlFixture() {
     },
     collected_at: at,
   };
-  const payload = { schema_version: "1.0.0", collected_at: at, summary: { project_count: 1, ...project.summary }, projects: [project] };
+  const payload = { schema_version: "1.0.0" as const, collected_at: at, summary: { project_count: 1, ...project.summary }, projects: [project] };
   return { ...payload, digest: createHash("sha256").update(JSON.stringify(canonicalize(payload))).digest("hex") };
 }

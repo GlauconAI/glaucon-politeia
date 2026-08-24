@@ -6,6 +6,7 @@ export interface ObservatoryCollectOptions {
     vaultRoot: string;
     configPath?: string;
     projectExecutionPath: string;
+    projectControlPath?: string;
   } | null;
 }
 
@@ -29,6 +30,7 @@ export function parseObservatoryCollectOptions(
         "--vault-root",
         "--config-path",
         "--project-execution-path",
+        "--project-control-path",
       ].includes(flag)
     ) {
       throw new Error(`Unknown System Observatory collection option: ${flag ?? "missing"}.`);
@@ -60,6 +62,9 @@ export function parseObservatoryCollectOptions(
             workspaceRoot,
             vaultRoot,
             projectExecutionPath: projectExecutionPath!,
+            ...(values.get("--project-control-path")
+              ? { projectControlPath: values.get("--project-control-path") }
+              : {}),
             ...(values.get("--config-path")
               ? { configPath: values.get("--config-path") }
               : {}),

@@ -39,10 +39,10 @@ describe("ProjectControlSnapshotSchema", () => {
     duplicateCanonical.projects[0].artifacts.push({ ...duplicateCanonical.projects[0].artifacts[0], artifact_id: "artifact-copy" });
     expect(ProjectControlSnapshotSchema.safeParse(duplicateCanonical).success).toBe(false);
     const gate = asgardProjectControlFixture();
-    gate.projects[0].gates[0].decision_id = null;
+    (gate.projects[0].gates[0] as { decision_id: string | null }).decision_id = null;
     expect(ProjectControlSnapshotSchema.safeParse(gate).success).toBe(false);
     const decision = asgardProjectControlFixture();
-    decision.projects[0].user_decisions[0].selected_option_id = null;
+    (decision.projects[0].user_decisions[0] as { selected_option_id: string | null }).selected_option_id = null;
     expect(ProjectControlSnapshotSchema.safeParse(decision).success).toBe(false);
   });
 

@@ -591,7 +591,7 @@ function canonicalize(value: unknown): unknown {
 }
 
 export function computeProjectControlDigest(
-  snapshot: z.infer<typeof ProjectControlSnapshotSchema>,
+  snapshot: { digest: string; [key: string]: unknown },
 ): string {
   const { digest: _digest, ...payload } = snapshot;
   return createHash("sha256")

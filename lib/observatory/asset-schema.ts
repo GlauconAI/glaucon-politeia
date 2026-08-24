@@ -23,6 +23,7 @@ export const OBSERVATORY_SOURCE_DOMAINS = [
   "operations",
   "source_repositories",
   "project_executions",
+  "project_controls",
 ] as const;
 
 export const OBSERVATORY_ASSET_MAX_ITEMS = 5_000;

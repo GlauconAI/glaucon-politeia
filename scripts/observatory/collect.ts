@@ -18,6 +18,7 @@ import {
   upgradeObservatorySnapshotToV3,
   upgradeObservatorySnapshotToV4,
   upgradeObservatorySnapshotToV5,
+  upgradeObservatorySnapshotToV6,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
@@ -35,6 +36,10 @@ import {
   ObservatoryProjectExecutionCollectionError,
   collectProjectExecutionSnapshot,
 } from "#observatory-project-execution-collector";
+import {
+  ObservatoryProjectControlCollectionError,
+  collectProjectControlSnapshot,
+} from "#observatory-project-control-collector";
 
 const files: AtomicFileAdapter = {
   openExclusive: async (path) => {
@@ -198,7 +203,7 @@ async function main(): Promise<void> {
         { now: () => new Date() },
       ),
     );
-    snapshot = upgradeObservatorySnapshotToV5(
+    const executionSnapshot = upgradeObservatorySnapshotToV5(
       repositorySnapshot,
       await collectProjectExecutionSnapshot(
         {
@@ -211,6 +216,21 @@ async function main(): Promise<void> {
         },
       ),
     );
+    snapshot = options.systemRoots.projectControlPath
+      ? upgradeObservatorySnapshotToV6(
+          executionSnapshot,
+          await collectProjectControlSnapshot(
+            {
+              exportPath: resolve(options.systemRoots.projectControlPath),
+            },
+            {
+              realpath,
+              readTextFile: readTextFileBounded,
+              now: () => new Date(),
+            },
+          ),
+        )
+      : executionSnapshot;
     await writeObservatorySnapshotWithSourceProtection(
       snapshot,
       { registryPath, destinationPath },
@@ -234,7 +254,8 @@ main().catch((error: unknown) => {
   if (
     error instanceof ObservatoryCollectorError ||
     error instanceof GovernanceCollectionError ||
-    error instanceof ObservatoryProjectExecutionCollectionError
+    error instanceof ObservatoryProjectExecutionCollectionError ||
+    error instanceof ObservatoryProjectControlCollectionError
   ) {
     process.stderr.write(`${error.code}: ${error.message}\n`);
   } else {
