@@ -84,6 +84,13 @@ export function listProjectControlDecisions(snapshot: ProjectControlSnapshot) {
         ...decision,
         projectTitle: project.project.title,
         projectSlug: project.project.project_slug,
+        stageTitle:
+          project.stages.find((stage) => stage.stage_id === decision.stage_id)
+            ?.title ?? null,
+        ownerAgentId:
+          project.stages.find((stage) => stage.stage_id === decision.stage_id)
+            ?.accountable_owner_agent_id ??
+          project.project.accountable_owner_agent_id,
         gateTitle:
           project.gates.find((gate) => gate.gate_id === decision.gate_id)
             ?.title ?? null,

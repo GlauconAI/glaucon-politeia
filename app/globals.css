@@ -5490,7 +5490,8 @@ body {
 
 .project-control-card dl,
 .project-control-meta,
-.project-control-stage-meta {
+.project-control-stage-meta,
+.project-control-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -5498,7 +5499,8 @@ body {
 
 .project-control-card dl div,
 .project-control-meta div,
-.project-control-stage-meta div {
+.project-control-stage-meta div,
+.project-control-summary-grid div {
   min-width: 0;
   padding: 9px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -5507,7 +5509,8 @@ body {
 
 .project-control-card dt,
 .project-control-meta dt,
-.project-control-stage-meta dt {
+.project-control-stage-meta dt,
+.project-control-summary-grid dt {
   color: var(--muted);
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -5515,7 +5518,8 @@ body {
 
 .project-control-card dd,
 .project-control-meta dd,
-.project-control-stage-meta dd {
+.project-control-stage-meta dd,
+.project-control-summary-grid dd {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
   color: var(--strong);
@@ -5631,7 +5635,15 @@ body {
 .project-control-ledger-list small { grid-column: 1 / -1; overflow-wrap: anywhere; color: var(--muted); }
 
 .decision-center { display: grid; gap: 18px; }
+.decision-center-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
 .decision-center-filter { display: grid; gap: 5px; min-width: min(100%, 240px); }
+.decision-center-options { display: grid; gap: 6px; margin: 12px 0; padding: 0; list-style: none; }
+.decision-center-options li { display: grid; gap: 3px; padding: 9px; border-left: 2px solid rgba(56, 189, 248, 0.5); }
+.decision-center-options span { color: var(--muted); }
 .decision-center-list article > p { overflow-wrap: anywhere; color: var(--muted); }
 .decision-center-list footer { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; margin-top: 12px; }
 .decision-center-list a { color: #7dd3fc; }
@@ -5658,7 +5670,8 @@ body {
   }
 
   .project-control-header,
-  .project-control-ledger-grid {
+  .project-control-ledger-grid,
+  .decision-center-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -5709,7 +5722,9 @@ body {
 
   .project-control-card dl,
   .project-control-meta,
-  .project-control-stage-meta {
+  .project-control-stage-meta,
+  .project-control-summary-grid,
+  .decision-center-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 

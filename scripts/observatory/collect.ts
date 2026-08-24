@@ -25,6 +25,7 @@ import {
 } from "#observatory-collector";
 import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
+import { ObservatoryCollectionEnvelopeV6Schema } from "#observatory-collection-schema";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
 import { collectSourceRepositories } from "#observatory-source-repository-discovery";
@@ -39,6 +40,8 @@ import {
 import {
   ObservatoryProjectControlCollectionError,
   collectProjectControlSnapshot,
+  retainProjectControlLastKnownGood,
+  type ProjectControlCollectionResult,
 } from "#observatory-project-control-collector";
 
 const files: AtomicFileAdapter = {
@@ -114,6 +117,31 @@ function isMissing(error: unknown): boolean {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+async function readPreviousProjectControl(
+  destinationPath: string,
+): Promise<ProjectControlCollectionResult | undefined> {
+  let text: string;
+  try {
+    text = await readTextFileBounded(destinationPath);
+  } catch (error) {
+    if (isMissing(error)) return undefined;
+    throw error;
+  }
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const previous = ObservatoryCollectionEnvelopeV6Schema.safeParse(candidate);
+  if (!previous.success || !previous.data.project_controls) return undefined;
+  const sourceHealth = previous.data.source_health.find(
+    (source) => source.domain === "project_controls",
+  );
+  if (!sourceHealth) return undefined;
+  return { snapshot: previous.data.project_controls, sourceHealth };
 }
 
 const identities: FileIdentityAdapter = {
@@ -216,10 +244,11 @@ async function main(): Promise<void> {
         },
       ),
     );
-    snapshot = options.systemRoots.projectControlPath
-      ? upgradeObservatorySnapshotToV6(
-          executionSnapshot,
-          await collectProjectControlSnapshot(
+    if (options.systemRoots.projectControlPath) {
+      const previousProjectControl = await readPreviousProjectControl(
+        destinationPath,
+      );
+      const candidateProjectControl = await collectProjectControlSnapshot(
             {
               exportPath: resolve(options.systemRoots.projectControlPath),
             },
@@ -228,9 +257,17 @@ async function main(): Promise<void> {
               readTextFile: readTextFileBounded,
               now: () => new Date(),
             },
-          ),
-        )
-      : executionSnapshot;
+          );
+      snapshot = upgradeObservatorySnapshotToV6(
+        executionSnapshot,
+        retainProjectControlLastKnownGood(
+          candidateProjectControl,
+          previousProjectControl,
+        ),
+      );
+    } else {
+      snapshot = executionSnapshot;
+    }
     await writeObservatorySnapshotWithSourceProtection(
       snapshot,
       { registryPath, destinationPath },

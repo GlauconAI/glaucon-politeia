@@ -46,6 +46,47 @@ describe("ProjectControlSnapshotSchema", () => {
     expect(ProjectControlSnapshotSchema.safeParse(decision).success).toBe(false);
   });
 
+  it("rejects contradictory Stage admission and controller facts", () => {
+    const eligibleButBlocked = asgardProjectControlFixture();
+    eligibleButBlocked.projects[0].stages[1].admission.reason_codes = [
+      "dependency_missing",
+    ];
+    expect(ProjectControlSnapshotSchema.safeParse(eligibleButBlocked).success).toBe(false);
+
+    const terminalWhileActive = asgardProjectControlFixture();
+    terminalWhileActive.projects[0].stages[1].admission.evaluation = "terminal";
+    expect(ProjectControlSnapshotSchema.safeParse(terminalWhileActive).success).toBe(false);
+
+    const plannedExecutorControlledByAgent = asgardProjectControlFixture();
+    plannedExecutorControlledByAgent.projects[0].stages[6].current_controller =
+      "executing_agent";
+    expect(
+      ProjectControlSnapshotSchema.safeParse(plannedExecutorControlledByAgent)
+        .success,
+    ).toBe(false);
+
+    const activeExecutorControlledByManager = asgardProjectControlFixture();
+    const stage = activeExecutorControlledByManager.projects[0].stages[1];
+    stage.transfer_mode = "project_executor";
+    stage.return_trigger = "terminal_signal";
+    stage.current_controller = "project_manager";
+    expect(
+      ProjectControlSnapshotSchema.safeParse(activeExecutorControlledByManager)
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects partial Decision audit facts and secret-bearing public text", () => {
+    const partialAudit = asgardProjectControlFixture();
+    partialAudit.projects[0].user_decisions[1].selected_option_id = "accept";
+    expect(ProjectControlSnapshotSchema.safeParse(partialAudit).success).toBe(false);
+
+    const secret = asgardProjectControlFixture();
+    secret.projects[0].project.objective =
+      "Use Bearer abcdefghijklmnopqrstuvwxyz for the integration.";
+    expect(ProjectControlSnapshotSchema.safeParse(secret).success).toBe(false);
+  });
+
   it("keeps structural validation separate from digest verification", () => {
     const snapshot = asgardProjectControlFixture();
     snapshot.digest = "f".repeat(64);

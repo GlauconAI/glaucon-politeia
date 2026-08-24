@@ -422,10 +422,10 @@ P0-B adds exact real-projection checks for Asgard:
 
 ### P0-A rollout
 
-1. merge and deploy v6-compatible consumer code;
-2. apply Work Tracker binding migration;
-3. keep `project_controls=null` in production;
-4. verify all existing v5 pages and Work Tracker flows remain unchanged.
+1. apply the additive Work Tracker binding migration and verify both the legacy and binding-aware RPC signatures;
+2. merge and deploy the v6-compatible consumer code;
+3. keep `project_controls=null` in production until a producer export passes the contract and privacy gates;
+4. verify all existing v5 pages, legacy Work Tracker flows, and binding-aware flows remain unchanged.
 
 ### P0-B rollout
 

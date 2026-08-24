@@ -52,6 +52,12 @@ describe("Observatory collection script", () => {
     expect(cronSource).toContain("OBSERVATORY_PROJECT_EXECUTION_PATH");
     expect(cronSource).not.toContain("/Users/");
   });
+
+  it("retains a validated Project Control last-known-good when the source disappears", () => {
+    expect(source).toContain("readPreviousProjectControl");
+    expect(source).toContain("retainProjectControlLastKnownGood");
+    expect(source).toContain("ObservatoryCollectionEnvelopeV6Schema.safeParse");
+  });
 });
 
 describe("Observatory Snapshot verifier", () => {

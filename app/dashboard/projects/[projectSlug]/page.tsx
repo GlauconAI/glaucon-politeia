@@ -6,8 +6,39 @@ import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import { findProjectControlProject } from "@/lib/observatory/project-control";
 import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
+import {
+  createObservatoryRepository,
+  type ObservatoryRepositoryClient,
+  type ObservatoryWorkItemRow,
+} from "@/lib/observatory/repository";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+async function loadBoundWorkItems(projectKey: string, planRevision: number): Promise<{
+  items: ObservatoryWorkItemRow[];
+  available: boolean;
+}> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const repository = createObservatoryRepository(
+      supabase as unknown as ObservatoryRepositoryClient,
+    );
+    const items = await repository.listWorkItems();
+    return {
+      items: items.filter(
+        (item) =>
+          item.project_key === projectKey &&
+          item.plan_revision === planRevision &&
+          item.stage_id !== null &&
+          item.work_package_id !== null,
+      ),
+      available: true,
+    };
+  } catch {
+    return { items: [], available: false };
+  }
+}
 
 export default async function ProjectControlPage({
   params,
@@ -41,11 +72,19 @@ export default async function ProjectControlPage({
   }
   const project = findProjectControlProject(snapshot, projectSlug);
   if (!project) notFound();
+  const boundWork = await loadBoundWorkItems(
+    project.project.project_key,
+    project.project.approved_plan_revision,
+  );
 
   return (
     <section className="observatory-page">
       <div className="project-control-back"><Link className="operator-link" href="/dashboard/projects">← Projects</Link></div>
-      <ProjectControlView project={project} />
+      <ProjectControlView
+        project={project}
+        boundWorkItems={boundWork.items}
+        workTrackerAvailable={boundWork.available}
+      />
     </section>
   );
 }

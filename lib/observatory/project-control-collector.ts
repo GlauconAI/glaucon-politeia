@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, relative } from "node:path";
+import { basename, dirname, isAbsolute, relative } from "node:path";
 
 import type { ObservatorySourceHealth } from "#observatory-asset-schema";
 import {
@@ -6,12 +6,15 @@ import {
   computeProjectControlDigest,
   type ProjectControlSnapshot,
 } from "#observatory-project-control-schema";
+import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
 
 export const OBSERVATORY_PROJECT_CONTROL_MAX_BYTES = 10 * 1024 * 1024;
 
 export type ObservatoryProjectControlCollectionErrorCode =
+  | "PROJECT_CONTROL_PATH_INVALID"
   | "PROJECT_CONTROL_PATH_ESCAPE"
   | "PROJECT_CONTROL_SOURCE_INVALID"
+  | "PROJECT_CONTROL_PRIVACY_VIOLATION"
   | "PROJECT_CONTROL_DIGEST_MISMATCH"
   | "PROJECT_CONTROL_RESOURCE_LIMIT_EXCEEDED"
   | "PROJECT_CONTROL_READ_FAILED";
@@ -40,6 +43,27 @@ export interface ProjectControlCollectionResult {
   sourceHealth: ObservatorySourceHealth;
 }
 
+export function retainProjectControlLastKnownGood(
+  candidate: ProjectControlCollectionResult,
+  previous?: ProjectControlCollectionResult,
+): ProjectControlCollectionResult {
+  if (candidate.snapshot || !previous?.snapshot) return candidate;
+  return {
+    snapshot: previous.snapshot,
+    sourceHealth: {
+      domain: "project_controls",
+      status: "stale",
+      health: "degraded",
+      collected_at: candidate.sourceHealth.collected_at,
+      last_success_at:
+        previous.sourceHealth.last_success_at ?? previous.snapshot.collected_at,
+      asset_count: previous.snapshot.summary.project_count,
+      error_code:
+        candidate.sourceHealth.error_code ?? "PROJECT_CONTROL_REFRESH_FAILED",
+    },
+  };
+}
+
 function isMissing(error: unknown): boolean {
   return (
     error !== null &&
@@ -54,6 +78,12 @@ export async function collectProjectControlSnapshot(
   dependencies: ProjectControlCollectorDependencies,
 ): Promise<ProjectControlCollectionResult> {
   const observedAt = dependencies.now().toISOString();
+  if (basename(input.exportPath) !== "project-control-snapshot.json") {
+    throw new ObservatoryProjectControlCollectionError(
+      "PROJECT_CONTROL_PATH_INVALID",
+      "Expected the exact Project Control export filename.",
+    );
+  }
   let canonicalParent: string;
   let canonicalFile: string;
   try {
@@ -98,7 +128,7 @@ export async function collectProjectControlSnapshot(
   let text: string;
   try {
     text = await dependencies.readTextFile(
-      input.exportPath,
+      canonicalFile,
       OBSERVATORY_PROJECT_CONTROL_MAX_BYTES,
     );
   } catch (error) {
@@ -121,6 +151,13 @@ export async function collectProjectControlSnapshot(
     throw new ObservatoryProjectControlCollectionError(
       "PROJECT_CONTROL_SOURCE_INVALID",
       "The Project Control export is not valid JSON.",
+    );
+  }
+  const privacyCounts = scanObservatoryPrivacy(candidate);
+  if (Object.values(privacyCounts).some((count) => count > 0)) {
+    throw new ObservatoryProjectControlCollectionError(
+      "PROJECT_CONTROL_PRIVACY_VIOLATION",
+      "The Project Control export failed the aggregate privacy scan.",
     );
   }
   const parsed = ProjectControlSnapshotSchema.safeParse(candidate);

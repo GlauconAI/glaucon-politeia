@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { ProjectControlProject } from "@/lib/observatory/project-control-schema";
+import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
 import { topologicallyOrderProjectStages } from "@/lib/observatory/project-control";
 
 function words(value: string) {
@@ -20,9 +21,34 @@ function formatTime(value: string | null) {
   }).format(new Date(value));
 }
 
-export function ProjectControlView({ project }: { project: ProjectControlProject }) {
+export function ProjectControlView({
+  project,
+  boundWorkItems = [],
+  workTrackerAvailable = true,
+}: {
+  project: ProjectControlProject;
+  boundWorkItems?: ObservatoryWorkItemRow[];
+  workTrackerAvailable?: boolean;
+}) {
   const stages = topologicallyOrderProjectStages(project);
   const stagesById = new Map(project.stages.map((stage) => [stage.stage_id, stage]));
+  const childrenByStage = new Map(
+    project.stages.map((stage) => [
+      stage.stage_id,
+      project.stages.filter((candidate) => candidate.dependency_ids.includes(stage.stage_id)),
+    ]),
+  );
+  const currentStages = project.project.current_stage_ids
+    .map((id) => stagesById.get(id))
+    .filter((stage): stage is NonNullable<typeof stage> => Boolean(stage));
+  const currentGate = project.gates.find(
+    (gate) => gate.gate_id === project.project.current_gate_id,
+  );
+  const nextStages = project.project.next_admissible_stage_ids
+    .map((id) => stagesById.get(id))
+    .filter((stage): stage is NonNullable<typeof stage> => Boolean(stage));
+  const missingEvidence =
+    project.summary.missing_artifact_count + project.summary.pending_verification_count;
   const workPackagesByStage = new Map(
     project.stages.map((stage) => [
       stage.stage_id,
@@ -52,6 +78,37 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
         </p>
       ) : null}
 
+      <section aria-labelledby="current-control-heading" className="project-control-section">
+        <p className="eyebrow">Control tower</p>
+        <h2 id="current-control-heading">Current control</h2>
+        <dl className="project-control-summary-grid">
+          <div>
+            <dt>Current Stages</dt>
+            <dd>{currentStages.length ? currentStages.map((stage) => stage.title).join(", ") : "None"}</dd>
+          </div>
+          <div>
+            <dt>Current Gate</dt>
+            <dd>{currentGate ? `Current gate: ${currentGate.title} (${currentGate.gate_id})` : "No active Gate"}</dd>
+          </div>
+          <div>
+            <dt>Critical path</dt>
+            <dd>{project.stages.filter((stage) => stage.critical_path && stage.status !== "completed").map((stage) => stage.title).join(" → ") || "Complete"}</dd>
+          </div>
+          <div>
+            <dt>Missing evidence</dt>
+            <dd>{missingEvidence} open evidence records</dd>
+          </div>
+          <div>
+            <dt>Pending decisions</dt>
+            <dd>{project.summary.pending_decision_count}</dd>
+          </div>
+          <div>
+            <dt>Next admissible Stages</dt>
+            <dd>{nextStages.length ? nextStages.map((stage) => stage.title).join(", ") : "No Stage is currently admissible."}</dd>
+          </div>
+        </dl>
+      </section>
+
       <section aria-labelledby="stage-map-heading" className="project-control-section">
         <div className="dashboard-directory-heading">
           <div><p className="eyebrow">Plan topology</p><h2 id="stage-map-heading">Stage dependency map</h2></div>
@@ -62,7 +119,7 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
             const workPackages = workPackagesByStage.get(stage.stage_id) ?? [];
             return (
               <li key={stage.stage_id}>
-                <article className={`project-control-stage stage-${stage.status}`}>
+                <article id={stage.stage_id} className={`project-control-stage stage-${stage.status}`}>
                   <header>
                     <div>
                       <p className="eyebrow">{stage.stage_id}</p>
@@ -85,6 +142,11 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
                       ? `Depends on ${stage.dependency_ids.map((id) => stagesById.get(id)?.title ?? id).join(", ")}`
                       : "Depends on no prior Stage"}
                   </p>
+                  <p className="project-control-dependencies">
+                    {(childrenByStage.get(stage.stage_id) ?? []).length
+                      ? `Unlocks ${(childrenByStage.get(stage.stage_id) ?? []).map((child) => child.title).join(", ")}`
+                      : "Unlocks no later Stage"}
+                  </p>
                   {stage.admission.reason_codes.length ? (
                     <p className="project-control-reasons">Reason: {stage.admission.reason_codes.map(words).join(", ")}</p>
                   ) : null}
@@ -104,6 +166,24 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
             );
           })}
         </ol>
+      </section>
+
+      <section aria-labelledby="execution-lines-heading" className="project-control-section">
+        <p className="eyebrow">Parallel control</p>
+        <h2 id="execution-lines-heading">Execution lines</h2>
+        {project.execution_lines.length ? (
+          <ul className="project-control-ledger-list">
+            {project.execution_lines.map((line) => (
+              <li key={line.execution_line_id}>
+                <strong>{line.title}</strong>
+                <span>{words(line.status)}</span>
+                <small>
+                  Owner {line.accountable_owner_agent_id} · Executor {line.executing_agent_id ?? "not admitted"} · {controlLabel(line.transfer_mode)} · Controller {words(line.current_controller)}
+                </small>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="empty-text">No execution lines published.</p>}
       </section>
 
       <div className="project-control-ledger-grid">
@@ -133,7 +213,7 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
           <h2 id="gate-ledger-heading">Gates &amp; decisions</h2>
           <ul className="project-control-ledger-list">
             {project.gates.map((gate) => (
-              <li key={gate.gate_id}>
+              <li id={gate.gate_id} key={gate.gate_id}>
                 <strong>{gate.title}</strong><span>{words(gate.status)}</span>
                 <small>{gate.decision_authority === "user" ? "User authority" : "Project Manager authority"}</small>
               </li>
@@ -147,6 +227,51 @@ export function ProjectControlView({ project }: { project: ProjectControlProject
             ))}
           </ul>
           <Link className="operator-link" href="/dashboard/decisions">Open Decision Center →</Link>
+        </section>
+      </div>
+
+      <div className="project-control-ledger-grid">
+        <section aria-labelledby="bound-work-heading" className="project-control-section">
+          <p className="eyebrow">Delivery ledger</p>
+          <h2 id="bound-work-heading">Bound Work Tracker cards</h2>
+          {!workTrackerAvailable ? (
+            <p className="empty-text">Work Tracker is temporarily unavailable.</p>
+          ) : boundWorkItems.length ? (
+            <ul className="project-control-ledger-list">
+              {boundWorkItems.map((item) => (
+                <li key={item.id}>
+                  <Link href={`/dashboard/work-items/${item.id}`}><strong>{item.title}</strong></Link>
+                  <span>{words(item.state)}</span>
+                  <small>
+                    {item.stage_id} · {item.work_package_id} · Plan {item.plan_revision} · {
+                      project.stages.some((stage) => stage.stage_id === item.stage_id) &&
+                      project.work_packages.some((workPackage) =>
+                        workPackage.work_package_id === item.work_package_id &&
+                        workPackage.stage_id === item.stage_id)
+                        ? "Matched"
+                        : "Binding unmatched"
+                    }
+                  </small>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="empty-text">No Work Tracker card is bound to this Project revision.</p>}
+        </section>
+
+        <section aria-labelledby="outcome-reviews-heading" className="project-control-section">
+          <p className="eyebrow">Outcome ledger</p>
+          <h2 id="outcome-reviews-heading">Outcome reviews</h2>
+          {project.outcome_reviews.length ? (
+            <ul className="project-control-ledger-list">
+              {project.outcome_reviews.map((review) => (
+                <li key={review.outcome_review_id}>
+                  <strong>{review.title}</strong>
+                  <span>{words(review.status)}</span>
+                  <small>{review.decision ? words(review.decision) : review.evidence_summary || "Outcome evidence pending"}</small>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="empty-text">No Outcome Review published.</p>}
         </section>
       </div>
     </div>

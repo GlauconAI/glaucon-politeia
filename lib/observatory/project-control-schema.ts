@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { containsAbsoluteOrPrivatePath } from "#observatory-privacy-path";
+import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
 
 export const PROJECT_CONTROL_SCHEMA_VERSION = "1.0.0" as const;
 export const PROJECT_CONTROL_MAX_PROJECTS = 128;
@@ -31,7 +32,8 @@ const safeString = (max: number, allowEmpty = false) =>
       (value) =>
         !/[\u0000-\u001f\u007f]/u.test(value) &&
         !forbiddenReference.test(value) &&
-        !containsAbsoluteOrPrivatePath(value),
+        !containsAbsoluteOrPrivatePath(value) &&
+        Object.values(scanObservatoryPrivacy(value)).every((count) => count === 0),
       "Expected privacy-safe public text.",
     );
 const SafeTextSchema = safeString(1024);
@@ -95,6 +97,24 @@ const AdmissionSchema = z
     if (admission.eligible && missing > 0) {
       context.addIssue({ code: "custom", message: "Eligible admission cannot have missing contracts." });
     }
+    const blockingReasons = new Set([
+      "dependency_missing",
+      "artifact_missing",
+      "verification_missing",
+      "gate_missing",
+      "user_return_missing",
+      "revision_drift",
+    ]);
+    if (
+      admission.eligible &&
+      admission.reason_codes.some((reason) => blockingReasons.has(reason))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["reason_codes"],
+        message: "Eligible admission cannot carry a blocking reason.",
+      });
+    }
   });
 
 const transferMode = z.enum(["project_executor", "independent_owner_line"]);
@@ -144,6 +164,39 @@ const StageSchema = z
       stage.return_trigger !== "terminal_signal"
     ) {
       context.addIssue({ code: "custom", message: "Project executor return semantics are invalid." });
+    }
+    if (stage.transfer_mode === "project_executor") {
+      const agentControlled = [
+        "admitted",
+        "active",
+        "waiting_input",
+        "verifying",
+      ].includes(stage.status);
+      const expectedController = agentControlled
+        ? "executing_agent"
+        : "project_manager";
+      if (stage.current_controller !== expectedController) {
+        context.addIssue({
+          code: "custom",
+          path: ["current_controller"],
+          message: "Project executor controller does not match Stage status.",
+        });
+      }
+      if (agentControlled && !stage.executing_agent_id) {
+        context.addIssue({
+          code: "custom",
+          path: ["executing_agent_id"],
+          message: "Agent-controlled Stage requires an executing Agent.",
+        });
+      }
+    }
+    const terminal = ["completed", "cancelled"].includes(stage.status);
+    if ((stage.admission.evaluation === "terminal") !== terminal) {
+      context.addIssue({
+        code: "custom",
+        path: ["admission", "evaluation"],
+        message: "Terminal admission evaluation does not match Stage status.",
+      });
     }
     if ((stage.status === "completed") !== Boolean(stage.completed_at)) {
       context.addIssue({ code: "custom", path: ["completed_at"], message: "Completed timestamp drift." });
@@ -329,13 +382,15 @@ const DecisionSchema = z
   })
   .superRefine((decision, context) => {
     const recorded = decision.status === "recorded";
-    const terminalFacts = Boolean(
-      decision.selected_option_id &&
-        decision.decided_by &&
-        decision.decided_at &&
-        decision.audit_summary,
-    );
-    if (recorded !== terminalFacts) {
+    const auditFacts = [
+      decision.selected_option_id,
+      decision.decided_by,
+      decision.decided_at,
+      decision.audit_summary,
+    ];
+    const completeAudit = auditFacts.every(Boolean);
+    const emptyAudit = auditFacts.every((fact) => fact === null);
+    if ((recorded && !completeAudit) || (!recorded && !emptyAudit)) {
       context.addIssue({ code: "custom", message: "Decision audit facts drift." });
     }
     if (recorded && !decision.options.some((option) => option.option_id === decision.selected_option_id)) {
