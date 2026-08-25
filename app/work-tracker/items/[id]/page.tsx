@@ -56,31 +56,35 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
     notFound();
   }
 
+  let evidence;
+  let events;
+  let claims;
+  let overviewState;
   try {
-    const [evidence, events, claims, overviewState] = await Promise.all([
+    [evidence, events, claims, overviewState] = await Promise.all([
       repository.listWorkItemEvidence(id),
       repository.listWorkItemEvents(id),
       repository.listWorkItemClaims(id),
       loadObservatoryOverviewState(),
     ]);
-
-    return (
-      <WorkItemDetail
-        item={item}
-        evidence={evidence}
-        events={events}
-        claims={claims}
-        evaluatedAt={new Date().toISOString()}
-        currentAdmin={currentAdmin}
-        projectControls={
-          overviewState.status === "ready" &&
-          "project_controls" in overviewState.snapshot
-            ? overviewState.snapshot.project_controls
-            : null
-        }
-      />
-    );
   } catch {
     return unavailableState();
   }
+
+  return (
+    <WorkItemDetail
+      item={item}
+      evidence={evidence}
+      events={events}
+      claims={claims}
+      evaluatedAt={new Date().toISOString()}
+      currentAdmin={currentAdmin}
+      projectControls={
+        overviewState.status === "ready" &&
+        "project_controls" in overviewState.snapshot
+          ? overviewState.snapshot.project_controls
+          : null
+      }
+    />
+  );
 }

@@ -38,7 +38,11 @@ The same rule is stored in Plato's workspace `AGENTS.md` and shown in Quick Capt
 - TDD route-separation tests witnessed expected failures before implementation and passed after the new page was added.
 - TDD canonical-route tests witnessed missing routes, old links, and absent permanent redirect before implementation, then passed.
 - TDD navigation, Chinese guidance, and cache-revalidation tests witnessed expected failures before implementation, then passed.
-- Final focused, complete suite, lint, typecheck, diff, and production-build evidence will be recorded at the release checkpoint.
+- Final route and mutation regression suite: 10 files / 58 tests passed.
+- Final complete serial suite: 258 files / 801 tests passed, 0 failed. The default parallel suite exposed six existing HTML Note Kit child-process timeout failures; both affected files passed 38/38 in isolation, and the full single-worker run passed 801/801.
+- ESLint and TypeScript completed with exit code 0.
+- `git diff --check` completed with no output.
+- Next.js 16.2.6 production build completed with exit code 0, compiled 28/28 static pages, and emitted `/work-tracker`, `/work-tracker/items/[id]`, and the legacy `/dashboard/work-items/[id]` route.
 
 ## Release boundary
 
