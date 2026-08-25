@@ -307,7 +307,7 @@ describe("ObservatoryOverview", () => {
     ).toHaveAttribute("href", "#dashboard-objects");
     expect(
       within(summary).getByRole("link", { name: /view Active tasks/i }),
-    ).toHaveAttribute("href", "#dashboard-work");
+    ).toHaveAttribute("href", "#dashboard-snapshot");
   });
 
   it("adds a unique Skills index card when the validated snapshot has assets", () => {
@@ -449,7 +449,9 @@ describe("ObservatoryOverview", () => {
       "data-status",
       dataStatus,
     );
-    expect(screen.getByText(/quick capture remains available/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/work tracker remains available at \/work-tracker/i),
+    ).toBeInTheDocument();
   });
 
   it("searches projects, scenes, agents, and execution flows with a labelled native input", () => {

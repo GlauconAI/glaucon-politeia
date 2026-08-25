@@ -266,12 +266,12 @@ export function ObservatoryOverview({
     {
       label: "Active tasks",
       value: summary.task_totals.active,
-      href: "#dashboard-work",
+      href: "#dashboard-snapshot",
     },
     {
       label: "Failed tasks",
       value: summary.task_totals.failed,
-      href: "#dashboard-work",
+      href: "#dashboard-snapshot",
     },
     ...("source_repositories" in state.snapshot
       ? [{

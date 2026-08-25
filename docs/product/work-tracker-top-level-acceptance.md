@@ -1,6 +1,6 @@
 # Work Tracker Top-Level Surface Acceptance
 
-Date: 2026-08-24  
+Date: 2026-08-24
 Status: Local implementation accepted; production release pending explicit authorization
 
 ## Approved scope

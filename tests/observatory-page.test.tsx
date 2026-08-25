@@ -174,6 +174,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /no snapshot has been published yet/i,
     );
+    expect(screen.getByText(/work tracker remains available at \/work-tracker/i)).toBeInTheDocument();
   });
 
   it("does not render unvalidated snapshot jsonb", async () => {
@@ -197,6 +198,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /latest snapshot could not be loaded/i,
     );
+    expect(screen.getByText(/work tracker remains available at \/work-tracker/i)).toBeInTheDocument();
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
   });
 

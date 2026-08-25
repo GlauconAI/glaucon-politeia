@@ -1,7 +1,7 @@
 # Work Tracker Top-Level Surface Design
 
-**Date:** 2026-08-24  
-**Status:** Approved  
+**Date:** 2026-08-24
+**Status:** Approved
 **Owner:** Plato
 
 ## Problem

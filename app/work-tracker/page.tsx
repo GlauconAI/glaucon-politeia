@@ -66,10 +66,10 @@ export default async function WorkTrackerPage() {
       </header>
 
       <div className="observatory-layout work-tracker-layout">
+        <WorkTrackerBoard state={state} />
         <aside className="observatory-capture" aria-label="Work item capture">
           <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
         </aside>
-        <WorkTrackerBoard state={state} />
       </div>
     </section>
   );
