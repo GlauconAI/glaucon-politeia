@@ -14,8 +14,6 @@ const mocks = vi.hoisted(() => ({
     is_admin: true;
   } | null,
   getLatestSuccessfulSnapshot: vi.fn(),
-  listWorkItems: vi.fn(),
-  listActiveWorkItemClaims: vi.fn(),
   getCurrentAdmin: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -43,8 +41,6 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/observatory/repository", () => ({
   createObservatoryRepository: () => ({
     getLatestSuccessfulSnapshot: mocks.getLatestSuccessfulSnapshot,
-    listWorkItems: mocks.listWorkItems,
-    listActiveWorkItemClaims: mocks.listActiveWorkItemClaims,
   }),
 }));
 
@@ -131,10 +127,6 @@ describe("DashboardPage", () => {
     mocks.redirect.mockClear();
     mocks.getLatestSuccessfulSnapshot.mockReset();
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(snapshotRow());
-    mocks.listWorkItems.mockReset();
-    mocks.listWorkItems.mockResolvedValue([]);
-    mocks.listActiveWorkItemClaims.mockReset();
-    mocks.listActiveWorkItemClaims.mockResolvedValue([]);
   });
 
   it("forces request-time authorization and snapshot freshness", () => {
@@ -153,7 +145,7 @@ describe("DashboardPage", () => {
     expect(mocks.getLatestSuccessfulSnapshot).not.toHaveBeenCalled();
   });
 
-  it("renders the admin overview and Quick Capture", async () => {
+  it("renders the read-only admin overview without Work Tracker", async () => {
     render(await DashboardPage());
 
     expect(
@@ -161,10 +153,8 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/dashboard access/i)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
-    expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: /work tracker/i }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: /dashboard sections/i }),
     ).toBeInTheDocument();
@@ -172,36 +162,11 @@ describe("DashboardPage", () => {
       "href",
       "#dashboard-objects",
     );
-    expect(document.getElementById("dashboard-capture")).toBeInTheDocument();
-    expect(document.getElementById("dashboard-work")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Capture" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Work" })).not.toBeInTheDocument();
   });
 
-  it("generates a distinct cryptographically random capture key per page request", async () => {
-    const firstRender = render(await DashboardPage());
-    const firstKey = (
-      screen.getByRole("form", { name: /quick capture/i }).querySelector(
-        'input[name="idempotencyKey"]',
-      ) as HTMLInputElement
-    ).value;
-    firstRender.unmount();
-
-    render(await DashboardPage());
-    const secondKey = (
-      screen.getByRole("form", { name: /quick capture/i }).querySelector(
-        'input[name="idempotencyKey"]',
-      ) as HTMLInputElement
-    ).value;
-
-    expect(firstKey).toMatch(
-      /^observatory-capture-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-    );
-    expect(secondKey).toMatch(
-      /^observatory-capture-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-    );
-    expect(secondKey).not.toBe(firstKey);
-  });
-
-  it("keeps Quick Capture useful when no snapshot exists", async () => {
+  it("renders an explicit unavailable state when no snapshot exists", async () => {
     mocks.getLatestSuccessfulSnapshot.mockResolvedValue(null);
 
     render(await DashboardPage());
@@ -209,7 +174,6 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /no snapshot has been published yet/i,
     );
-    expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
   });
 
   it("does not render unvalidated snapshot jsonb", async () => {
@@ -236,17 +200,4 @@ describe("DashboardPage", () => {
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
   });
 
-  it("keeps observatory views available when Work Tracker loading fails", async () => {
-    mocks.listWorkItems.mockRejectedValue(
-      new Error("private database detail"),
-    );
-
-    render(await DashboardPage());
-
-    expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      /work tracker is temporarily unavailable/i,
-    );
-    expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
-  });
 });
