@@ -67,7 +67,7 @@ describe("WorkTrackerBoard", () => {
       screen.getByRole("link", { name: "Build the manual board" }),
     ).toHaveAttribute(
       "href",
-      `/dashboard/work-items/${item.id}`,
+      `/work-tracker/items/${item.id}`,
     );
     const select = screen.getByLabelText(/move build the manual board to/i);
     expect(select).toHaveValue("inbox");

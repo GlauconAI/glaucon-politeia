@@ -137,6 +137,10 @@ describe("WorkItemDetail", () => {
     expect(
       screen.getByRole("heading", { name: item.title }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /work tracker/i })).toHaveAttribute(
+      "href",
+      "/work-tracker",
+    );
     expect(screen.getByLabelText(/^title$/i)).toHaveValue(item.title);
     expect(screen.getByLabelText(/acceptance criteria/i)).toHaveValue(
       item.acceptance_criteria,

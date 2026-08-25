@@ -249,7 +249,7 @@ export function ProjectControlView({
             <ul className="project-control-ledger-list">
               {boundWorkItems.map((item) => (
                 <li key={item.id}>
-                  <Link href={`/dashboard/work-items/${item.id}`}><strong>{item.title}</strong></Link>
+                  <Link href={`/work-tracker/items/${item.id}`}><strong>{item.title}</strong></Link>
                   <span>{words(item.state)}</span>
                   <small>
                     {item.stage_id} · {item.work_package_id} · Plan {item.plan_revision} · {

@@ -205,7 +205,7 @@ export function WorkTrackerBoard({
                             {claimLabel}
                           </span>
                         </div>
-                        <Link href={`/dashboard/work-items/${item.id}`}>
+                        <Link href={`/work-tracker/items/${item.id}`}>
                           {item.title}
                         </Link>
                         <small>

@@ -243,7 +243,7 @@ export function WorkItemDetail({
       <header className="work-item-detail-header">
         <div>
           <p className="eyebrow">
-            <Link href="/dashboard">Dashboard</Link> / Work Tracker
+            <Link href="/work-tracker">Work Tracker</Link> / Item
           </p>
           <h1>{item.title}</h1>
           <p>

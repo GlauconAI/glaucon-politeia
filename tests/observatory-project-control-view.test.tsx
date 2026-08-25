@@ -73,7 +73,7 @@ describe("ProjectControlView", () => {
     expect(screen.getByRole("heading", { name: "Bound Work Tracker cards" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Validate coordinate interaction" })).toHaveAttribute(
       "href",
-      `/dashboard/work-items/${boundWorkItem.id}`,
+      `/work-tracker/items/${boundWorkItem.id}`,
     );
     expect(screen.getByRole("heading", { name: "Outcome reviews" })).toBeInTheDocument();
     expect(screen.getByText("Prototype outcome")).toBeInTheDocument();

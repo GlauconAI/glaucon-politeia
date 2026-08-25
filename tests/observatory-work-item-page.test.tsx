@@ -47,7 +47,7 @@ vi.mock("@/lib/observatory/dashboard-state", () => ({
   loadObservatoryOverviewState: async () => ({ status: "empty" }),
 }));
 
-import WorkItemPage from "@/app/dashboard/work-items/[id]/page";
+import WorkItemPage from "@/app/work-tracker/items/[id]/page";
 
 const item = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -101,7 +101,7 @@ describe("WorkItemPage", () => {
     await expect(
       WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
     ).rejects.toThrow(
-      `redirect:/auth?redirectTo=/dashboard/work-items/${item.id}`,
+      `redirect:/auth?redirectTo=/work-tracker/items/${item.id}`,
     );
     expect(mocks.getWorkItem).not.toHaveBeenCalled();
   });
