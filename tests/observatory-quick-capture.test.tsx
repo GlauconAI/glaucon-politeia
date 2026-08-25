@@ -25,10 +25,21 @@ describe("QuickCapture", () => {
     expect(within(form).getByRole("radio", { name: "Feature" })).toBeEnabled();
     expect(within(form).getByRole("radio", { name: "Bug" })).toBeEnabled();
     expect(within(form).getByLabelText("Title")).toHaveAttribute("name", "title");
+    expect(within(form).getByLabelText("Title")).toHaveAttribute(
+      "placeholder",
+      "用中文简要说明需要处理的事项",
+    );
     expect(within(form).getByLabelText(/details/i)).toHaveAttribute(
       "name",
       "description",
     );
+    expect(within(form).getByLabelText(/details/i)).toHaveAttribute(
+      "placeholder",
+      "补充背景、目标或限制；专有名词可保留英文",
+    );
+    expect(
+      screen.getByText(/标题、描述和验收标准默认使用中文/),
+    ).toBeInTheDocument();
     expect(
       within(form).getByRole("button", { name: /capture work item/i }),
     ).toHaveAttribute("type", "submit");

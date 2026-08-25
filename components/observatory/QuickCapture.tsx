@@ -70,6 +70,10 @@ export function QuickCapture({
       <p className="observatory-panel-copy">
         Capture an Idea, Feature, or Bug now; triage and planning happen later.
       </p>
+      <p className="work-tracker-language-guidance">
+        标题、描述和验收标准默认使用中文；常用英文专有名词、产品名、代码标识、路径、API
+        与提交哈希可以保留。
+      </p>
 
       <form
         action={formAction}
@@ -123,7 +127,7 @@ export function QuickCapture({
             autoComplete="off"
             aria-invalid={titleError ? true : undefined}
             aria-describedby={titleError ? "observatory-title-error" : undefined}
-            placeholder="What needs attention?"
+            placeholder="用中文简要说明需要处理的事项"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
@@ -148,7 +152,7 @@ export function QuickCapture({
             aria-describedby={
               descriptionError ? "observatory-description-error" : undefined
             }
-            placeholder="Context, desired outcome, or reproduction steps"
+            placeholder="补充背景、目标或限制；专有名词可保留英文"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
           />

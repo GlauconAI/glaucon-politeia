@@ -141,6 +141,9 @@ describe("WorkItemDetail", () => {
       "href",
       "/work-tracker",
     );
+    expect(
+      screen.getByText(/标题、描述和验收标准默认使用中文/),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/^title$/i)).toHaveValue(item.title);
     expect(screen.getByLabelText(/acceptance criteria/i)).toHaveValue(
       item.acceptance_criteria,

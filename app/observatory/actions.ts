@@ -69,7 +69,7 @@ function formError(error: unknown): string {
 function operationalError(): ObservatoryQuickCaptureActionState {
   return {
     status: "error",
-    formError: "Dashboard is temporarily unavailable. Try again.",
+    formError: "Work Tracker is temporarily unavailable. Try again.",
   };
 }
 
@@ -106,7 +106,7 @@ async function authorizedRepository(): Promise<
       ok: false,
       error: {
         status: "error",
-        formError: "Dashboard is temporarily unavailable. Try again.",
+        formError: "Work Tracker is temporarily unavailable. Try again.",
       } satisfies ObservatoryWorkItemMutationActionState,
     };
   }
@@ -161,8 +161,8 @@ function fieldErrorState(
 
 function revalidateWorkItem(workItemId: string) {
   for (const path of [
-    "/dashboard",
-    `/dashboard/work-items/${workItemId}`,
+    "/work-tracker",
+    `/work-tracker/items/${workItemId}`,
   ]) {
     try {
       revalidatePath(path);
@@ -229,7 +229,7 @@ export async function captureObservatoryWorkItemAction(
   }
 
   try {
-    revalidatePath("/dashboard");
+    revalidatePath("/work-tracker");
   } catch {
     // The RPC already committed. Cache invalidation is best-effort here.
   }

@@ -107,7 +107,7 @@ describe("captureObservatoryWorkItemAction", () => {
         captureObservatoryWorkItemAction(initialState, validFormData()),
       ).resolves.toEqual({
         status: "error",
-        formError: "Dashboard is temporarily unavailable. Try again.",
+        formError: "Work Tracker is temporarily unavailable. Try again.",
       });
       expect(mocks.createQuickCapture).not.toHaveBeenCalled();
       expect(mocks.revalidatePath).not.toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe("captureObservatoryWorkItemAction", () => {
       state: "inbox",
       idempotencyKey: "capture-20260721-1",
     });
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/work-tracker");
     expect(result).toEqual({ status: "success", workItemId: "item-1" });
   });
 
@@ -176,7 +176,7 @@ describe("captureObservatoryWorkItemAction", () => {
       captureObservatoryWorkItemAction(initialState, validFormData()),
     ).resolves.toEqual({ status: "success", workItemId: "item-1" });
     expect(mocks.createQuickCapture).toHaveBeenCalledTimes(1);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/work-tracker");
   });
 
   it("returns a stable form error for duplicate idempotency conflicts", async () => {
@@ -276,9 +276,9 @@ describe("Work Tracker mutation actions", () => {
       stageId: "stage-05b",
       workPackageId: "wp-05b-coordinate-slice",
     });
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/work-tracker");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/dashboard/work-items/${workItemId}`,
+      `/work-tracker/items/${workItemId}`,
     );
   });
 

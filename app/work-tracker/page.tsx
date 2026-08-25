@@ -65,11 +65,6 @@ export default async function WorkTrackerPage() {
         </div>
       </header>
 
-      <p className="work-tracker-language-guidance">
-        标题、描述和验收标准默认使用中文；常用英文专有名词、产品名、代码标识、路径、API
-        与提交哈希可以保留。
-      </p>
-
       <div className="observatory-layout work-tracker-layout">
         <aside className="observatory-capture" aria-label="Work item capture">
           <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
