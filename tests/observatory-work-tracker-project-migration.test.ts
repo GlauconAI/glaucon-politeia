@@ -31,6 +31,10 @@ describe("Work Tracker canonical Project capture migration", () => {
   it("stores, audits, and compares the canonical Project on idempotent retries", () => {
     const sql = migration();
     expect(sql).toContain("normalized_project_ref text := btrim(p_project_ref)");
+    expect(sql).toContain(
+      "if normalized_project_ref is null or length(normalized_project_ref) not between 1 and 160",
+    );
+    expect(sql).toContain("observatory_project_required");
     expect(sql).toContain("project_ref, idempotency_key");
     expect(sql).toContain(
       "existing_item.project_ref is distinct from normalized_project_ref",

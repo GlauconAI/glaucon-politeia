@@ -33,6 +33,12 @@ begin
     raise exception 'Administrator access required' using errcode = '42501';
   end if;
 
+  if normalized_project_ref is null
+    or length(normalized_project_ref) not between 1 and 160
+  then
+    raise exception 'OBSERVATORY_PROJECT_REQUIRED' using errcode = '22023';
+  end if;
+
   insert into public.observatory_work_items (
     type,
     title,
