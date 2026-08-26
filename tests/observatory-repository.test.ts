@@ -131,21 +131,18 @@ function workTrackerClient(rows: Record<string, unknown[]>) {
 describe("getCurrentObservatoryAdmin", () => {
   it("returns null without creating clients when server configuration is absent", async () => {
     const createServerClient = vi.fn();
-    const createAdminClient = vi.fn();
 
     await expect(
       getCurrentObservatoryAdmin({
         isConfigured: () => false,
         createServerClient,
-        createAdminClient,
       }),
     ).resolves.toBeNull();
     expect(createServerClient).not.toHaveBeenCalled();
-    expect(createAdminClient).not.toHaveBeenCalled();
   });
 
   it("does not query profiles for an anonymous caller", async () => {
-    const createAdminClient = vi.fn();
+    const from = vi.fn();
 
     await expect(
       getCurrentObservatoryAdmin({
@@ -154,15 +151,15 @@ describe("getCurrentObservatoryAdmin", () => {
           auth: {
             getUser: async () => ({ data: { user: null }, error: null }),
           },
+          from,
         }),
-        createAdminClient,
       }),
     ).resolves.toBeNull();
-    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
   });
 
   it("treats Supabase's missing-session response as an anonymous caller", async () => {
-    const createAdminClient = vi.fn();
+    const from = vi.fn();
 
     await expect(
       getCurrentObservatoryAdmin({
@@ -178,18 +175,19 @@ describe("getCurrentObservatoryAdmin", () => {
               },
             }),
           },
+          from,
         }),
-        createAdminClient,
       }),
     ).resolves.toBeNull();
-    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(from).not.toHaveBeenCalled();
   });
 
-  it("returns only a 402V administrator profile", async () => {
+  it("uses the authenticated server client to return only a 402V administrator profile", async () => {
     let profile: typeof adminProfile | { is_admin: false } | null = adminProfile;
     const maybeSingle = vi.fn(async () => ({ data: profile, error: null }));
     const eq = vi.fn(() => ({ maybeSingle }));
     const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
 
     const dependencies = {
       isConfigured: () => true,
@@ -200,13 +198,14 @@ describe("getCurrentObservatoryAdmin", () => {
             error: null,
           }),
         },
+        from,
       }),
-      createAdminClient: () => ({ from: () => ({ select }) }),
     };
 
     await expect(getCurrentObservatoryAdmin(dependencies)).resolves.toEqual(
       adminProfile,
     );
+    expect(from).toHaveBeenCalledWith("profiles");
     expect(select).toHaveBeenCalledWith(
       "user_id, username, display_name, is_admin",
     );
@@ -232,8 +231,6 @@ describe("getCurrentObservatoryAdmin", () => {
               error: failureAt === "auth" ? dependencyError : null,
             }),
           },
-        }),
-        createAdminClient: () => ({
           from: () => ({
             select: () => ({
               eq: () => ({
@@ -264,7 +261,6 @@ describe("getCurrentObservatoryAdmin", () => {
         createServerClient: async () => {
           throw new Error("private client construction detail");
         },
-        createAdminClient: vi.fn(),
       }),
     ).rejects.toMatchObject({
       name: "ObservatoryAdminAuthError",

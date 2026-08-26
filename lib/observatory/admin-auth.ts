@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getServerEnv } from "@/lib/env";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface ObservatoryAdminProfile {
@@ -34,9 +33,6 @@ interface ObservatoryServerAuthClient {
       error: ObservatoryAuthDependencyFailure | null;
     }>;
   };
-}
-
-interface ObservatoryAdminProfileClient {
   from(table: "profiles"): {
     select(columns: string): {
       eq(column: "user_id", value: string): {
@@ -57,15 +53,12 @@ interface ObservatoryAdminProfileClient {
 export interface ObservatoryAdminAuthDependencies {
   isConfigured(): boolean;
   createServerClient(): Promise<ObservatoryServerAuthClient>;
-  createAdminClient(): ObservatoryAdminProfileClient;
 }
 
 const defaultDependencies: ObservatoryAdminAuthDependencies = {
   isConfigured: () => getServerEnv().configured,
   createServerClient: async () =>
     (await createSupabaseServerClient()) as unknown as ObservatoryServerAuthClient,
-  createAdminClient: () =>
-    createSupabaseAdminClient() as unknown as ObservatoryAdminProfileClient,
 };
 
 export async function getCurrentObservatoryAdmin(
@@ -89,8 +82,7 @@ export async function getCurrentObservatoryAdmin(
       return null;
     }
 
-    const admin = dependencies.createAdminClient();
-    const { data: profile, error: profileError } = await admin
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("user_id, username, display_name, is_admin")
       .eq("user_id", data.user.id)
