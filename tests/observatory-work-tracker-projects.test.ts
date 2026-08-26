@@ -4,6 +4,7 @@ import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
 import type { ObservatoryRegistrySnapshot } from "@/lib/observatory/schema";
 import {
   buildWorkTrackerProjectOptions,
+  filterTrackedWorkTrackerProjects,
   matchesWorkTrackerProject,
   resolveWorkItemProject,
 } from "@/lib/observatory/work-tracker-projects";
@@ -115,5 +116,17 @@ describe("Work Tracker canonical Projects", () => {
     expect(matchesWorkTrackerProject(wenya, "问芽")).toBe(true);
     expect(matchesWorkTrackerProject(wenya, "shared")).toBe(true);
     expect(matchesWorkTrackerProject(wenya, "missing")).toBe(false);
+  });
+
+  it("limits filter options to canonical Projects referenced by current Items", () => {
+    const tracked = filterTrackedWorkTrackerProjects(projects, [
+      item({ project_ref: "Dashboard", project_key: null }),
+      item({ project_ref: "unknown/project", project_key: null }),
+    ]);
+
+    expect(tracked.map((project) => project.projectKey)).toEqual([
+      "plato/dashboard",
+    ]);
+    expect(filterTrackedWorkTrackerProjects(projects, [])).toEqual([]);
   });
 });

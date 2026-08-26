@@ -41,6 +41,21 @@ export function resolveWorkItemProject(
   );
 }
 
+export function filterTrackedWorkTrackerProjects(
+  projects: WorkTrackerProjectOption[],
+  items: Pick<ObservatoryWorkItemRow, "project_ref" | "project_key">[],
+): WorkTrackerProjectOption[] {
+  const trackedProjectKeys = new Set(
+    items
+      .map((item) => resolveWorkItemProject(item, projects)?.projectKey)
+      .filter((projectKey): projectKey is string => Boolean(projectKey)),
+  );
+
+  return projects.filter((project) =>
+    trackedProjectKeys.has(project.projectKey),
+  );
+}
+
 export function matchesWorkTrackerProject(
   project: WorkTrackerProjectOption,
   query: string,

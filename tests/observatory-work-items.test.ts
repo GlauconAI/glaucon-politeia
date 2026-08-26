@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   OBSERVATORY_WORK_ITEM_PRIORITIES,
+  OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS,
+  OBSERVATORY_WORK_ITEM_COMPLETED_STATES,
   OBSERVATORY_QUICK_CAPTURE_DESCRIPTION_MAX_LENGTH,
   OBSERVATORY_QUICK_CAPTURE_IDEMPOTENCY_KEY_MAX_LENGTH,
   OBSERVATORY_QUICK_CAPTURE_TITLE_MAX_LENGTH,
@@ -27,6 +29,36 @@ function validQuickCapture() {
 }
 
 describe("Observatory Quick Capture validation", () => {
+  it("maps audited states into four active groups and a separate completed view", () => {
+    expect(OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS).toEqual([
+      {
+        id: "pending",
+        label: "待处理",
+        description: "Inbox · Triage",
+        states: ["inbox", "triage"],
+      },
+      {
+        id: "ready",
+        label: "待执行",
+        description: "Ready · Reopened",
+        states: ["ready", "reopened"],
+      },
+      {
+        id: "active",
+        label: "进行中",
+        description: "In Progress · Blocked · Waiting",
+        states: ["in_progress", "blocked", "waiting"],
+      },
+      {
+        id: "review",
+        label: "待验收",
+        description: "Review",
+        states: ["review"],
+      },
+    ]);
+    expect(OBSERVATORY_WORK_ITEM_COMPLETED_STATES).toEqual(["done"]);
+  });
+
   it("publishes the approved work-item enums", () => {
     expect(OBSERVATORY_WORK_ITEM_TYPES).toEqual(["idea", "feature", "bug"]);
     expect(OBSERVATORY_WORK_ITEM_STATES).toEqual([

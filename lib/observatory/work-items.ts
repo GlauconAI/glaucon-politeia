@@ -77,6 +77,42 @@ export type ObservatoryWorkItemState =
   (typeof OBSERVATORY_WORK_ITEM_STATES)[number];
 export type ObservatoryWorkItemPriority =
   (typeof OBSERVATORY_WORK_ITEM_PRIORITIES)[number];
+
+export const OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS = [
+  {
+    id: "pending",
+    label: "待处理",
+    description: "Inbox · Triage",
+    states: ["inbox", "triage"],
+  },
+  {
+    id: "ready",
+    label: "待执行",
+    description: "Ready · Reopened",
+    states: ["ready", "reopened"],
+  },
+  {
+    id: "active",
+    label: "进行中",
+    description: "In Progress · Blocked · Waiting",
+    states: ["in_progress", "blocked", "waiting"],
+  },
+  {
+    id: "review",
+    label: "待验收",
+    description: "Review",
+    states: ["review"],
+  },
+] as const satisfies readonly {
+  id: string;
+  label: string;
+  description: string;
+  states: readonly ObservatoryWorkItemState[];
+}[];
+
+export const OBSERVATORY_WORK_ITEM_COMPLETED_STATES = [
+  "done",
+] as const satisfies readonly ObservatoryWorkItemState[];
 export type ObservatoryQuickCaptureInput = z.infer<
   typeof ObservatoryQuickCaptureInputSchema
 >;
