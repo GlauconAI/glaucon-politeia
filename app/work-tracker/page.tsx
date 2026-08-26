@@ -8,10 +8,12 @@ import {
   type WorkTrackerBoardState,
 } from "@/components/observatory/WorkTrackerBoard";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
+import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -40,14 +42,39 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
   }
 }
 
-export default async function WorkTrackerPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function searchValue(params: SearchParams, key: string): string | undefined {
+  const candidate = params[key];
+  return Array.isArray(candidate) ? candidate[0] : candidate;
+}
+
+export default async function WorkTrackerPage({
+  searchParams = Promise.resolve({}),
+}: {
+  searchParams?: Promise<SearchParams>;
+} = {}) {
   const currentAdmin = await getCurrentObservatoryAdmin();
 
   if (!currentAdmin) {
     redirect("/auth?redirectTo=/work-tracker");
   }
 
-  const state = await loadWorkTrackerState();
+  const [state, overviewState, params] = await Promise.all([
+    loadWorkTrackerState(),
+    loadObservatoryOverviewState(),
+    searchParams,
+  ]);
+  const projects =
+    overviewState.status === "ready"
+      ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
+      : [];
+  const requestedProject = searchValue(params, "project");
+  const initialProjectKey = projects.some(
+    (project) => project.projectKey === requestedProject,
+  )
+    ? requestedProject!
+    : "all";
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
 
   return (
@@ -66,7 +93,11 @@ export default async function WorkTrackerPage() {
       </header>
 
       <div className="observatory-layout work-tracker-layout">
-        <WorkTrackerBoard state={state} />
+        <WorkTrackerBoard
+          state={state}
+          projects={projects}
+          initialProjectKey={initialProjectKey}
+        />
         <aside className="observatory-capture" aria-label="Work item capture">
           <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
         </aside>

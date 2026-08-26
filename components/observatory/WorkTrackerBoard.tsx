@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
 
 import {
   transitionObservatoryWorkItemAction,
   type ObservatoryWorkItemMutationActionState,
 } from "@/app/observatory/actions";
+import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
 import {
   getAgentClaimEligibility,
 } from "@/lib/observatory/agent-claims";
@@ -14,6 +15,10 @@ import type {
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
 } from "@/lib/observatory/repository";
+import {
+  resolveWorkItemProject,
+  type WorkTrackerProjectOption,
+} from "@/lib/observatory/work-tracker-projects";
 import {
   OBSERVATORY_WORK_ITEM_STATES,
   allowedObservatoryWorkItemTransitions,
@@ -37,6 +42,8 @@ type TransitionAction = (
 type WorkTrackerBoardProps = {
   state: WorkTrackerBoardState;
   action?: TransitionAction;
+  projects?: WorkTrackerProjectOption[];
+  initialProjectKey?: string;
 };
 
 const labels: Record<ObservatoryWorkItemState, string> = {
@@ -56,11 +63,36 @@ const idleState: ObservatoryWorkItemMutationActionState = { status: "idle" };
 export function WorkTrackerBoard({
   state,
   action = transitionObservatoryWorkItemAction,
+  projects,
+  initialProjectKey = "all",
 }: WorkTrackerBoardProps) {
+  const [projectKey, setProjectKey] = useState(initialProjectKey);
   const [mutationState, formAction, pending] = useActionState(
     action,
     idleState,
   );
+  const filteredItems = useMemo(() => {
+    if (state.status !== "ready" || projectKey === "all" || !projects) {
+      return state.status === "ready" ? state.items : [];
+    }
+    return state.items.filter(
+      (item) =>
+        resolveWorkItemProject(item, projects)?.projectKey === projectKey,
+    );
+  }, [projectKey, projects, state]);
+
+  useEffect(() => {
+    if (!projects) return;
+    const search = new URLSearchParams(window.location.search);
+    if (projectKey === "all") search.delete("project");
+    else search.set("project", projectKey);
+    const query = search.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `/work-tracker${query ? `?${query}` : ""}`,
+    );
+  }, [projectKey, projects]);
 
   if (state.status === "error") {
     return (
@@ -76,7 +108,7 @@ export function WorkTrackerBoard({
     );
   }
 
-  const itemsById = new Map(state.items.map((item) => [item.id, item]));
+  const itemsById = new Map(filteredItems.map((item) => [item.id, item]));
   const evaluatedAt = new Date(state.evaluatedAt ?? "1970-01-01").getTime();
   const activeClaims = new Map(
     (state.activeClaims ?? [])
@@ -118,16 +150,32 @@ export function WorkTrackerBoard({
           <p className="eyebrow">Daily write surface</p>
           <h2 id="work-tracker-title">Work Tracker</h2>
         </div>
-        <span>{state.items.length} items</span>
+        <span>{filteredItems.length} of {state.items.length} items</span>
       </div>
       <p className="observatory-panel-copy">
         Server-authoritative workflow. Drag is optional; every card has a
         keyboard-operable move control.
       </p>
 
-      {state.items.length === 0 ? (
+      {projects ? (
+        <div className="work-tracker-filter">
+          <CanonicalProjectPicker
+            id="work-tracker-project-filter"
+            name="projectFilter"
+            projects={projects}
+            value={projectKey}
+            onChange={setProjectKey}
+            allowAll
+            selectLabel="Filter by Project"
+          />
+        </div>
+      ) : null}
+
+      {filteredItems.length === 0 ? (
         <p className="work-tracker-empty-board">
-          Capture the first work item with Quick Capture.
+          {state.items.length === 0
+            ? "Capture the first work item with Quick Capture."
+            : "No work items match this Project."}
         </p>
       ) : null}
       {mutationState.status === "error" && mutationState.formError ? (
@@ -143,7 +191,7 @@ export function WorkTrackerBoard({
 
       <div className="work-tracker-columns" aria-label="Work Tracker Board">
         {OBSERVATORY_WORK_ITEM_STATES.map((columnState) => {
-          const items = state.items.filter(
+          const items = filteredItems.filter(
             (item) => item.state === columnState,
           );
           return (
@@ -163,6 +211,9 @@ export function WorkTrackerBoard({
               ) : (
                 <ul>
                   {items.map((item) => {
+                    const project = projects
+                      ? resolveWorkItemProject(item, projects)
+                      : null;
                     const targets =
                       allowedObservatoryWorkItemTransitions(item.state);
                     const claim = activeClaims.get(item.id);
@@ -208,11 +259,27 @@ export function WorkTrackerBoard({
                         <Link href={`/work-tracker/items/${item.id}`}>
                           {item.title}
                         </Link>
-                        <small>
-                          {item.project_key && item.plan_revision !== null
-                            ? `${item.project_key} · Plan ${item.plan_revision} · ${item.stage_id} · ${item.work_package_id}`
-                            : `${item.project_ref ?? "No project"}${item.milestone_ref ? ` · ${item.milestone_ref}` : ""}`}
-                        </small>
+                        {project ? (
+                          <span className="work-tracker-project-badge">
+                            Project: {project.title}
+                          </span>
+                        ) : item.project_ref ? (
+                          <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
+                            Legacy Project: {item.project_ref}
+                          </span>
+                        ) : (
+                          <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
+                            No Project
+                          </span>
+                        )}
+                        {item.milestone_ref ? (
+                          <small>Milestone: {item.milestone_ref}</small>
+                        ) : null}
+                        {item.project_key && item.plan_revision !== null ? (
+                          <small>
+                            Project Control: {item.project_key} · Plan {item.plan_revision} · {item.stage_id} · {item.work_package_id}
+                          </small>
+                        ) : null}
                         {targets.length > 0 ? (
                           <form
                             action={formAction}

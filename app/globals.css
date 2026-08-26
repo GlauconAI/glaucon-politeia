@@ -96,6 +96,28 @@
   text-transform: none;
 }
 
+.work-tracker-project-badge {
+  justify-self: start;
+  border: 1px solid #93a7df;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.work-tracker-project-badge-legacy {
+  border-color: #d4b16a;
+  background: #fff8e8;
+  color: var(--warning);
+}
+
+.work-tracker-filter {
+  max-width: 760px;
+  margin-top: 14px;
+}
+
 .work-tracker-card > a {
   color: var(--strong);
   font-weight: 700;

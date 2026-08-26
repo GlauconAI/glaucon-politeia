@@ -4,6 +4,22 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
 import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
 import type { ObservatoryWorkItemClaimRow } from "@/lib/observatory/repository";
+import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
+
+const projects: WorkTrackerProjectOption[] = [
+  {
+    projectKey: "plato/dashboard",
+    title: "Dashboard",
+    owner: "plato",
+    status: "active",
+  },
+  {
+    projectKey: "amou/wenya-ai",
+    title: "问芽 AI",
+    owner: "amou",
+    status: "maintained",
+  },
+];
 
 const item: ObservatoryWorkItemRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -14,7 +30,7 @@ const item: ObservatoryWorkItemRow = {
   priority: "high",
   owner_id: "22222222-2222-4222-8222-222222222222",
   acceptance_criteria: "The item reaches Done.",
-  project_ref: "dashboard",
+  project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
   project_key: null,
   plan_revision: null,
@@ -56,6 +72,60 @@ describe("WorkTrackerBoard", () => {
     }
     expect(screen.getByText("Build the manual board")).toBeInTheDocument();
     expect(screen.getAllByText("No work items.").length).toBeGreaterThan(0);
+  });
+
+  it("defaults to all Projects, filters through the URL, and shows prominent Project badges", () => {
+    const otherProjectItem = {
+      ...item,
+      id: "55555555-5555-4555-8555-555555555555",
+      title: "训练问芽模型",
+      project_ref: "amou/wenya-ai",
+    };
+    window.history.replaceState(null, "", "/work-tracker");
+
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item, otherProjectItem] }}
+        projects={projects}
+        initialProjectKey="all"
+      />,
+    );
+
+    expect(screen.getByLabelText("Filter by Project")).toHaveValue("all");
+    expect(screen.getByText("Project: Dashboard")).toBeVisible();
+    expect(screen.getByText("Project: 问芽 AI")).toBeVisible();
+    expect(screen.getByText("2 of 2 items")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("Filter by Project"), {
+      target: { value: "amou/wenya-ai" },
+    });
+    expect(screen.queryByText("Build the manual board")).not.toBeInTheDocument();
+    expect(screen.getByText("训练问芽模型")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 items")).toBeVisible();
+    expect(window.location.pathname + window.location.search).toBe(
+      "/work-tracker?project=amou%2Fwenya-ai",
+    );
+
+    fireEvent.change(screen.getByLabelText("Filter by Project"), {
+      target: { value: "all" },
+    });
+    expect(window.location.pathname + window.location.search).toBe(
+      "/work-tracker",
+    );
+  });
+
+  it("labels unresolved legacy Project references without inventing registry membership", () => {
+    render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [{ ...item, project_ref: "legacy-project" }],
+        }}
+        projects={projects}
+      />,
+    );
+
+    expect(screen.getByText("Legacy Project: legacy-project")).toBeVisible();
   });
 
   it("links each card to its detail and exposes only allowed move targets", () => {

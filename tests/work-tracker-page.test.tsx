@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAdmin: vi.fn(),
   listWorkItems: vi.fn(),
   listActiveWorkItemClaims: vi.fn(),
+  loadOverviewState: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -27,6 +28,10 @@ vi.mock("@/lib/observatory/repository", () => ({
   }),
 }));
 
+vi.mock("@/lib/observatory/dashboard-state", () => ({
+  loadObservatoryOverviewState: mocks.loadOverviewState,
+}));
+
 import WorkTrackerPage, { dynamic } from "@/app/work-tracker/page";
 
 describe("WorkTrackerPage", () => {
@@ -42,6 +47,30 @@ describe("WorkTrackerPage", () => {
     mocks.listWorkItems.mockResolvedValue([]);
     mocks.listActiveWorkItemClaims.mockReset();
     mocks.listActiveWorkItemClaims.mockResolvedValue([]);
+    mocks.loadOverviewState.mockReset();
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "ready",
+      snapshot: {
+        registry: {
+          project_groups: [
+            {
+              owner: "plato",
+              focus: "Product delivery",
+              projects: [
+                {
+                  project_key: "plato/dashboard",
+                  name: "dashboard",
+                  title: "Dashboard",
+                  status: "active",
+                  description: "Operational system view.",
+                  scene_ids: ["S13"],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
     mocks.redirect.mockClear();
   });
 
@@ -67,6 +96,23 @@ describe("WorkTrackerPage", () => {
     expect(
       screen.getByText(/标题、描述和验收标准默认使用中文/),
     ).toBeInTheDocument();
+  });
+
+  it("validates the Project query against the canonical registry", async () => {
+    render(
+      await WorkTrackerPage({
+        searchParams: Promise.resolve({ project: "plato/dashboard" }),
+      }),
+    );
+    expect(screen.getByLabelText("Filter by Project")).toHaveValue("plato/dashboard");
+
+    document.body.innerHTML = "";
+    render(
+      await WorkTrackerPage({
+        searchParams: Promise.resolve({ project: "unknown/project" }),
+      }),
+    );
+    expect(screen.getByLabelText("Filter by Project")).toHaveValue("all");
   });
 
   it("generates a distinct cryptographically random capture key per request", async () => {
