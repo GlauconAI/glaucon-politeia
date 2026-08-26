@@ -21,6 +21,7 @@ function validQuickCapture() {
     title: "Map the runtime boundary",
     description: "Keep the source observation read-only.",
     state: "inbox",
+    projectRef: "plato/dashboard",
     idempotencyKey: "capture-20260721-0001",
   } as const;
 }
@@ -60,6 +61,7 @@ describe("Observatory Quick Capture validation", () => {
     const result = ObservatoryQuickCaptureInputSchema.safeParse({
       type: "feature",
       title: "  A bounded title  ",
+      projectRef: "  plato/dashboard  ",
       idempotencyKey: "  capture-0002  ",
     });
 
@@ -70,6 +72,7 @@ describe("Observatory Quick Capture validation", () => {
         title: "A bounded title",
         description: "",
         state: "inbox",
+        projectRef: "plato/dashboard",
         idempotencyKey: "capture-0002",
       },
     });
@@ -194,7 +197,7 @@ describe("Work Tracker workflow contract", () => {
       acceptanceCriteria: "The item can reach Done.",
       priority: "urgent",
       ownerId: "22222222-2222-4222-8222-222222222222",
-      projectRef: null,
+      projectRef: "asgard/archaea-gacha-game",
       milestoneRef: "OBS-M3",
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
@@ -216,7 +219,7 @@ describe("Work Tracker workflow contract", () => {
         acceptanceCriteria: "",
         priority: null,
         ownerId: null,
-        projectRef: null,
+        projectRef: "",
         milestoneRef: null,
         projectKey: null,
         planRevision: null,
@@ -237,7 +240,7 @@ describe("Work Tracker workflow contract", () => {
       acceptanceCriteria: "The binding is visible.",
       priority: "high",
       ownerId: "22222222-2222-4222-8222-222222222222",
-      projectRef: null,
+      projectRef: "asgard/archaea-gacha-game",
       milestoneRef: null,
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
@@ -251,6 +254,12 @@ describe("Work Tracker workflow contract", () => {
     ).toBe(false);
     expect(
       ObservatoryWorkItemUpdateInputSchema.safeParse({ ...base, projectKey: "/private/project" }).success,
+    ).toBe(false);
+    expect(
+      ObservatoryWorkItemUpdateInputSchema.safeParse({
+        ...base,
+        projectRef: "plato/dashboard",
+      }).success,
     ).toBe(false);
   });
 

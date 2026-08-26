@@ -43,6 +43,9 @@ const NullableReferenceSchema = QuickCaptureTextSchema.max(
 )
   .nullable()
   .transform((value) => value || null);
+const ProjectReferenceSchema = QuickCaptureTextSchema.min(1).max(
+  OBSERVATORY_GOVERNANCE_REF_MAX_LENGTH,
+);
 const NullableProjectKeySchema = QuickCaptureTextSchema.max(256)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/u)
   .nullable();
@@ -58,6 +61,7 @@ export const ObservatoryQuickCaptureInputSchema = z.strictObject({
   description: QuickCaptureTextSchema.max(
     OBSERVATORY_QUICK_CAPTURE_DESCRIPTION_MAX_LENGTH,
   ).default(""),
+  projectRef: ProjectReferenceSchema,
   state: z.literal("inbox").default("inbox"),
   idempotencyKey: QuickCaptureTextSchema.min(1)
     .max(OBSERVATORY_QUICK_CAPTURE_IDEMPOTENCY_KEY_MAX_LENGTH)
@@ -137,7 +141,7 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   ),
   priority: NullablePrioritySchema,
   ownerId: NullableOwnerSchema,
-  projectRef: NullableReferenceSchema,
+  projectRef: ProjectReferenceSchema,
   milestoneRef: NullableReferenceSchema,
   projectKey: NullableProjectKeySchema,
   planRevision: z.number().int().nonnegative().nullable(),
@@ -151,6 +155,13 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
       code: "custom",
       path: ["projectKey"],
       message: "Project Control binding must be fully specified or fully empty.",
+    });
+  }
+  if (input.projectKey && input.projectRef !== input.projectKey) {
+    context.addIssue({
+      code: "custom",
+      path: ["projectRef"],
+      message: "Project must match the Project Control binding.",
     });
   }
 });
