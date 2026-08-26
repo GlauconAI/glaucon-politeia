@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   configureAgentClaimPolicy: vi.fn(),
   cancelAgentClaim: vi.fn(),
   revalidatePath: vi.fn(),
+  loadOverviewState: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
@@ -28,6 +29,10 @@ vi.mock("@/lib/supabase/server", () => ({
     if (mocks.serverClientError) throw mocks.serverClientError;
     return { from: vi.fn(), rpc: vi.fn() };
   },
+}));
+
+vi.mock("@/lib/observatory/dashboard-state", () => ({
+  loadObservatoryOverviewState: mocks.loadOverviewState,
 }));
 
 vi.mock("@/lib/observatory/repository", async (importOriginal) => {
@@ -67,6 +72,7 @@ function validFormData() {
   formData.set("type", "feature");
   formData.set("title", "  Show stale sources  ");
   formData.set("description", "  Make freshness explicit.  ");
+  formData.set("projectRef", "plato/dashboard");
   formData.set("idempotencyKey", "capture-20260721-1");
   return formData;
 }
@@ -79,6 +85,30 @@ describe("captureObservatoryWorkItemAction", () => {
     mocks.createQuickCapture.mockReset();
     mocks.createQuickCapture.mockResolvedValue({ id: "item-1" });
     mocks.revalidatePath.mockReset();
+    mocks.loadOverviewState.mockReset();
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "ready",
+      snapshot: {
+        registry: {
+          project_groups: [
+            {
+              owner: "plato",
+              focus: "Product delivery",
+              projects: [
+                {
+                  project_key: "plato/dashboard",
+                  name: "dashboard",
+                  title: "Dashboard",
+                  status: "active",
+                  description: "Operational system view.",
+                  scene_ids: ["S13"],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("rejects unauthorized callers before validation or mutation", async () => {
@@ -148,11 +178,39 @@ describe("captureObservatoryWorkItemAction", () => {
       type: "feature",
       title: "Show stale sources",
       description: "Make freshness explicit.",
+      projectRef: "plato/dashboard",
       state: "inbox",
       idempotencyKey: "capture-20260721-1",
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/work-tracker");
     expect(result).toEqual({ status: "success", workItemId: "item-1" });
+  });
+
+  it("rejects Projects that are not in the canonical registry", async () => {
+    const formData = validFormData();
+    formData.set("projectRef", "unknown/project");
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, formData),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        projectRef: ["Choose a Project from the canonical registry."],
+      },
+    });
+    expect(mocks.createQuickCapture).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the canonical Project registry is unavailable", async () => {
+    mocks.loadOverviewState.mockResolvedValue({ status: "empty" });
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, validFormData()),
+    ).resolves.toEqual({
+      status: "error",
+      formError: "Work Tracker is temporarily unavailable. Try again.",
+    });
+    expect(mocks.createQuickCapture).not.toHaveBeenCalled();
   });
 
   it("defaults an omitted optional description", async () => {
@@ -250,9 +308,9 @@ describe("Work Tracker mutation actions", () => {
     formData.set("acceptanceCriteria", "  Reaches Done.  ");
     formData.set("priority", "high");
     formData.set("ownerId", ownerId);
-    formData.set("projectRef", "  dashboard  ");
+    formData.set("projectRef", "  plato/dashboard  ");
     formData.set("milestoneRef", "");
-    formData.set("projectKey", "asgard/archaea-gacha-game");
+    formData.set("projectKey", "plato/dashboard");
     formData.set("planRevision", "3");
     formData.set("stageId", "stage-05b");
     formData.set("workPackageId", "wp-05b-coordinate-slice");
@@ -269,9 +327,9 @@ describe("Work Tracker mutation actions", () => {
       acceptanceCriteria: "Reaches Done.",
       priority: "high",
       ownerId,
-      projectRef: "dashboard",
+      projectRef: "plato/dashboard",
       milestoneRef: null,
-      projectKey: "asgard/archaea-gacha-game",
+      projectKey: "plato/dashboard",
       planRevision: 3,
       stageId: "stage-05b",
       workPackageId: "wp-05b-coordinate-slice",

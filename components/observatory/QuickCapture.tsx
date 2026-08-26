@@ -6,6 +6,8 @@ import {
   captureObservatoryWorkItemAction,
   type ObservatoryQuickCaptureActionState,
 } from "@/app/observatory/actions";
+import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
+import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
 
 type QuickCaptureAction = (
   previousState: ObservatoryQuickCaptureActionState,
@@ -16,6 +18,7 @@ type QuickCaptureProps = {
   action?: QuickCaptureAction;
   initialIdempotencyKey: string;
   initialState?: ObservatoryQuickCaptureActionState;
+  projects?: WorkTrackerProjectOption[];
 };
 
 const idleState: ObservatoryQuickCaptureActionState = { status: "idle" };
@@ -24,12 +27,14 @@ export function QuickCapture({
   action = captureObservatoryWorkItemAction,
   initialIdempotencyKey,
   initialState = idleState,
+  projects,
 }: QuickCaptureProps) {
   const [selectedType, setSelectedType] = useState<
     "idea" | "feature" | "bug"
   >("idea");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [projectRef, setProjectRef] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(
     initialIdempotencyKey,
   );
@@ -56,6 +61,7 @@ export function QuickCapture({
   const titleError = fieldErrors?.title?.[0];
   const descriptionError = fieldErrors?.description?.[0];
   const typeError = fieldErrors?.type?.[0];
+  const projectError = fieldErrors?.projectRef?.[0];
   const idempotencyError = fieldErrors?.idempotencyKey?.[0];
 
   return (
@@ -90,6 +96,21 @@ export function QuickCapture({
           name="idempotencyKey"
           value={idempotencyKey}
         />
+
+        {projects ? (
+          <>
+            <CanonicalProjectPicker
+              id="observatory-capture-project"
+              projects={projects}
+              value={projectRef}
+              onChange={setProjectRef}
+              required
+            />
+            {projectError ? (
+              <p className="observatory-field-error">{projectError}</p>
+            ) : null}
+          </>
+        ) : null}
 
         <fieldset
           className="observatory-type-picker"
@@ -182,7 +203,11 @@ export function QuickCapture({
           </p>
         ) : null}
 
-        <button className="button-primary" type="submit" disabled={pending}>
+        <button
+          className="button-primary"
+          type="submit"
+          disabled={pending || (projects !== undefined && projects.length === 0)}
+        >
           {pending ? "Capturing…" : "Capture work item"}
         </button>
       </form>

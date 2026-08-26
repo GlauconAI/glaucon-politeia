@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 import {
   AgentClaimCancellationInputSchema,
   AgentClaimPolicyInputSchema,
@@ -12,6 +13,7 @@ import {
   ObservatoryRepositoryError,
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
+import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
 import {
   ObservatoryEvidenceInputSchema,
   ObservatoryEvidenceRemovalInputSchema,
@@ -25,6 +27,7 @@ type ObservatoryQuickCaptureField =
   | "type"
   | "title"
   | "description"
+  | "projectRef"
   | "idempotencyKey";
 
 export type ObservatoryQuickCaptureActionState =
@@ -195,6 +198,7 @@ export async function captureObservatoryWorkItemAction(
     type: formValue(formData, "type"),
     title: formValue(formData, "title"),
     description: formValue(formData, "description") ?? undefined,
+    projectRef: formValue(formData, "projectRef"),
     idempotencyKey: formValue(formData, "idempotencyKey"),
   });
 
@@ -206,7 +210,31 @@ export async function captureObservatoryWorkItemAction(
         type: fieldErrors.type,
         title: fieldErrors.title,
         description: fieldErrors.description,
+        projectRef: fieldErrors.projectRef,
         idempotencyKey: fieldErrors.idempotencyKey,
+      },
+    };
+  }
+
+  let canonicalProjects;
+  try {
+    const overviewState = await loadObservatoryOverviewState();
+    if (overviewState.status !== "ready") return operationalError();
+    canonicalProjects = buildWorkTrackerProjectOptions(
+      overviewState.snapshot.registry,
+    );
+  } catch {
+    return operationalError();
+  }
+  if (
+    !canonicalProjects.some(
+      (project) => project.projectKey === validation.data.projectRef,
+    )
+  ) {
+    return {
+      status: "error",
+      fieldErrors: {
+        projectRef: ["Choose a Project from the canonical registry."],
       },
     };
   }

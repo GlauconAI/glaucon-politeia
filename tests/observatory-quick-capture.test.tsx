@@ -10,6 +10,22 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ObservatoryQuickCaptureActionState } from "@/app/observatory/actions";
 import { QuickCapture } from "@/components/observatory/QuickCapture";
+import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
+
+const projects: WorkTrackerProjectOption[] = [
+  {
+    projectKey: "plato/dashboard",
+    title: "Dashboard",
+    owner: "plato",
+    status: "active",
+  },
+  {
+    projectKey: "amou/wenya-ai",
+    title: "问芽 AI",
+    owner: "amou",
+    status: "maintained",
+  },
+];
 
 describe("QuickCapture", () => {
   it("uses keyboard-accessible native controls for Idea, Feature, and Bug capture", () => {
@@ -47,6 +63,41 @@ describe("QuickCapture", () => {
       (form.querySelector('input[name="idempotencyKey"]') as HTMLInputElement)
         .value,
     ).toBe("observatory-capture-11111111-1111-4111-8111-111111111111");
+  });
+
+  it("requires a canonical Project and preserves it after a successful capture", async () => {
+    const action = vi.fn(
+      async (
+        _previousState: ObservatoryQuickCaptureActionState,
+        _formData: FormData,
+      ): Promise<ObservatoryQuickCaptureActionState> => ({
+        status: "success",
+        workItemId: "work-item-project",
+      }),
+    );
+    render(
+      <QuickCapture
+        action={action}
+        projects={projects}
+        initialIdempotencyKey="observatory-capture-77777777-7777-4777-8777-777777777777"
+      />,
+    );
+
+    const project = screen.getByLabelText("Project");
+    expect(project).toBeRequired();
+    fireEvent.change(project, { target: { value: "amou/wenya-ai" } });
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "补充问芽训练样本" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: /quick capture/i }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /captured in inbox/i,
+    );
+    expect((action.mock.calls[0][1] as FormData).get("projectRef")).toBe(
+      "amou/wenya-ai",
+    );
+    expect(project).toHaveValue("amou/wenya-ai");
   });
 
   it("announces a successful capture", () => {

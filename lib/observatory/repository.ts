@@ -435,6 +435,7 @@ export function createObservatoryRepository(
           p_type: input.type,
           p_title: input.title,
           p_description: input.description,
+          p_project_ref: input.projectRef,
           p_idempotency_key: input.idempotencyKey,
         },
       );

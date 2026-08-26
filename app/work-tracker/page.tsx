@@ -99,7 +99,10 @@ export default async function WorkTrackerPage({
           initialProjectKey={initialProjectKey}
         />
         <aside className="observatory-capture" aria-label="Work item capture">
-          <QuickCapture initialIdempotencyKey={initialIdempotencyKey} />
+          <QuickCapture
+            initialIdempotencyKey={initialIdempotencyKey}
+            projects={projects}
+          />
         </aside>
       </div>
     </section>
