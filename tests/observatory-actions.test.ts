@@ -281,6 +281,30 @@ describe("Work Tracker mutation actions", () => {
       mutation.mockResolvedValue({ id: workItemId, version: 4 });
     }
     mocks.revalidatePath.mockReset();
+    mocks.loadOverviewState.mockReset();
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "ready",
+      snapshot: {
+        registry: {
+          project_groups: [
+            {
+              owner: "plato",
+              focus: "Product delivery",
+              projects: [
+                {
+                  project_key: "plato/dashboard",
+                  name: "dashboard",
+                  title: "Dashboard",
+                  status: "active",
+                  description: "Operational system view.",
+                  scene_ids: ["S13"],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("rejects a transition before parsing when the caller is unauthorized", async () => {
@@ -338,6 +362,34 @@ describe("Work Tracker mutation actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
       `/work-tracker/items/${workItemId}`,
     );
+  });
+
+  it("rejects a detail edit with a non-canonical Project", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("type", "feature");
+    formData.set("title", "手册看板");
+    formData.set("description", "仅管理员可用。");
+    formData.set("acceptanceCriteria", "事项可以进入 Done。");
+    formData.set("priority", "high");
+    formData.set("ownerId", ownerId);
+    formData.set("projectRef", "unknown/project");
+    formData.set("milestoneRef", "OBS-M3");
+    formData.set("projectKey", "");
+    formData.set("planRevision", "");
+    formData.set("stageId", "");
+    formData.set("workPackageId", "");
+
+    await expect(
+      updateObservatoryWorkItemAction({ status: "idle" }, formData),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        projectRef: ["Choose a Project from the canonical registry."],
+      },
+    });
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
   });
 
   it("moves a work item and returns a stable Ready Gate error", async () => {

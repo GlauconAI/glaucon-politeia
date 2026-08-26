@@ -9,6 +9,7 @@ import type {
   ObservatoryWorkItemClaimRow,
 } from "@/lib/observatory/repository";
 import { ProjectControlSnapshotSchema } from "@/lib/observatory/project-control-schema";
+import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
 import { asgardProjectControlFixture } from "./fixtures/project-control/asgard-plan-v3";
 
 const item: ObservatoryWorkItemRow = {
@@ -20,7 +21,7 @@ const item: ObservatoryWorkItemRow = {
   priority: "high",
   owner_id: "22222222-2222-4222-8222-222222222222",
   acceptance_criteria: "The item can reach Done.",
-  project_ref: "dashboard",
+  project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
   project_key: null,
   plan_revision: null,
@@ -38,6 +39,21 @@ const item: ObservatoryWorkItemRow = {
   claim_approved_by: null,
   claim_approved_at: null,
 };
+
+const projects: WorkTrackerProjectOption[] = [
+  {
+    projectKey: "plato/dashboard",
+    title: "Dashboard",
+    owner: "plato",
+    status: "active",
+  },
+  {
+    projectKey: "asgard/archaea-gacha-game",
+    title: "阿斯加德古菌",
+    owner: "lordguan",
+    status: "active",
+  },
+];
 
 const evidence: ObservatoryWorkItemEvidenceRow[] = [
   {
@@ -95,15 +111,19 @@ const activeClaim: ObservatoryWorkItemClaimRow = {
 };
 
 describe("WorkItemDetail", () => {
-  it("offers only validated Project Control Work Package bindings", () => {
+  it("offers only validated Project Control Work Package bindings", async () => {
+    const updateAction = vi
+      .fn()
+      .mockResolvedValue({ status: "success", version: 4 });
     render(
       <WorkItemDetail
         item={item}
         evidence={evidence}
         events={events}
+        projects={projects}
         projectControls={ProjectControlSnapshotSchema.parse(asgardProjectControlFixture())}
         currentAdmin={{ user_id: item.created_by, display_name: "Glaucon", username: "glaucon" }}
-        updateAction={successAction}
+        updateAction={updateAction}
         transitionAction={successAction}
         addEvidenceAction={successAction}
         removeEvidenceAction={successAction}
@@ -114,6 +134,24 @@ describe("WorkItemDetail", () => {
       "Coordinate interaction slice",
     );
     expect(screen.getByText(/parent Stage and Gate remain Orchestrator-owned/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^project$/i)).toHaveValue("plato/dashboard");
+    expect(screen.queryByLabelText(/project reference/i)).not.toBeInTheDocument();
+
+    const binding = screen.getByLabelText(/project control binding/i);
+    const asgardBinding = Array.from(
+      (binding as HTMLSelectElement).options,
+    ).find((option) => option.value && option.textContent?.includes("Coordinate interaction slice"));
+    expect(asgardBinding).toBeDefined();
+    fireEvent.change(binding, { target: { value: asgardBinding!.value } });
+    expect(screen.getByLabelText(/^project$/i)).toHaveValue(
+      "asgard/archaea-gacha-game",
+    );
+
+    fireEvent.submit(screen.getByRole("button", { name: /save fields/i }).closest("form")!);
+    await waitFor(() => expect(updateAction).toHaveBeenCalledTimes(1));
+    const submitted = updateAction.mock.calls[0][1] as FormData;
+    expect(submitted.get("projectRef")).toBe("asgard/archaea-gacha-game");
+    expect(submitted.get("projectKey")).toBe("asgard/archaea-gacha-game");
   });
 
   it("renders editable fields, Ready Gate guidance, and allowed transitions", () => {
@@ -122,6 +160,7 @@ describe("WorkItemDetail", () => {
         item={item}
         evidence={evidence}
         events={events}
+        projects={projects}
         currentAdmin={{
           user_id: item.created_by,
           display_name: "Glaucon",
@@ -168,6 +207,7 @@ describe("WorkItemDetail", () => {
         item={item}
         evidence={evidence}
         events={events}
+        projects={projects}
         currentAdmin={{
           user_id: item.created_by,
           display_name: "Glaucon",
@@ -203,6 +243,7 @@ describe("WorkItemDetail", () => {
         item={{ ...item, priority: null, owner_id: null, acceptance_criteria: "" }}
         evidence={[]}
         events={[]}
+        projects={projects}
         currentAdmin={{
           user_id: item.created_by,
           display_name: "Glaucon",
@@ -230,6 +271,7 @@ describe("WorkItemDetail", () => {
         item={{ ...item, priority: null, owner_id: null }}
         evidence={[]}
         events={[]}
+        projects={projects}
         currentAdmin={{
           user_id: item.created_by,
           display_name: "Glaucon",
@@ -268,6 +310,7 @@ describe("WorkItemDetail", () => {
         }}
         evidence={[]}
         events={[]}
+        projects={projects}
         claims={[activeClaim]}
         currentAdmin={{
           user_id: item.created_by,
@@ -296,6 +339,7 @@ describe("WorkItemDetail", () => {
         item={item}
         evidence={[]}
         events={[]}
+        projects={projects}
         claims={[
           {
             ...activeClaim,

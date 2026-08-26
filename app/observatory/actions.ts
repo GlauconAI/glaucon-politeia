@@ -76,6 +76,13 @@ function operationalError(): ObservatoryQuickCaptureActionState {
   };
 }
 
+async function loadCanonicalWorkTrackerProjects() {
+  const overviewState = await loadObservatoryOverviewState();
+  return overviewState.status === "ready"
+    ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
+    : null;
+}
+
 async function authorizedRepository(): Promise<
   | {
       ok: true;
@@ -218,11 +225,8 @@ export async function captureObservatoryWorkItemAction(
 
   let canonicalProjects;
   try {
-    const overviewState = await loadObservatoryOverviewState();
-    if (overviewState.status !== "ready") return operationalError();
-    canonicalProjects = buildWorkTrackerProjectOptions(
-      overviewState.snapshot.registry,
-    );
+    canonicalProjects = await loadCanonicalWorkTrackerProjects();
+    if (!canonicalProjects) return operationalError();
   } catch {
     return operationalError();
   }
@@ -293,6 +297,31 @@ export async function updateObservatoryWorkItemAction(
   });
   if (!validation.success) {
     return fieldErrorState(validation.error.flatten().fieldErrors);
+  }
+
+  let canonicalProjects;
+  try {
+    canonicalProjects = await loadCanonicalWorkTrackerProjects();
+  } catch {
+    return {
+      status: "error",
+      formError: "Work Tracker is temporarily unavailable. Try again.",
+    };
+  }
+  if (!canonicalProjects) {
+    return {
+      status: "error",
+      formError: "Work Tracker is temporarily unavailable. Try again.",
+    };
+  }
+  if (
+    !canonicalProjects.some(
+      (project) => project.projectKey === validation.data.projectRef,
+    )
+  ) {
+    return fieldErrorState({
+      projectRef: ["Choose a Project from the canonical registry."],
+    });
   }
 
   try {

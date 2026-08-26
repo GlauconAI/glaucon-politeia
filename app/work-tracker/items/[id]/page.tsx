@@ -8,6 +8,7 @@ import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
+import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,11 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
       claims={claims}
       evaluatedAt={new Date().toISOString()}
       currentAdmin={currentAdmin}
+      projects={
+        overviewState.status === "ready"
+          ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
+          : []
+      }
       projectControls={
         overviewState.status === "ready" &&
         "project_controls" in overviewState.snapshot

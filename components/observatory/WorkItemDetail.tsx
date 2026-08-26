@@ -12,6 +12,7 @@ import {
   type ObservatoryWorkItemMutationActionState,
   updateObservatoryWorkItemAction,
 } from "@/app/observatory/actions";
+import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
 import type {
   ObservatoryWorkItemEventRow,
   ObservatoryWorkItemEvidenceRow,
@@ -20,6 +21,10 @@ import type {
 } from "@/lib/observatory/repository";
 import type { ProjectControlSnapshot } from "@/lib/observatory/project-control-schema";
 import { classifyProjectControlBinding } from "@/lib/observatory/project-control";
+import {
+  resolveWorkItemProject,
+  type WorkTrackerProjectOption,
+} from "@/lib/observatory/work-tracker-projects";
 import {
   OBSERVATORY_AGENT_ACTION_CLASSES,
   OBSERVATORY_AGENT_RISK_LEVELS,
@@ -55,6 +60,7 @@ type WorkItemDetailProps = {
   cancelClaimAction?: MutationAction;
   evaluatedAt?: string;
   projectControls?: ProjectControlSnapshot | null;
+  projects: WorkTrackerProjectOption[];
 };
 
 const stateLabels = {
@@ -151,6 +157,7 @@ export function WorkItemDetail({
   cancelClaimAction = cancelObservatoryAgentClaimAction,
   evaluatedAt = item.updated_at,
   projectControls = null,
+  projects,
 }: WorkItemDetailProps) {
   const [updateState, updateFormAction, updating] = useActionState(
     updateAction,
@@ -176,6 +183,9 @@ export function WorkItemDetail({
   );
   const [priority, setPriority] = useState(item.priority ?? "");
   const [ownerId, setOwnerId] = useState(item.owner_id ?? "");
+  const [projectRef, setProjectRef] = useState(
+    resolveWorkItemProject(item, projects)?.projectKey ?? "",
+  );
   const bindingOptions = projectControls?.projects.flatMap((project) =>
     project.work_packages.map((workPackage) => {
       const stage = project.stages.find((candidate) => candidate.stage_id === workPackage.stage_id);
@@ -204,6 +214,13 @@ export function WorkItemDetail({
     : bindingOptions;
   const [bindingKey, setBindingKey] = useState(currentBinding?.key ?? "");
   const selectedBinding = allBindingOptions.find((option) => option.key === bindingKey) ?? null;
+  function selectBinding(nextBindingKey: string) {
+    setBindingKey(nextBindingKey);
+    const nextBinding = allBindingOptions.find(
+      (option) => option.key === nextBindingKey,
+    );
+    if (nextBinding) setProjectRef(nextBinding.projectKey);
+  }
   const bindingStatus = currentBinding
     ? classifyProjectControlBinding(currentBinding, projectControls)
     : null;
@@ -342,14 +359,15 @@ export function WorkItemDetail({
               <option value={currentAdmin.user_id}>{ownerLabel}</option>
             </select>
           </label>
-          <label>
-            <span>Project reference</span>
-            <input
-              name="projectRef"
-              defaultValue={item.project_ref ?? ""}
-              maxLength={160}
+          <div className="work-item-wide-field">
+            <CanonicalProjectPicker
+              id="work-item-project"
+              projects={projects}
+              value={projectRef}
+              onChange={setProjectRef}
+              required
             />
-          </label>
+          </div>
           <label>
             <span>Milestone reference</span>
             <input
@@ -363,7 +381,7 @@ export function WorkItemDetail({
             <select
               aria-describedby="project-control-binding-help"
               value={bindingKey}
-              onChange={(event) => setBindingKey(event.target.value)}
+              onChange={(event) => selectBinding(event.target.value)}
             >
               <option value="">Not bound</option>
               {allBindingOptions.map((option) => (
@@ -381,7 +399,11 @@ export function WorkItemDetail({
           <input type="hidden" name="planRevision" value={selectedBinding?.planRevision ?? ""} />
           <input type="hidden" name="stageId" value={selectedBinding?.stageId ?? ""} />
           <input type="hidden" name="workPackageId" value={selectedBinding?.workPackageId ?? ""} />
-          <button className="button-primary" type="submit" disabled={updating}>
+          <button
+            className="button-primary"
+            type="submit"
+            disabled={updating || projects.length === 0}
+          >
             {updating ? "Saving…" : "Save fields"}
           </button>
         </form>

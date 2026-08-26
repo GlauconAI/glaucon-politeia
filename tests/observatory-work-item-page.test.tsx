@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("not-found");
   }),
+  loadOverviewState: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -44,7 +45,7 @@ vi.mock("@/lib/observatory/repository", () => ({
   }),
 }));
 vi.mock("@/lib/observatory/dashboard-state", () => ({
-  loadObservatoryOverviewState: async () => ({ status: "empty" }),
+  loadObservatoryOverviewState: mocks.loadOverviewState,
 }));
 
 import WorkItemPage from "@/app/work-tracker/items/[id]/page";
@@ -58,7 +59,7 @@ const item = {
   priority: null,
   owner_id: null,
   acceptance_criteria: "",
-  project_ref: null,
+  project_ref: "Dashboard",
   milestone_ref: null,
   project_key: null,
   plan_revision: null,
@@ -93,6 +94,30 @@ describe("WorkItemPage", () => {
     mocks.listWorkItemEvents.mockResolvedValue([]);
     mocks.listWorkItemClaims.mockReset();
     mocks.listWorkItemClaims.mockResolvedValue([]);
+    mocks.loadOverviewState.mockReset();
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "ready",
+      snapshot: {
+        registry: {
+          project_groups: [
+            {
+              owner: "plato",
+              focus: "Product delivery",
+              projects: [
+                {
+                  project_key: "plato/dashboard",
+                  name: "dashboard",
+                  title: "Dashboard",
+                  status: "active",
+                  description: "Operational system view.",
+                  scene_ids: ["S13"],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
   });
 
   it("redirects unauthorized visitors before reading the item", async () => {
@@ -117,6 +142,7 @@ describe("WorkItemPage", () => {
     expect(mocks.listWorkItemEvidence).toHaveBeenCalledWith(item.id);
     expect(mocks.listWorkItemEvents).toHaveBeenCalledWith(item.id);
     expect(mocks.listWorkItemClaims).toHaveBeenCalledWith(item.id);
+    expect(screen.getByLabelText(/^project$/i)).toHaveValue("plato/dashboard");
   });
 
   it("uses the not-found boundary for a missing item", async () => {
