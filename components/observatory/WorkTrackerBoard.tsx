@@ -1,28 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import {
   transitionObservatoryWorkItemAction,
   type ObservatoryWorkItemMutationActionState,
 } from "@/app/observatory/actions";
 import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
-import {
-  getAgentClaimEligibility,
-} from "@/lib/observatory/agent-claims";
+import { getAgentClaimEligibility } from "@/lib/observatory/agent-claims";
 import type {
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
 } from "@/lib/observatory/repository";
 import {
+  filterTrackedWorkTrackerProjects,
   resolveWorkItemProject,
   type WorkTrackerProjectOption,
 } from "@/lib/observatory/work-tracker-projects";
 import {
-  OBSERVATORY_WORK_ITEM_STATES,
+  OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS,
+  OBSERVATORY_WORK_ITEM_COMPLETED_STATES,
   allowedObservatoryWorkItemTransitions,
   type ObservatoryWorkItemState,
+  type ObservatoryWorkItemType,
 } from "@/lib/observatory/work-items";
 
 export type WorkTrackerBoardState =
@@ -46,7 +47,7 @@ type WorkTrackerBoardProps = {
   initialProjectKey?: string;
 };
 
-const labels: Record<ObservatoryWorkItemState, string> = {
+const stateLabels: Record<ObservatoryWorkItemState, string> = {
   inbox: "Inbox",
   triage: "Triage",
   ready: "Ready",
@@ -58,6 +59,12 @@ const labels: Record<ObservatoryWorkItemState, string> = {
   reopened: "Reopened",
 };
 
+const typeLabels: Record<ObservatoryWorkItemType, string> = {
+  idea: "想法",
+  feature: "功能",
+  bug: "Bug",
+};
+
 const idleState: ObservatoryWorkItemMutationActionState = { status: "idle" };
 
 export function WorkTrackerBoard({
@@ -67,14 +74,20 @@ export function WorkTrackerBoard({
   initialProjectKey = "all",
 }: WorkTrackerBoardProps) {
   const [projectKey, setProjectKey] = useState(initialProjectKey);
+  const [view, setView] = useState<"active" | "completed">("active");
   const [mutationState, formAction, pending] = useActionState(
     action,
     idleState,
   );
+
+  const trackedProjects = useMemo(() => {
+    if (state.status !== "ready" || !projects) return [];
+    return filterTrackedWorkTrackerProjects(projects, state.items);
+  }, [projects, state]);
+
   const filteredItems = useMemo(() => {
-    if (state.status !== "ready" || projectKey === "all" || !projects) {
-      return state.status === "ready" ? state.items : [];
-    }
+    if (state.status !== "ready") return [];
+    if (projectKey === "all" || !projects) return state.items;
     return state.items.filter(
       (item) =>
         resolveWorkItemProject(item, projects)?.projectKey === projectKey,
@@ -108,7 +121,6 @@ export function WorkTrackerBoard({
     );
   }
 
-  const itemsById = new Map(filteredItems.map((item) => [item.id, item]));
   const evaluatedAt = new Date(state.evaluatedAt ?? "1970-01-01").getTime();
   const activeClaims = new Map(
     (state.activeClaims ?? [])
@@ -120,27 +132,106 @@ export function WorkTrackerBoard({
       )
       .map((claim) => [claim.work_item_id, claim]),
   );
+  const activeItems = filteredItems.filter(
+    (item) => !OBSERVATORY_WORK_ITEM_COMPLETED_STATES.includes(item.state as "done"),
+  );
+  const completedItems = filteredItems.filter((item) =>
+    OBSERVATORY_WORK_ITEM_COMPLETED_STATES.includes(item.state as "done"),
+  );
 
-  function submitMove(item: ObservatoryWorkItemRow, targetState: string) {
-    const formData = new FormData();
-    formData.set("workItemId", item.id);
-    formData.set("expectedVersion", String(item.version));
-    formData.set("targetState", targetState);
-    startTransition(() => formAction(formData));
-  }
+  function renderCard(item: ObservatoryWorkItemRow) {
+    const project = projects ? resolveWorkItemProject(item, projects) : null;
+    const targets = allowedObservatoryWorkItemTransitions(item.state);
+    const claim = activeClaims.get(item.id);
+    const readyGateComplete = Boolean(
+      item.acceptance_criteria.trim() && item.priority && item.owner_id,
+    );
+    const eligibility = getAgentClaimEligibility({
+      type: item.type,
+      state: item.state,
+      readyGateComplete,
+      riskLevel: item.risk_level,
+      enabled: item.agent_claim_enabled,
+      authorizedPaths: item.authorized_paths,
+      allowedActionClasses: item.allowed_action_classes,
+      activeClaim: Boolean(claim),
+    });
+    const claimLabel = claim
+      ? `Claimed by ${claim.agent_id}`
+      : eligibility.eligible
+        ? "Agent eligible"
+        : "Manual";
 
-  function dropOnColumn(
-    event: React.DragEvent<HTMLElement>,
-    targetState: ObservatoryWorkItemState,
-  ) {
-    event.preventDefault();
-    const item = itemsById.get(event.dataTransfer.getData("text/plain"));
-    if (
-      item &&
-      allowedObservatoryWorkItemTransitions(item.state).includes(targetState)
-    ) {
-      submitMove(item, targetState);
-    }
+    return (
+      <li
+        key={item.id}
+        className={`work-tracker-card work-tracker-card-${item.type}`}
+        data-testid={`work-item-${item.id}`}
+      >
+        <div className="work-tracker-card-header">
+          <div className="work-tracker-card-meta">
+            <span
+              className={`work-tracker-type-badge work-tracker-type-${item.type}`}
+            >
+              {typeLabels[item.type]}
+            </span>
+            <span
+              className={`work-tracker-state-badge work-tracker-state-${item.state}`}
+            >
+              {stateLabels[item.state]}
+            </span>
+            <span className="work-tracker-priority-badge">
+              {item.priority ?? "No priority"}
+            </span>
+          </div>
+          {targets.length > 0 ? (
+            <details className="work-tracker-card-actions">
+              <summary aria-label={`打开 ${item.title} 操作菜单`}>
+                <span aria-hidden="true">•••</span>
+              </summary>
+              <form action={formAction}>
+                <input type="hidden" name="workItemId" value={item.id} />
+                <input
+                  type="hidden"
+                  name="expectedVersion"
+                  value={item.version}
+                />
+                {targets.map((target) => (
+                  <button
+                    key={target}
+                    type="submit"
+                    name="targetState"
+                    value={target}
+                    disabled={pending}
+                  >
+                    移动到 {stateLabels[target]}
+                  </button>
+                ))}
+              </form>
+            </details>
+          ) : null}
+        </div>
+
+        <Link href={`/work-tracker/items/${item.id}`}>{item.title}</Link>
+
+        <div className="work-tracker-card-footer">
+          {project ? (
+            <span className="work-tracker-project-badge">
+              Project: {project.title}
+            </span>
+          ) : item.project_ref ? (
+            <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
+              Legacy Project: {item.project_ref}
+            </span>
+          ) : (
+            <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
+              No Project
+            </span>
+          )}
+          <span className="work-tracker-claim-badge">{claimLabel}</span>
+        </div>
+      </li>
+    );
   }
 
   return (
@@ -150,31 +241,50 @@ export function WorkTrackerBoard({
           <p className="eyebrow">Daily write surface</p>
           <h2 id="work-tracker-title">Work Tracker</h2>
         </div>
-        <span>{filteredItems.length} of {state.items.length} items</span>
+        <span>
+          {filteredItems.length} of {state.items.length} items
+        </span>
       </div>
       <p className="observatory-panel-copy">
-        Server-authoritative workflow. Drag is optional; every card has a
-        keyboard-operable move control.
+        九种审计状态收束为四个工作分组；精确状态转换位于每张卡片的三点菜单。
       </p>
 
-      {projects ? (
+      {projects && trackedProjects.length > 0 ? (
         <div className="work-tracker-filter">
           <CanonicalProjectPicker
             id="work-tracker-project-filter"
             name="projectFilter"
-            projects={projects}
+            projects={trackedProjects}
             value={projectKey}
             onChange={setProjectKey}
             allowAll
             selectLabel="Filter by Project"
+            allLabel="全部有 Item 的 Project"
           />
         </div>
       ) : null}
 
+      <div className="work-tracker-view-tabs" aria-label="Work Tracker views">
+        <button
+          type="button"
+          aria-pressed={view === "active"}
+          onClick={() => setView("active")}
+        >
+          进行中工作 {activeItems.length}
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "completed"}
+          onClick={() => setView("completed")}
+        >
+          已完成 {completedItems.length}
+        </button>
+      </div>
+
       {filteredItems.length === 0 ? (
         <p className="work-tracker-empty-board">
           {state.items.length === 0
-            ? "Capture the first work item with Quick Capture."
+            ? "Use 新建 Item to capture the first work item."
             : "No work items match this Project."}
         </p>
       ) : null}
@@ -189,142 +299,46 @@ export function WorkTrackerBoard({
         </p>
       ) : null}
 
-      <div className="work-tracker-columns" aria-label="Work Tracker Board">
-        {OBSERVATORY_WORK_ITEM_STATES.map((columnState) => {
-          const items = filteredItems.filter(
-            (item) => item.state === columnState,
-          );
-          return (
-            <section
-              key={columnState}
-              className={`work-tracker-column work-tracker-column-${columnState}`}
-              aria-label={`${labels[columnState]} · ${items.length}`}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => dropOnColumn(event, columnState)}
-            >
-              <header>
-                <h3>{labels[columnState]}</h3>
-                <span>{items.length}</span>
-              </header>
-              {items.length === 0 ? (
-                <p className="work-tracker-column-empty">No work items.</p>
-              ) : (
-                <ul>
-                  {items.map((item) => {
-                    const project = projects
-                      ? resolveWorkItemProject(item, projects)
-                      : null;
-                    const targets =
-                      allowedObservatoryWorkItemTransitions(item.state);
-                    const claim = activeClaims.get(item.id);
-                    const readyGateComplete = Boolean(
-                      item.acceptance_criteria.trim() &&
-                        item.priority &&
-                        item.owner_id,
-                    );
-                    const eligibility = getAgentClaimEligibility({
-                      type: item.type,
-                      state: item.state,
-                      readyGateComplete,
-                      riskLevel: item.risk_level,
-                      enabled: item.agent_claim_enabled,
-                      authorizedPaths: item.authorized_paths,
-                      allowedActionClasses: item.allowed_action_classes,
-                      activeClaim: Boolean(claim),
-                    });
-                    const claimLabel = claim
-                      ? `Claimed by ${claim.agent_id}`
-                      : eligibility.eligible
-                        ? "Agent eligible"
-                        : "Manual";
-                    return (
-                      <li
-                        key={item.id}
-                        className="work-tracker-card"
-                        draggable
-                        data-testid={`work-item-${item.id}`}
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", item.id);
-                        }}
-                      >
-                        <div className="work-tracker-card-meta">
-                          <span>{item.type}</span>
-                          <span>{item.priority ?? "No priority"}</span>
-                          <span>v{item.version}</span>
-                          <span className="work-tracker-claim-badge">
-                            {claimLabel}
-                          </span>
-                        </div>
-                        <Link href={`/work-tracker/items/${item.id}`}>
-                          {item.title}
-                        </Link>
-                        {project ? (
-                          <span className="work-tracker-project-badge">
-                            Project: {project.title}
-                          </span>
-                        ) : item.project_ref ? (
-                          <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
-                            Legacy Project: {item.project_ref}
-                          </span>
-                        ) : (
-                          <span className="work-tracker-project-badge work-tracker-project-badge-legacy">
-                            No Project
-                          </span>
-                        )}
-                        {item.milestone_ref ? (
-                          <small>Milestone: {item.milestone_ref}</small>
-                        ) : null}
-                        {item.project_key && item.plan_revision !== null ? (
-                          <small>
-                            Project Control: {item.project_key} · Plan {item.plan_revision} · {item.stage_id} · {item.work_package_id}
-                          </small>
-                        ) : null}
-                        {targets.length > 0 ? (
-                          <form
-                            action={formAction}
-                            className="work-tracker-move-form"
-                          >
-                            <input
-                              type="hidden"
-                              name="workItemId"
-                              value={item.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="expectedVersion"
-                              value={item.version}
-                            />
-                            <label>
-                              <span className="sr-only">
-                                Move {item.title} to
-                              </span>
-                              <select
-                                name="targetState"
-                                aria-label={`Move ${item.title} to`}
-                                defaultValue={targets[0]}
-                              >
-                                {targets.map((target) => (
-                                  <option key={target} value={target}>
-                                    {labels[target]}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <button type="submit" disabled={pending}>
-                              {pending ? "Moving…" : "Move"}
-                            </button>
-                          </form>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
+      {view === "active" ? (
+        <div className="work-tracker-columns" aria-label="Work Tracker Board">
+          {OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS.map((group) => {
+            const items = activeItems.filter((item) =>
+              group.states.includes(item.state as never),
+            );
+            return (
+              <section
+                key={group.id}
+                className={`work-tracker-column work-tracker-column-${group.id}`}
+                aria-label={`${group.label} · ${items.length}`}
+              >
+                <header>
+                  <div>
+                    <h3>{group.label}</h3>
+                    <small>{group.description}</small>
+                  </div>
+                  <span>{items.length}</span>
+                </header>
+                {items.length === 0 ? (
+                  <p className="work-tracker-column-empty">No work items.</p>
+                ) : (
+                  <ul>{items.map(renderCard)}</ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <section
+          className="work-tracker-history"
+          aria-label={`已完成事项 · ${completedItems.length}`}
+        >
+          {completedItems.length === 0 ? (
+            <p className="work-tracker-column-empty">No completed work items.</p>
+          ) : (
+            <ul>{completedItems.map(renderCard)}</ul>
+          )}
+        </section>
+      )}
     </section>
   );
 }

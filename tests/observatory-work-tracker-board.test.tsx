@@ -19,6 +19,12 @@ const projects: WorkTrackerProjectOption[] = [
     owner: "amou",
     status: "maintained",
   },
+  {
+    projectKey: "plato/unused",
+    title: "Unused Project",
+    owner: "plato",
+    status: "active",
+  },
 ];
 
 const item: ObservatoryWorkItemRow = {
@@ -50,31 +56,32 @@ const item: ObservatoryWorkItemRow = {
 };
 
 describe("WorkTrackerBoard", () => {
-  it("renders every workflow column and an explicit empty state", () => {
+  it("renders four active work groups and keeps Done in a separate view", () => {
     render(
       <WorkTrackerBoard state={{ status: "ready", items: [item] }} />,
     );
 
     for (const label of [
-      "Inbox",
-      "Triage",
-      "Ready",
-      "In Progress",
-      "Review",
-      "Done",
-      "Blocked",
-      "Waiting",
-      "Reopened",
+      "待处理",
+      "待执行",
+      "进行中",
+      "待验收",
     ]) {
       expect(
         screen.getByRole("region", { name: new RegExp(`^${label}`, "i") }),
       ).toBeInTheDocument();
     }
+    expect(screen.queryByRole("region", { name: /^Done/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /进行中工作 1/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /已完成 0/i })).toBeInTheDocument();
     expect(screen.getByText("Build the manual board")).toBeInTheDocument();
     expect(screen.getAllByText("No work items.").length).toBeGreaterThan(0);
   });
 
-  it("defaults to all Projects, filters through the URL, and shows prominent Project badges", () => {
+  it("filters through the URL and only offers Projects that already have Items", () => {
     const otherProjectItem = {
       ...item,
       id: "55555555-5555-4555-8555-555555555555",
@@ -91,7 +98,11 @@ describe("WorkTrackerBoard", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Filter by Project")).toHaveValue("all");
+    const filter = screen.getByLabelText("Filter by Project");
+    expect(filter).toHaveValue("all");
+    expect(screen.getByRole("option", { name: /Dashboard/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /问芽 AI/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Unused Project/ })).not.toBeInTheDocument();
     expect(screen.getByText("Project: Dashboard")).toBeVisible();
     expect(screen.getByText("Project: 问芽 AI")).toBeVisible();
     expect(screen.getByText("2 of 2 items")).toBeVisible();
@@ -128,7 +139,7 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByText("Legacy Project: legacy-project")).toBeVisible();
   });
 
-  it("links each card to its detail and exposes only allowed move targets", () => {
+  it("links each compact card to its detail and exposes allowed moves in a three-dot menu", () => {
     render(
       <WorkTrackerBoard state={{ status: "ready", items: [item] }} />,
     );
@@ -139,13 +150,16 @@ describe("WorkTrackerBoard", () => {
       "href",
       `/work-tracker/items/${item.id}`,
     );
-    const select = screen.getByLabelText(/move build the manual board to/i);
-    expect(select).toHaveValue("inbox");
-    expect(screen.getByRole("option", { name: "Inbox" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Ready" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("option", { name: "Done" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("功能")).toHaveClass("work-tracker-type-feature");
+    expect(screen.getByText("Triage")).toHaveClass("work-tracker-state-badge");
+    expect(screen.queryByText(/Milestone:/)).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByLabelText(/打开 build the manual board 操作菜单/i),
+    );
+    expect(screen.getByRole("button", { name: "移动到 Inbox" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移动到 Ready" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "移动到 Done" })).not.toBeInTheDocument();
   });
 
   it("labels manual, eligible, and actively claimed work without drag-only semantics", () => {
@@ -195,7 +209,7 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByText("Agent eligible")).toBeInTheDocument();
     expect(screen.getByText("Claimed by plato-pilot")).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/move claimed feature to/i),
+      screen.getByLabelText(/打开 claimed feature 操作菜单/i),
     ).toBeInTheDocument();
   });
 
@@ -210,11 +224,10 @@ describe("WorkTrackerBoard", () => {
       />,
     );
 
-    fireEvent.change(
-      screen.getByLabelText(/move build the manual board to/i),
-      { target: { value: "ready" } },
+    fireEvent.click(
+      screen.getByLabelText(/打开 build the manual board 操作菜单/i),
     );
-    fireEvent.click(screen.getByRole("button", { name: /^move$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "移动到 Ready" }));
 
     await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
     const submitted = action.mock.calls[0][1] as FormData;
@@ -223,7 +236,7 @@ describe("WorkTrackerBoard", () => {
     expect(submitted.get("targetState")).toBe("ready");
   });
 
-  it("supports native drag as enhancement and reports stable failures", async () => {
+  it("reports stable failures from an explicit menu action", async () => {
     const action = vi.fn().mockResolvedValue({
       status: "error",
       formError: "This item changed. Refresh before trying again.",
@@ -235,22 +248,32 @@ describe("WorkTrackerBoard", () => {
       />,
     );
 
-    const data = new Map<string, string>();
-    const dataTransfer = {
-      setData: (type: string, value: string) => data.set(type, value),
-      getData: (type: string) => data.get(type) ?? "",
-      effectAllowed: "move",
-    };
-    fireEvent.dragStart(screen.getByTestId(`work-item-${item.id}`), {
-      dataTransfer,
-    });
-    fireEvent.drop(screen.getByRole("region", { name: /^ready/i }), {
-      dataTransfer,
-    });
+    fireEvent.click(
+      screen.getByLabelText(/打开 build the manual board 操作菜单/i),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "移动到 Ready" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/changed.*refresh/i),
     );
+  });
+
+  it("switches to a compact completed history view", () => {
+    const done = {
+      ...item,
+      id: "99999999-9999-4999-8999-999999999999",
+      title: "Shipped release",
+      state: "done" as const,
+    };
+    render(
+      <WorkTrackerBoard state={{ status: "ready", items: [item, done] }} />,
+    );
+
+    expect(screen.queryByText("Shipped release")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /已完成 1/i }));
+    expect(screen.getByText("Shipped release")).toBeInTheDocument();
+    expect(screen.queryByText("Build the manual board")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /已完成事项 · 1/i })).toBeInTheDocument();
   });
 
   it("renders bounded unavailable and empty-board states", () => {
