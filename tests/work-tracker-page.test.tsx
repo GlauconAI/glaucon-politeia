@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -85,20 +85,55 @@ describe("WorkTrackerPage", () => {
     expect(mocks.listActiveWorkItemClaims).not.toHaveBeenCalled();
   });
 
-  it("renders the independent write surface with Chinese authoring guidance", async () => {
+  it("opens Quick Capture from a top-level button without reserving board width", async () => {
     render(await WorkTrackerPage());
 
     expect(
       screen.getByRole("heading", { name: /^work tracker$/i, level: 1 }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /新建 item/i }));
+    expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /work tracker/i })).toBeInTheDocument();
     expect(
       screen.getByText(/标题、描述和验收标准默认使用中文/),
     ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: /quick capture/i })).not.toBeInTheDocument();
   });
 
   it("validates the Project query against the canonical registry", async () => {
+    mocks.listWorkItems.mockResolvedValue([
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        type: "feature",
+        title: "Improve Work Tracker",
+        description: "",
+        state: "triage",
+        priority: "high",
+        owner_id: "22222222-2222-4222-8222-222222222222",
+        acceptance_criteria: "The board is usable.",
+        project_ref: "plato/dashboard",
+        milestone_ref: null,
+        project_key: null,
+        plan_revision: null,
+        stage_id: null,
+        work_package_id: null,
+        idempotency_key: "capture-page-test",
+        version: 2,
+        created_by: "22222222-2222-4222-8222-222222222222",
+        created_at: "2026-08-26T20:00:00.000Z",
+        updated_at: "2026-08-26T20:00:00.000Z",
+        risk_level: "unclassified",
+        agent_claim_enabled: false,
+        authorized_paths: [],
+        allowed_action_classes: [],
+        claim_approved_by: null,
+        claim_approved_at: null,
+      },
+    ]);
     render(
       await WorkTrackerPage({
         searchParams: Promise.resolve({ project: "plato/dashboard" }),
@@ -117,6 +152,7 @@ describe("WorkTrackerPage", () => {
 
   it("generates a distinct cryptographically random capture key per request", async () => {
     const firstRender = render(await WorkTrackerPage());
+    fireEvent.click(screen.getByRole("button", { name: /新建 item/i }));
     const firstKey = (
       screen.getByRole("form", { name: /quick capture/i }).querySelector(
         'input[name="idempotencyKey"]',
@@ -125,6 +161,7 @@ describe("WorkTrackerPage", () => {
     firstRender.unmount();
 
     render(await WorkTrackerPage());
+    fireEvent.click(screen.getByRole("button", { name: /新建 item/i }));
     const secondKey = (
       screen.getByRole("form", { name: /quick capture/i }).querySelector(
         'input[name="idempotencyKey"]',

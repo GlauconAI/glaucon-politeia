@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { redirect } from "next/navigation";
 
-import { QuickCapture } from "@/components/observatory/QuickCapture";
+import { WorkTrackerCaptureDrawer } from "@/components/observatory/WorkTrackerCaptureDrawer";
 import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
@@ -13,7 +13,10 @@ import {
   createObservatoryRepository,
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
-import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
+import {
+  buildWorkTrackerProjectOptions,
+  filterTrackedWorkTrackerProjects,
+} from "@/lib/observatory/work-tracker-projects";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +72,12 @@ export default async function WorkTrackerPage({
     overviewState.status === "ready"
       ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
       : [];
+  const trackedProjects =
+    state.status === "ready"
+      ? filterTrackedWorkTrackerProjects(projects, state.items)
+      : [];
   const requestedProject = searchValue(params, "project");
-  const initialProjectKey = projects.some(
+  const initialProjectKey = trackedProjects.some(
     (project) => project.projectKey === requestedProject,
   )
     ? requestedProject!
@@ -85,10 +92,16 @@ export default async function WorkTrackerPage({
           <h1>Work Tracker</h1>
           <p>&gt; 管理、推进并审计真实工作事项</p>
         </div>
-        <div className="shell-status-line" aria-label="Work Tracker access">
-          <span>mode: admin</span>
-          <span>workflow: audited write</span>
-          <span>agent claim: bounded</span>
+        <div className="work-tracker-hero-actions">
+          <div className="shell-status-line" aria-label="Work Tracker access">
+            <span>mode: admin</span>
+            <span>workflow: audited write</span>
+            <span>agent claim: bounded</span>
+          </div>
+          <WorkTrackerCaptureDrawer
+            initialIdempotencyKey={initialIdempotencyKey}
+            projects={projects}
+          />
         </div>
       </header>
 
@@ -98,12 +111,6 @@ export default async function WorkTrackerPage({
           projects={projects}
           initialProjectKey={initialProjectKey}
         />
-        <aside className="observatory-capture" aria-label="Work item capture">
-          <QuickCapture
-            initialIdempotencyKey={initialIdempotencyKey}
-            projects={projects}
-          />
-        </aside>
       </div>
     </section>
   );

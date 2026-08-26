@@ -31,15 +31,14 @@
 
 .work-tracker-columns {
   display: grid;
-  grid-auto-columns: minmax(250px, 1fr);
-  grid-auto-flow: column;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 12px;
   margin-top: 16px;
-  overflow-x: auto;
   padding-bottom: 8px;
 }
 
 .work-tracker-column {
+  min-width: 0;
   min-height: 180px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -48,8 +47,9 @@
 }
 
 .work-tracker-column > header,
+.work-tracker-card-header,
 .work-tracker-card-meta,
-.work-tracker-move-form {
+.work-tracker-card-footer {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -59,6 +59,14 @@
 .work-tracker-column h3 {
   margin: 0;
   font-size: 15px;
+}
+
+.work-tracker-column > header small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 .work-tracker-column ul {
@@ -71,40 +79,136 @@
 
 .work-tracker-card {
   display: grid;
-  gap: 9px;
+  min-width: 0;
+  gap: 8px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: 8px;
   background: var(--panel);
-  padding: 12px;
+  padding: 10px;
+}
+
+.work-tracker-card-idea {
+  border-left-color: #7c3aed;
+}
+
+.work-tracker-card-feature {
+  border-left-color: #2563eb;
+}
+
+.work-tracker-card-bug {
+  border-left-color: #dc2626;
+}
+
+.work-tracker-card-header {
+  align-items: flex-start;
 }
 
 .work-tracker-card-meta {
   flex-wrap: wrap;
   justify-content: flex-start;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.work-tracker-type-badge,
+.work-tracker-state-badge,
+.work-tracker-priority-badge,
+.work-tracker-claim-badge {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  line-height: 1;
+}
+
+.work-tracker-type-badge {
+  font-weight: 800;
+}
+
+.work-tracker-type-badge::before {
+  display: inline-grid;
+  width: 12px;
+  place-items: center;
+  margin-right: 3px;
+  font-weight: 900;
+}
+
+.work-tracker-type-idea {
+  border-color: #c4b5fd;
+  background: #f3e8ff;
+  color: #6d28d9;
+}
+
+.work-tracker-type-idea::before {
+  content: "◇";
+}
+
+.work-tracker-type-feature {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.work-tracker-type-feature::before {
+  content: "+";
+}
+
+.work-tracker-type-bug {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.work-tracker-type-bug::before {
+  content: "!";
+}
+
+.work-tracker-state-badge,
+.work-tracker-priority-badge {
+  background: var(--panel-muted);
   color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
+}
+
+.work-tracker-state-blocked {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.work-tracker-state-waiting {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.work-tracker-state-reopened {
+  border-color: #c4b5fd;
+  background: #f3e8ff;
+  color: #6d28d9;
 }
 
 .work-tracker-claim-badge {
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
-  padding: 2px 7px;
-  text-transform: none;
 }
 
 .work-tracker-project-badge {
-  justify-self: start;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid #93a7df;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
-  padding: 4px 9px;
-  font-size: 12px;
+  padding: 3px 7px;
+  overflow: hidden;
+  font-size: 10px;
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .work-tracker-project-badge-legacy {
@@ -114,13 +218,16 @@
 }
 
 .work-tracker-filter {
-  max-width: 760px;
+  max-width: 680px;
   margin-top: 14px;
 }
 
 .work-tracker-card > a {
+  overflow-wrap: anywhere;
   color: var(--strong);
+  font-size: 14px;
   font-weight: 700;
+  line-height: 1.35;
 }
 
 .work-tracker-card small,
@@ -129,23 +236,110 @@
   color: var(--muted);
 }
 
-.work-tracker-move-form select,
-.work-tracker-move-form button {
-  min-height: 36px;
-  border: 1px solid var(--border-strong);
+.work-tracker-card-footer {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 5px;
+}
+
+.work-tracker-card-actions {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.work-tracker-card-actions summary {
+  display: grid;
+  width: 30px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
   border-radius: 7px;
-  background: var(--panel);
-  color: var(--text);
-  padding: 6px 8px;
-}
-
-.work-tracker-move-form select {
-  min-width: 120px;
-}
-
-.work-tracker-move-form button {
+  color: var(--muted);
   cursor: pointer;
+  list-style: none;
+}
+
+.work-tracker-card-actions summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-tracker-card-actions[open] summary {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.work-tracker-card-actions form {
+  display: grid;
+  position: absolute;
+  z-index: 12;
+  top: 34px;
+  right: 0;
+  width: max-content;
+  min-width: 150px;
+  gap: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+  padding: 6px;
+}
+
+.work-tracker-card-actions button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 6px 9px;
+  text-align: left;
+}
+
+.work-tracker-card-actions button:hover,
+.work-tracker-card-actions button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.work-tracker-view-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.work-tracker-view-tabs button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 12px;
   font-weight: 700;
+}
+
+.work-tracker-view-tabs button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.work-tracker-history {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 10px;
+}
+
+.work-tracker-history ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .work-tracker-error {
@@ -168,12 +362,76 @@
 .work-tracker-project-picker input,
 .work-tracker-project-picker select {
   width: 100%;
-  min-height: 40px;
+  height: 42px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--panel-soft);
   color: var(--text);
   padding: 9px 10px;
+  line-height: 1.2;
+}
+
+.work-tracker-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.work-tracker-capture-trigger {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.work-tracker-drawer-backdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.work-tracker-capture-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(520px, 100vw);
+  height: 100dvh;
+  overflow-y: auto;
+  border-left: 1px solid var(--border-strong);
+  background: var(--bg);
+  box-shadow: -24px 0 70px rgba(0, 0, 0, 0.32);
+  padding: 18px;
+}
+
+.work-tracker-drawer-close {
+  display: grid;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  margin: 0 0 8px auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--strong);
+  cursor: pointer;
+  font-size: 22px;
+}
+
+@media (max-width: 1100px) {
+  .work-tracker-columns {
+    grid-template-columns: repeat(4, minmax(260px, 82vw));
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-snap-type: x proximity;
+  }
+
+  .work-tracker-column {
+    scroll-snap-align: start;
+  }
 }
 
 .work-tracker-project-picker small,
@@ -444,6 +702,10 @@
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 14px;
   align-items: start;
+}
+
+.work-tracker-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .observatory-layout > * {
@@ -1596,6 +1858,24 @@
     flex-direction: column;
     align-items: flex-start;
     padding: 14px;
+  }
+
+  .work-tracker-hero-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .work-tracker-hero-actions .shell-status-line {
+    align-items: flex-start;
+  }
+
+  .work-tracker-project-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work-tracker-capture-drawer {
+    width: 100vw;
+    padding: 12px;
   }
 
   .observatory-summary,
