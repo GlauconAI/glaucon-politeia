@@ -47,3 +47,12 @@ The same rule is stored in Plato's workspace `AGENTS.md` and shown in Quick Capt
 ## Release boundary
 
 No canonical `main` push or 402v production deployment is authorized by the implementation request alone. Release remains blocked until User explicitly authorizes both the exact branch head push and production deployment.
+
+## Project organization release candidate
+
+Date: 2026-08-25
+Status: Local implementation accepted; production release pending explicit authorization
+
+The approved Project organization follow-up keeps the default all-Project board and adds a searchable canonical Project filter, prominent Project badges, and required canonical Project selection in Quick Capture and Item detail. Project values are validated against the existing 64-Project Observatory registry in both the client and server path; the create RPC also enforces Project presence at the database boundary.
+
+Full evidence, migration order, browser results, the known pre-existing horizontal-overflow limitation, and rollback coordination are recorded in `docs/product/work-tracker-project-filter-acceptance.md`. The canonical Agent handbook remains aligned to the current production version until this release is explicitly authorized and successfully deployed.
