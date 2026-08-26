@@ -15,11 +15,11 @@
 **Files:**
 - Modify: `tests/observatory-work-tracker-board.test.tsx`
 
-- [ ] **Step 1: Write the failing structural test**
+- [x] **Step 1: Write the failing structural test**
 
 Add assertions that the board no longer renders the inner `Daily write surface`, `Work Tracker` level-two heading, or audit implementation copy; that `Work Tracker controls` contains `2 of 2 items`; and that `Projects available` is absent from the board filter.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `npm test -- tests/observatory-work-tracker-board.test.tsx`
 
@@ -31,11 +31,11 @@ Expected: FAIL because the duplicate heading/copy still render and the compact t
 - Modify: `components/observatory/CanonicalProjectPicker.tsx`
 - Modify: `components/observatory/WorkTrackerBoard.tsx`
 
-- [ ] **Step 1: Add an optional availability-count contract**
+- [x] **Step 1: Add an optional availability-count contract**
 
 Add `showAvailabilityCount?: boolean` to `CanonicalProjectPickerProps`, default it to `true`, and render the `<small>` count only when the registry is available and the option is true. Registry errors remain visible regardless of the option.
 
-- [ ] **Step 2: Replace duplicate framing with one toolbar**
+- [x] **Step 2: Replace duplicate framing with one toolbar**
 
 Remove the board-level `observatory-panel-heading` and `observatory-panel-copy`. Render:
 
@@ -50,7 +50,7 @@ Remove the board-level `observatory-panel-heading` and `observatory-panel-copy`.
 
 Pass `showAvailabilityCount={false}` to the board filter picker. Keep error-state framing unchanged because it needs its own recovery context.
 
-- [ ] **Step 3: Run the focused test and verify GREEN**
+- [x] **Step 3: Run the focused test and verify GREEN**
 
 Run: `npm test -- tests/observatory-work-tracker-board.test.tsx`
 
@@ -61,23 +61,23 @@ Expected: all focused tests pass.
 **Files:**
 - Modify: `app/globals.css`
 
-- [ ] **Step 1: Compact the page hero and board shell**
+- [x] **Step 1: Compact the page hero and board shell**
 
 Scope Work Tracker hero adjustments under `.work-tracker-page` and reduce board padding to 14px. Cap the page title at 36px and reduce its supporting copy/status badges without changing generic Observatory pages.
 
-- [ ] **Step 2: Lay out the toolbar**
+- [x] **Step 2: Lay out the toolbar**
 
 Use a flex toolbar with two bounded Project columns (`200–250px` search and `230–300px` select), 36px controls, and a right-aligned 11px Item count. Remove the old filter max-width and margin that created a separate row.
 
-- [ ] **Step 3: Compact tabs, columns, cards, badges, and menus**
+- [x] **Step 3: Compact tabs, columns, cards, badges, and menus**
 
 Apply the design scale: 13px/32px tabs, 14px columns, 13px card titles, 10px/20px badges, 26×24px three-dot trigger, and 12px/30px menu actions. Set the claim badge font size explicitly so `Manual` no longer inherits body text.
 
-- [ ] **Step 4: Preserve responsive containment**
+- [x] **Step 4: Preserve responsive containment**
 
 At 720px and below, stack the toolbar and Project picker, keep the count readable, retain the full-screen capture drawer, and preserve internal board scrolling.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `npm test -- tests/observatory-work-tracker-board.test.tsx tests/work-tracker-page.test.tsx tests/work-tracker-responsive.test.ts`
 
@@ -88,24 +88,24 @@ Expected: all focused tests pass.
 **Files:**
 - Create: `docs/superpowers/evidence/2026-08-26-work-tracker-compact-density.md`
 
-- [ ] **Step 1: Run release gates**
+- [x] **Step 1: Run release gates**
 
 Run: `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
 
 Expected: zero failures/errors and successful production build.
 
-- [ ] **Step 2: Commit and push the exact reviewed diff**
+- [x] **Step 2: Commit and push the exact reviewed diff**
 
 Review `git diff --check`, confirm no unrelated files changed, commit the implementation and evidence, and fast-forward the authorized branch to `origin/main`.
 
-- [ ] **Step 3: Verify deployment**
+- [x] **Step 3: Verify deployment**
 
 Confirm GitHub `main`, Vercel deployment readiness, and the `402v.com` production alias resolve to the new commit.
 
-- [ ] **Step 4: Run browser acceptance**
+- [x] **Step 4: Run browser acceptance**
 
 Using a named agent-browser session with the dedicated `402v-admin` profile, verify at 1280px and 390×844: one page title only, toolbar/count layout, control height, tab/card/menu density, `Manual` readability, internal board scrolling, and zero console/runtime errors. Do not mutate production Items.
 
-- [ ] **Step 5: Record evidence and close the self-owned Work**
+- [x] **Step 5: Record evidence and close the self-owned Work**
 
 Write exact commands, commit/deployment identifiers, viewport measurements, and browser observations to the evidence file, re-run `git diff --check`, then close the Work as completed.
