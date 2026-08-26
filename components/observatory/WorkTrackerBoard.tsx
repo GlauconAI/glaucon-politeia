@@ -235,34 +235,31 @@ export function WorkTrackerBoard({
   }
 
   return (
-    <section className="work-tracker-board" aria-labelledby="work-tracker-title">
-      <div className="observatory-panel-heading">
-        <div>
-          <p className="eyebrow">Daily write surface</p>
-          <h2 id="work-tracker-title">Work Tracker</h2>
-        </div>
-        <span>
+    <section className="work-tracker-board" aria-label="Work Tracker Board">
+      <div
+        className="work-tracker-toolbar"
+        role="group"
+        aria-label="Work Tracker controls"
+      >
+        {projects && trackedProjects.length > 0 ? (
+          <div className="work-tracker-filter">
+            <CanonicalProjectPicker
+              id="work-tracker-project-filter"
+              name="projectFilter"
+              projects={trackedProjects}
+              value={projectKey}
+              onChange={setProjectKey}
+              allowAll
+              selectLabel="Filter by Project"
+              allLabel="全部有 Item 的 Project"
+              showAvailabilityCount={false}
+            />
+          </div>
+        ) : null}
+        <span className="work-tracker-item-count">
           {filteredItems.length} of {state.items.length} items
         </span>
       </div>
-      <p className="observatory-panel-copy">
-        九种审计状态收束为四个工作分组；精确状态转换位于每张卡片的三点菜单。
-      </p>
-
-      {projects && trackedProjects.length > 0 ? (
-        <div className="work-tracker-filter">
-          <CanonicalProjectPicker
-            id="work-tracker-project-filter"
-            name="projectFilter"
-            projects={trackedProjects}
-            value={projectKey}
-            onChange={setProjectKey}
-            allowAll
-            selectLabel="Filter by Project"
-            allLabel="全部有 Item 的 Project"
-          />
-        </div>
-      ) : null}
 
       <div className="work-tracker-view-tabs" aria-label="Work Tracker views">
         <button

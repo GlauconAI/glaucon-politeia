@@ -29,11 +29,16 @@
   padding: 18px;
 }
 
+.work-tracker-board {
+  padding: 14px;
+  font-size: 13px;
+}
+
 .work-tracker-columns {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 12px;
   padding-bottom: 8px;
 }
 
@@ -43,7 +48,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-muted);
-  padding: 10px;
+  padding: 9px;
 }
 
 .work-tracker-column > header,
@@ -58,7 +63,12 @@
 
 .work-tracker-column h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
+}
+
+.work-tracker-column > header > span {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .work-tracker-column > header small {
@@ -71,8 +81,8 @@
 
 .work-tracker-column ul {
   display: grid;
-  gap: 10px;
-  margin: 10px 0 0;
+  gap: 8px;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -80,12 +90,12 @@
 .work-tracker-card {
   display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 7px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: 8px;
   background: var(--panel);
-  padding: 10px;
+  padding: 9px;
 }
 
 .work-tracker-card-idea {
@@ -116,11 +126,12 @@
 .work-tracker-priority-badge,
 .work-tracker-claim-badge {
   display: inline-flex;
-  min-height: 22px;
+  min-height: 20px;
   align-items: center;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 2px 7px;
+  padding: 2px 6px;
+  font-size: 10px;
   line-height: 1;
 }
 
@@ -193,6 +204,7 @@
 .work-tracker-claim-badge {
   background: var(--accent-soft);
   color: var(--accent-strong);
+  font-weight: 650;
 }
 
 .work-tracker-project-badge {
@@ -217,15 +229,50 @@
   color: var(--warning);
 }
 
+.work-tracker-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .work-tracker-filter {
-  max-width: 680px;
-  margin-top: 14px;
+  width: min(100%, 562px);
+  min-width: 0;
+}
+
+.work-tracker-filter .work-tracker-project-picker {
+  grid-template-columns: minmax(180px, 240px) minmax(220px, 300px);
+  gap: 8px;
+}
+
+.work-tracker-filter .work-tracker-project-picker label {
+  gap: 4px;
+  font-size: 11px;
+}
+
+.work-tracker-filter .work-tracker-project-picker input,
+.work-tracker-filter .work-tracker-project-picker select {
+  height: 36px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.work-tracker-item-count {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .work-tracker-card > a {
   overflow-wrap: anywhere;
   color: var(--strong);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -234,6 +281,7 @@
 .work-tracker-column-empty,
 .work-tracker-empty-board {
   color: var(--muted);
+  font-size: 12px;
 }
 
 .work-tracker-card-footer {
@@ -250,13 +298,14 @@
 
 .work-tracker-card-actions summary {
   display: grid;
-  width: 30px;
-  height: 28px;
+  width: 26px;
+  height: 24px;
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 7px;
   color: var(--muted);
   cursor: pointer;
+  font-size: 11px;
   list-style: none;
 }
 
@@ -273,26 +322,27 @@
   display: grid;
   position: absolute;
   z-index: 12;
-  top: 34px;
+  top: 28px;
   right: 0;
   width: max-content;
-  min-width: 150px;
-  gap: 4px;
+  min-width: 132px;
+  gap: 2px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
-  padding: 6px;
+  padding: 4px;
 }
 
 .work-tracker-card-actions button {
-  min-height: 34px;
+  min-height: 30px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
-  padding: 6px 9px;
+  padding: 5px 8px;
+  font-size: 12px;
   text-align: left;
 }
 
@@ -305,18 +355,19 @@
 .work-tracker-view-tabs {
   display: flex;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .work-tracker-view-tabs button {
-  min-height: 36px;
+  min-height: 32px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel-muted);
   color: var(--muted);
   cursor: pointer;
-  padding: 6px 12px;
-  font-weight: 700;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .work-tracker-view-tabs button[aria-pressed="true"] {
@@ -326,7 +377,7 @@
 }
 
 .work-tracker-history {
-  margin-top: 16px;
+  margin-top: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-muted);
@@ -379,7 +430,8 @@
 }
 
 .work-tracker-capture-trigger {
-  min-height: 42px;
+  min-height: 36px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -706,6 +758,39 @@
 
 .work-tracker-layout {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.work-tracker-page {
+  gap: 14px;
+}
+
+.work-tracker-page .observatory-hero {
+  align-items: center;
+  padding: 18px;
+}
+
+.work-tracker-page .observatory-hero h1 {
+  margin-top: 8px;
+  font-size: clamp(28px, 3.6vw, 36px);
+}
+
+.work-tracker-page .observatory-hero p:not(.eyebrow) {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.work-tracker-page .work-tracker-hero-actions {
+  gap: 8px;
+}
+
+.work-tracker-page .work-tracker-hero-actions .shell-status-line {
+  gap: 6px;
+  margin-top: 0;
+}
+
+.work-tracker-page .work-tracker-hero-actions .shell-status-line span {
+  padding: 3px 7px;
+  font-size: 10px;
 }
 
 .observatory-layout > * {
@@ -1871,6 +1956,25 @@
 
   .work-tracker-project-picker {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work-tracker-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .work-tracker-filter {
+    width: 100%;
+  }
+
+  .work-tracker-filter .work-tracker-project-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work-tracker-item-count {
+    min-height: 0;
+    align-self: flex-end;
   }
 
   .work-tracker-capture-drawer {

@@ -79,7 +79,7 @@ At 720px and below, stack the toolbar and Project picker, keep the count readabl
 
 - [ ] **Step 5: Run focused tests**
 
-Run: `npm test -- tests/observatory-work-tracker-board.test.tsx tests/observatory-work-tracker-page.test.tsx`
+Run: `npm test -- tests/observatory-work-tracker-board.test.tsx tests/work-tracker-page.test.tsx tests/work-tracker-responsive.test.ts`
 
 Expected: all focused tests pass.
 
@@ -109,4 +109,3 @@ Using a named agent-browser session with the dedicated `402v-admin` profile, ver
 - [ ] **Step 5: Record evidence and close the self-owned Work**
 
 Write exact commands, commit/deployment identifiers, viewport measurements, and browser observations to the evidence file, re-run `git diff --check`, then close the Work as completed.
-

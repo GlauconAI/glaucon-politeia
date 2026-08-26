@@ -20,6 +20,7 @@ type CanonicalProjectPickerProps = {
   selectLabel?: string;
   allLabel?: string;
   emptyLabel?: string;
+  showAvailabilityCount?: boolean;
 };
 
 export function CanonicalProjectPicker({
@@ -35,6 +36,7 @@ export function CanonicalProjectPicker({
   selectLabel = "Project",
   allLabel = "All Projects",
   emptyLabel = "Choose a Project",
+  showAvailabilityCount = true,
 }: CanonicalProjectPickerProps) {
   const [query, setQuery] = useState("");
   const selected = projects.find((project) => project.projectKey === value);
@@ -91,9 +93,9 @@ export function CanonicalProjectPicker({
         <p id={helpId} role="alert" className="work-tracker-project-picker-error">
           Project registry is unavailable. Project changes are disabled.
         </p>
-      ) : (
+      ) : showAvailabilityCount ? (
         <small>{visibleProjects.length} Projects available</small>
-      )}
+      ) : null}
     </div>
   );
 }

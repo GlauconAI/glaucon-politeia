@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
@@ -79,6 +79,18 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByRole("button", { name: /已完成 0/i })).toBeInTheDocument();
     expect(screen.getByText("Build the manual board")).toBeInTheDocument();
     expect(screen.getAllByText("No work items.").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Daily write surface")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "Work Tracker" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/九种审计状态收束为四个工作分组/),
+    ).not.toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("group", { name: "Work Tracker controls" }),
+      ).getByText("1 of 1 items"),
+    ).toBeVisible();
   });
 
   it("filters through the URL and only offers Projects that already have Items", () => {
@@ -106,6 +118,7 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByText("Project: Dashboard")).toBeVisible();
     expect(screen.getByText("Project: 问芽 AI")).toBeVisible();
     expect(screen.getByText("2 of 2 items")).toBeVisible();
+    expect(screen.queryByText(/Projects available/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Filter by Project"), {
       target: { value: "amou/wenya-ai" },
