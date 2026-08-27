@@ -5,7 +5,7 @@ import { resolveOrchestratorRequest } from "@/lib/orchestrator/route";
 
 describe("Orchestrator route", () => {
   it("redirects non-admin visitors to authentication", async () => {
-    const request = new NextRequest("https://402v.com/orchestrator");
+    const request = new NextRequest("https://402v.com/orchestrator/artifact");
 
     const response = await resolveOrchestratorRequest(request, {
       getCurrentAdmin: vi.fn().mockResolvedValue(null),
@@ -20,7 +20,7 @@ describe("Orchestrator route", () => {
 
   it("serves the exact standalone artifact to administrators", async () => {
     const html = "<!doctype html><html><body>Orchestrator</body></html>";
-    const request = new NextRequest("https://402v.com/orchestrator");
+    const request = new NextRequest("https://402v.com/orchestrator/artifact");
 
     const response = await resolveOrchestratorRequest(request, {
       getCurrentAdmin: vi.fn().mockResolvedValue({
@@ -40,7 +40,7 @@ describe("Orchestrator route", () => {
   });
 
   it("returns 404 when the published artifact is unavailable", async () => {
-    const request = new NextRequest("https://402v.com/orchestrator");
+    const request = new NextRequest("https://402v.com/orchestrator/artifact");
 
     const response = await resolveOrchestratorRequest(request, {
       getCurrentAdmin: vi.fn().mockResolvedValue({
