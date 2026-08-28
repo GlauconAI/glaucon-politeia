@@ -246,7 +246,6 @@ export function WorkItemDetail({
     new Set([
       item.assigned_agent_id,
       ...agentIds,
-      ...projects.map((project) => project.owner),
     ]),
   ).sort((left, right) => left.localeCompare(right, "en"));
   const activeClaim = claims.find(

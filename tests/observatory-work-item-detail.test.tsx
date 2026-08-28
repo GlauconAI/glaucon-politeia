@@ -242,6 +242,42 @@ describe("WorkItemDetail", () => {
     expect(screen.queryByText(/claimed by amou/i)).not.toBeInTheDocument();
   });
 
+  it("does not treat Project owner labels as assigned Agent IDs", () => {
+    render(
+      <WorkItemDetail
+        item={item}
+        evidence={[]}
+        events={events}
+        projects={[
+          { ...projects[0], owner: "Plato" },
+          { ...projects[1], owner: "LordGuan" },
+          {
+            projectKey: "shared/asgard-archaea-game",
+            title: "阿斯加德古菌",
+            owner: "Shared",
+            status: "active",
+          },
+        ]}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={successAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+
+    const values = Array.from(
+      (screen.getByLabelText(/^assigned agent$/i) as HTMLSelectElement).options,
+      (option) => option.value,
+    );
+    expect(values).toEqual(["plato"]);
+    expect(values.every((value) => /^[a-z][a-z0-9-]{0,79}$/u.test(value))).toBe(true);
+  });
+
   it("renders safe evidence controls and chronological audit history", () => {
     render(
       <WorkItemDetail

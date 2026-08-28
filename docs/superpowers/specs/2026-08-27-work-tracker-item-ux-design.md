@@ -43,7 +43,7 @@ At tablet/mobile widths the sidebar becomes a normal single-column section. All 
 3. Repository reads/writes include the new column/argument.
 4. The server action validates and forwards the field through the existing authorization boundary.
 5. Board cards render a dedicated `Assigned · <agent>` badge; Claim state remains separate.
-6. The detail component derives suggested Agent IDs from canonical Project keys, includes the current value even if it is not present in the current registry, and saves through the existing audited update action.
+6. The detail component sources suggested Agent IDs only from the Agent snapshot, includes the current value even if it is not present in the current snapshot, and saves through the existing audited update action. Project owner display labels are not Agent IDs and must never become assignment options.
 
 ## Error handling and accessibility
 
