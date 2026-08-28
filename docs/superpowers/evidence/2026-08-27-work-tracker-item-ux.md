@@ -5,7 +5,7 @@ Date: 2026-08-27
 ## Release
 
 - Application commits: `1d571c046e5338ae30f5cfaeb14a94488bd547d4`, `b99e533024ab89726070964a3129b81025a4ca43`, and `1a67f0d9075718b3fb17a644f418b6eea4761bc2`.
-- Canonical GitHub `main`: `1a67f0d9075718b3fb17a644f418b6eea4761bc2`.
+- Accepted application release head: `1a67f0d9075718b3fb17a644f418b6eea4761bc2`; the evidence is recorded in a later docs-only commit.
 - Supabase migration: `20260827000100_work_tracker_assigned_agent.sql`; dry-run listed only this migration and remote history records it.
 - Vercel deployment: `dpl_8QkKYqVX82pR2Xz76PKyvNDQcPc9`, `READY`, production alias `https://402v.com`.
 
