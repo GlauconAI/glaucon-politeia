@@ -50,6 +50,7 @@ At tablet/mobile widths the sidebar becomes a normal single-column section. All 
 - Invalid or missing Agent IDs fail validation before RPC execution.
 - Database constraints remain the final authority and optimistic version conflicts keep their current user-facing response.
 - Menus expose `aria-expanded`, close on Escape, and restore focus to their trigger after keyboard dismissal.
+- Created/updated dates use an explicit `America/Vancouver` operator timezone so server and browser rendering remain hydration-stable.
 - Sidebar labels use explicit form associations; status feedback retains `role=status`/`role=alert`.
 - The migration is transactional and fail-closed.
 

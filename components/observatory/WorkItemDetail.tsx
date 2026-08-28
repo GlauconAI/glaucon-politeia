@@ -76,6 +76,13 @@ const stateLabels = {
   reopened: "Reopened",
 } as const;
 
+const workItemDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Vancouver",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 const idleState: ObservatoryWorkItemMutationActionState = { status: "idle" };
 
 function MutationFeedback({
@@ -281,8 +288,8 @@ export function WorkItemDetail({
             <span>v{item.version}</span>
           </div>
           <p className="work-item-detail-timestamps">
-            Created {new Date(item.created_at).toLocaleDateString("en-CA")}
-            {" · "}Updated {new Date(item.updated_at).toLocaleDateString("en-CA")}
+            Created {workItemDateFormatter.format(new Date(item.created_at))}
+            {" · "}Updated {workItemDateFormatter.format(new Date(item.updated_at))}
           </p>
         </div>
       </header>

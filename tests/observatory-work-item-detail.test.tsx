@@ -206,6 +206,35 @@ describe("WorkItemDetail", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders Item dates in the operator timezone regardless of server timezone", () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = "UTC";
+
+    try {
+      render(
+        <WorkItemDetail
+          item={{ ...item, updated_at: "2026-08-28T00:30:00.000Z" }}
+          evidence={[]}
+          events={events}
+          projects={projects}
+          currentAdmin={{
+            user_id: item.created_by,
+            display_name: "Glaucon",
+            username: "glaucon",
+          }}
+          updateAction={successAction}
+          transitionAction={successAction}
+          addEvidenceAction={successAction}
+          removeEvidenceAction={successAction}
+        />,
+      );
+
+      expect(screen.getByText(/Updated 2026-08-27/)).toBeInTheDocument();
+    } finally {
+      process.env.TZ = previousTimezone;
+    }
+  });
+
   it("submits an explicit assigned Agent separately from Owner and Agent Claim", async () => {
     const updateAction = vi
       .fn()
