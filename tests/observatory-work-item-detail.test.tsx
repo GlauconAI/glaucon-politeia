@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkItemDetail } from "@/components/observatory/WorkItemDetail";
@@ -20,6 +20,7 @@ const item: ObservatoryWorkItemRow = {
   state: "triage",
   priority: "high",
   owner_id: "22222222-2222-4222-8222-222222222222",
+  assigned_agent_id: "plato",
   acceptance_criteria: "The item can reach Done.",
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
@@ -189,6 +190,10 @@ describe("WorkItemDetail", () => {
     );
     expect(screen.getByLabelText(/^priority$/i)).toHaveValue("high");
     expect(screen.getByLabelText(/^owner$/i)).toHaveValue(item.owner_id);
+    expect(screen.getByLabelText(/^assigned agent$/i)).toHaveValue("plato");
+    expect(screen.getByRole("region", { name: /item content/i })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: /item properties/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^activity$/i })).toBeInTheDocument();
     expect(screen.getByText(/ready gate requires/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /move to inbox/i }),
@@ -199,6 +204,42 @@ describe("WorkItemDetail", () => {
     expect(
       screen.queryByRole("button", { name: /move to done/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("submits an explicit assigned Agent separately from Owner and Agent Claim", async () => {
+    const updateAction = vi
+      .fn()
+      .mockResolvedValue({ status: "success", version: 4 });
+    render(
+      <WorkItemDetail
+        item={item}
+        evidence={[]}
+        events={events}
+        projects={projects}
+        agentIds={["amou", "lordguan", "plato"]}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={updateAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+
+    const assignedAgent = screen.getByLabelText(/^assigned agent$/i);
+    fireEvent.change(assignedAgent, { target: { value: "amou" } });
+    fireEvent.submit(
+      screen.getByRole("button", { name: /save fields/i }).closest("form")!,
+    );
+
+    await waitFor(() => expect(updateAction).toHaveBeenCalledTimes(1));
+    const submitted = updateAction.mock.calls[0][1] as FormData;
+    expect(submitted.get("assignedAgentId")).toBe("amou");
+    expect(submitted.get("ownerId")).toBe(item.owner_id);
+    expect(screen.queryByText(/claimed by amou/i)).not.toBeInTheDocument();
   });
 
   it("renders safe evidence controls and chronological audit history", () => {
@@ -230,9 +271,13 @@ describe("WorkItemDetail", () => {
       screen.getByRole("button", { name: /remove production dashboard/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /^history$/i }),
+      screen.getByRole("heading", { name: /^activity$/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/created/i)).toBeInTheDocument();
+    const activity = screen
+      .getByRole("heading", { name: /^activity$/i })
+      .closest("section");
+    expect(activity).not.toBeNull();
+    expect(within(activity!).getByText(/^created$/i)).toBeInTheDocument();
     expect(screen.getByText(/inbox → triage/i)).toBeInTheDocument();
     expect(screen.queryByText(/actor_id/i)).not.toBeInTheDocument();
   });

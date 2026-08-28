@@ -286,6 +286,7 @@ export async function updateObservatoryWorkItemAction(
     acceptanceCriteria: formData.get("acceptanceCriteria") ?? "",
     priority: nullableText(formData, "priority"),
     ownerId: nullableText(formData, "ownerId"),
+    assignedAgentId: nullableText(formData, "assignedAgentId"),
     projectRef: nullableText(formData, "projectRef"),
     milestoneRef: nullableText(formData, "milestoneRef"),
     projectKey: nullableText(formData, "projectKey"),

@@ -114,6 +114,7 @@ describe("WorkTrackerPage", () => {
         state: "triage",
         priority: "high",
         owner_id: "22222222-2222-4222-8222-222222222222",
+        assigned_agent_id: "plato",
         acceptance_criteria: "The board is usable.",
         project_ref: "plato/dashboard",
         milestone_ref: null,

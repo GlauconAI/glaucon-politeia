@@ -27,4 +27,13 @@ describe("Work Tracker responsive layout", () => {
       /@media \(max-width: 1100px\)[\s\S]*?\.work-tracker-columns \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(260px, 82vw\)\);[\s\S]*?scroll-snap-type: x proximity;/u,
     );
   });
+
+  it("uses a readable detail hierarchy that collapses cleanly on mobile", () => {
+    expect(css).toMatch(
+      /\.work-item-edit-form \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) minmax\(300px, 360px\);/u,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 720px\)[\s\S]*?\.work-item-edit-form \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?\.work-item-detail-lower \{[\s\S]*?flex-direction: column;/u,
+    );
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   transitionObservatoryWorkItemAction,
@@ -75,6 +75,9 @@ export function WorkTrackerBoard({
 }: WorkTrackerBoardProps) {
   const [projectKey, setProjectKey] = useState(initialProjectKey);
   const [view, setView] = useState<"active" | "completed">("active");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRefs = useRef(new Map<string, HTMLDetailsElement>());
+  const menuTriggerRefs = useRef(new Map<string, HTMLElement>());
   const [mutationState, formAction, pending] = useActionState(
     action,
     idleState,
@@ -106,6 +109,20 @@ export function WorkTrackerBoard({
       `/work-tracker${query ? `?${query}` : ""}`,
     );
   }, [projectKey, projects]);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const activeMenuId = openMenuId;
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const menu = menuRefs.current.get(activeMenuId);
+      if (menu && !menu.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [openMenuId]);
 
   if (state.status === "error") {
     return (
@@ -185,8 +202,49 @@ export function WorkTrackerBoard({
             </span>
           </div>
           {targets.length > 0 ? (
-            <details className="work-tracker-card-actions">
-              <summary aria-label={`打开 ${item.title} 操作菜单`}>
+            <details
+              className="work-tracker-card-actions"
+              open={openMenuId === item.id}
+              ref={(node) => {
+                if (node) menuRefs.current.set(item.id, node);
+                else menuRefs.current.delete(item.id);
+              }}
+              onToggle={(event) => {
+                if (event.currentTarget.open) setOpenMenuId(item.id);
+                else {
+                  setOpenMenuId((current) =>
+                    current === item.id ? null : current,
+                  );
+                }
+              }}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setOpenMenuId((current) =>
+                    current === item.id ? null : current,
+                  );
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                setOpenMenuId(null);
+                menuTriggerRefs.current.get(item.id)?.focus();
+              }}
+            >
+              <summary
+                aria-label={`打开 ${item.title} 操作菜单`}
+                aria-expanded={openMenuId === item.id}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setOpenMenuId((current) =>
+                    current === item.id ? null : item.id,
+                  );
+                }}
+                ref={(node) => {
+                  if (node) menuTriggerRefs.current.set(item.id, node);
+                  else menuTriggerRefs.current.delete(item.id);
+                }}
+              >
                 <span aria-hidden="true">•••</span>
               </summary>
               <form action={formAction}>
@@ -203,6 +261,7 @@ export function WorkTrackerBoard({
                     name="targetState"
                     value={target}
                     disabled={pending}
+                    onClick={() => setOpenMenuId(null)}
                   >
                     移动到 {stateLabels[target]}
                   </button>
@@ -228,6 +287,9 @@ export function WorkTrackerBoard({
               No Project
             </span>
           )}
+          <span className="work-tracker-assignee-badge">
+            Assigned · {item.assigned_agent_id}
+          </span>
           <span className="work-tracker-claim-badge">{claimLabel}</span>
         </div>
       </li>

@@ -332,6 +332,7 @@ describe("Work Tracker mutation actions", () => {
     formData.set("acceptanceCriteria", "  Reaches Done.  ");
     formData.set("priority", "high");
     formData.set("ownerId", ownerId);
+    formData.set("assignedAgentId", "  plato  ");
     formData.set("projectRef", "  plato/dashboard  ");
     formData.set("milestoneRef", "");
     formData.set("projectKey", "plato/dashboard");
@@ -351,6 +352,7 @@ describe("Work Tracker mutation actions", () => {
       acceptanceCriteria: "Reaches Done.",
       priority: "high",
       ownerId,
+      assignedAgentId: "plato",
       projectRef: "plato/dashboard",
       milestoneRef: null,
       projectKey: "plato/dashboard",
@@ -374,6 +376,7 @@ describe("Work Tracker mutation actions", () => {
     formData.set("acceptanceCriteria", "事项可以进入 Done。");
     formData.set("priority", "high");
     formData.set("ownerId", ownerId);
+    formData.set("assignedAgentId", "plato");
     formData.set("projectRef", "unknown/project");
     formData.set("milestoneRef", "OBS-M3");
     formData.set("projectKey", "");

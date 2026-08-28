@@ -14,6 +14,10 @@ const agentClaimMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260723000200_observatory_agent_claim_engine.sql",
 );
+const assignedAgentMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260827000100_work_tracker_assigned_agent.sql",
+);
 
 function readMigration(): string {
   return existsSync(migrationPath)
@@ -526,6 +530,39 @@ describe("M3 Low-risk Agent Claim Engine migration", () => {
     }
     expect(source).not.toMatch(
       /complete_observatory_work_item_claim[\s\S]*set state = 'done'/u,
+    );
+  });
+});
+
+describe("Work Tracker assigned Agent migration", () => {
+  const sql = () =>
+    existsSync(assignedAgentMigrationPath)
+      ? readFileSync(assignedAgentMigrationPath, "utf8")
+          .toLowerCase()
+          .replace(/\s+/gu, " ")
+      : "";
+
+  it("adds, backfills, and constrains a durable Agent assignment", () => {
+    const source = sql();
+    expect(source).toContain("add column assigned_agent_id text");
+    expect(source).toContain("split_part(project_ref, '/', 1)");
+    expect(source).toContain("alter column assigned_agent_id set not null");
+    expect(source).toContain("observatory_work_items_assigned_agent_id_check");
+    expect(source).toContain("assigned_agent_id ~ '^[a-z][a-z0-9-]{0,79}$'");
+  });
+
+  it("derives new assignments and audits versioned assignment changes", () => {
+    const source = sql();
+    expect(source).toContain("split_part(normalized_project_ref, '/', 1)");
+    expect(source).toContain("p_assigned_agent_id text");
+    expect(source).toContain("assigned_agent_id = normalized_assigned_agent_id");
+    expect(source).toContain("'assigned_agent_id', current_item.assigned_agent_id");
+    expect(source).toContain("'assigned_agent_id', updated_item.assigned_agent_id");
+    expect(source).toMatch(
+      /grant execute on function public\.update_observatory_work_item\([^)]+\) to authenticated/u,
+    );
+    expect(source).not.toMatch(
+      /grant execute on function public\.update_observatory_work_item\([^)]+\) to service_role/u,
     );
   });
 });

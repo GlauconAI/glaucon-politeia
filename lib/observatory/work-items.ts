@@ -38,6 +38,12 @@ const NullablePrioritySchema = z
   .enum(OBSERVATORY_WORK_ITEM_PRIORITIES)
   .nullable();
 const NullableOwnerSchema = z.uuid().nullable();
+const AssignedAgentIdSchema = QuickCaptureTextSchema.min(1)
+  .max(80)
+  .regex(
+    /^[a-z][a-z0-9-]{0,79}$/u,
+    "Use a lowercase Agent ID with letters, numbers, and hyphens.",
+  );
 const NullableReferenceSchema = QuickCaptureTextSchema.max(
   OBSERVATORY_GOVERNANCE_REF_MAX_LENGTH,
 )
@@ -177,6 +183,7 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   ),
   priority: NullablePrioritySchema,
   ownerId: NullableOwnerSchema,
+  assignedAgentId: AssignedAgentIdSchema,
   projectRef: ProjectReferenceSchema,
   milestoneRef: NullableReferenceSchema,
   projectKey: NullableProjectKeySchema,

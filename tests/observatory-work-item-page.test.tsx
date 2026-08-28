@@ -58,6 +58,7 @@ const item = {
   state: "triage",
   priority: null,
   owner_id: null,
+  assigned_agent_id: "plato",
   acceptance_criteria: "",
   project_ref: "Dashboard",
   milestone_ref: null,

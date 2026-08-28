@@ -14,6 +14,7 @@ const boundWorkItem: ObservatoryWorkItemRow = {
   state: "in_progress",
   priority: "high",
   owner_id: "22222222-2222-4222-8222-222222222222",
+  assigned_agent_id: "plato",
   acceptance_criteria: "The slice is deterministic.",
   project_ref: null,
   milestone_ref: null,

@@ -85,6 +85,11 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
           ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
           : []
       }
+      agentIds={
+        overviewState.status === "ready"
+          ? (overviewState.snapshot.agents ?? []).map((agent) => agent.id)
+          : []
+      }
       projectControls={
         overviewState.status === "ready" &&
         "project_controls" in overviewState.snapshot

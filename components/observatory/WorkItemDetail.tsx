@@ -61,6 +61,7 @@ type WorkItemDetailProps = {
   evaluatedAt?: string;
   projectControls?: ProjectControlSnapshot | null;
   projects: WorkTrackerProjectOption[];
+  agentIds?: readonly string[];
 };
 
 const stateLabels = {
@@ -158,6 +159,7 @@ export function WorkItemDetail({
   evaluatedAt = item.updated_at,
   projectControls = null,
   projects,
+  agentIds = [],
 }: WorkItemDetailProps) {
   const [updateState, updateFormAction, updating] = useActionState(
     updateAction,
@@ -183,6 +185,9 @@ export function WorkItemDetail({
   );
   const [priority, setPriority] = useState(item.priority ?? "");
   const [ownerId, setOwnerId] = useState(item.owner_id ?? "");
+  const [assignedAgentId, setAssignedAgentId] = useState(
+    item.assigned_agent_id,
+  );
   const [projectRef, setProjectRef] = useState(
     resolveWorkItemProject(item, projects)?.projectKey ?? "",
   );
@@ -237,6 +242,13 @@ export function WorkItemDetail({
   });
   const ownerLabel =
     currentAdmin.display_name ?? currentAdmin.username ?? "Current admin";
+  const agentOptions = Array.from(
+    new Set([
+      item.assigned_agent_id,
+      ...agentIds,
+      ...projects.map((project) => project.owner),
+    ]),
+  ).sort((left, right) => left.localeCompare(right, "en"));
   const activeClaim = claims.find(
     (claim) =>
       claim.status === "active" &&
@@ -263,49 +275,37 @@ export function WorkItemDetail({
             <Link href="/work-tracker">Work Tracker</Link> / Item
           </p>
           <h1>{item.title}</h1>
-          <p>
-            {stateLabels[item.state]} · {item.type} · version {item.version}
+          <div className="work-item-detail-badges">
+            <span>{stateLabels[item.state]}</span>
+            <span>{item.type}</span>
+            <span>Assigned · {item.assigned_agent_id}</span>
+            <span>v{item.version}</span>
+          </div>
+          <p className="work-item-detail-timestamps">
+            Created {new Date(item.created_at).toLocaleDateString("en-CA")}
+            {" · "}Updated {new Date(item.updated_at).toLocaleDateString("en-CA")}
           </p>
         </div>
       </header>
 
-      <section aria-labelledby="work-item-fields-title">
-        <h2 id="work-item-fields-title">Work item</h2>
-        <p className="work-item-ready-gate">
-          Ready Gate requires acceptance criteria, priority, and owner.
-          {readyFailures.length > 0
-            ? ` Missing ${readyFailures
-                .map((failure) =>
-                  failure === "acceptanceCriteria"
-                    ? "acceptance criteria"
-                    : failure === "ownerId"
-                      ? "owner"
-                      : "priority",
-                )
-                .join(", ")}.`
-            : " Gate complete."}
-        </p>
-        <p className="work-tracker-language-guidance">
-          标题、描述和验收标准默认使用中文；常用英文专有名词、产品名、代码标识、路径、API
-          与提交哈希可以保留。
-        </p>
-        <form action={updateFormAction} className="work-item-edit-form">
-          <input type="hidden" name="workItemId" value={item.id} />
-          <input
-            type="hidden"
-            name="expectedVersion"
-            value={item.version}
-          />
-          <label>
-            <span>Type</span>
-            <select name="type" defaultValue={item.type}>
-              {OBSERVATORY_WORK_ITEM_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type[0].toUpperCase() + type.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
+      <form action={updateFormAction} className="work-item-edit-form">
+        <input type="hidden" name="workItemId" value={item.id} />
+        <input
+          type="hidden"
+          name="expectedVersion"
+          value={item.version}
+        />
+        <section
+          className="work-item-content-panel"
+          role="region"
+          aria-label="Item content"
+        >
+          <p className="eyebrow">Item content</p>
+          <h2 id="work-item-fields-title">Content</h2>
+          <p className="work-tracker-language-guidance">
+            标题、描述和验收标准默认使用中文；常用英文专有名词、产品名、代码标识、路径、API
+            与提交哈希可以保留。
+          </p>
           <label>
             <span>Title</span>
             <input
@@ -315,23 +315,55 @@ export function WorkItemDetail({
               required
             />
           </label>
-          <label className="work-item-wide-field">
+          <label>
             <span>Description</span>
             <textarea
               name="description"
               defaultValue={item.description}
               maxLength={4000}
-              rows={4}
+              rows={8}
             />
           </label>
-          <label className="work-item-wide-field">
+          <label>
             <span>Acceptance criteria</span>
             <textarea
               name="acceptanceCriteria"
               defaultValue={item.acceptance_criteria}
               maxLength={4000}
-              rows={5}
+              rows={8}
             />
+          </label>
+        </section>
+
+        <aside
+          className="work-item-properties-panel"
+          aria-label="Item properties"
+        >
+          <p className="eyebrow">Responsibility & control</p>
+          <h2>Properties</h2>
+          <p className="work-item-ready-gate">
+            Ready Gate requires acceptance criteria, priority, and owner.
+            {readyFailures.length > 0
+              ? ` Missing ${readyFailures
+                  .map((failure) =>
+                    failure === "acceptanceCriteria"
+                      ? "acceptance criteria"
+                      : failure === "ownerId"
+                        ? "owner"
+                        : "priority",
+                  )
+                  .join(", ")}.`
+              : " Gate complete."}
+          </p>
+          <label>
+            <span>Type</span>
+            <select name="type" defaultValue={item.type}>
+              {OBSERVATORY_WORK_ITEM_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type[0].toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>Priority</span>
@@ -349,6 +381,23 @@ export function WorkItemDetail({
             </select>
           </label>
           <label>
+            <span>Assigned Agent</span>
+            <select
+              aria-label="Assigned Agent"
+              name="assignedAgentId"
+              value={assignedAgentId}
+              onChange={(event) => setAssignedAgentId(event.target.value)}
+              required
+            >
+              {agentOptions.map((agentId) => (
+                <option key={agentId} value={agentId}>
+                  {agentId}
+                </option>
+              ))}
+            </select>
+            <small>Execution responsibility; this does not grant controller authority.</small>
+          </label>
+          <label>
             <span>Owner</span>
             <select
               name="ownerId"
@@ -359,7 +408,7 @@ export function WorkItemDetail({
               <option value={currentAdmin.user_id}>{ownerLabel}</option>
             </select>
           </label>
-          <div className="work-item-wide-field">
+          <div>
             <CanonicalProjectPicker
               id="work-item-project"
               projects={projects}
@@ -376,7 +425,7 @@ export function WorkItemDetail({
               maxLength={160}
             />
           </label>
-          <label className="work-item-wide-field">
+          <label>
             <span>Project Control binding</span>
             <select
               aria-describedby="project-control-binding-help"
@@ -406,9 +455,12 @@ export function WorkItemDetail({
           >
             {updating ? "Saving…" : "Save fields"}
           </button>
-        </form>
-        <MutationFeedback state={updateState} success="Fields saved." />
-      </section>
+          <MutationFeedback state={updateState} success="Fields saved." />
+        </aside>
+      </form>
+
+      <div className="work-item-detail-lower">
+        <aside className="work-item-workflow-panel" aria-label="Workflow and Agent Claim">
 
       <section aria-labelledby="work-item-transitions-title">
         <h2 id="work-item-transitions-title">Move state</h2>
@@ -544,6 +596,9 @@ export function WorkItemDetail({
         )}
       </section>
 
+        </aside>
+        <div className="work-item-detail-main-stack">
+
       <section aria-labelledby="work-item-evidence-title">
         <h2 id="work-item-evidence-title">Evidence</h2>
         {evidence.length === 0 ? (
@@ -605,7 +660,7 @@ export function WorkItemDetail({
       </section>
 
       <section aria-labelledby="work-item-history-title">
-        <h2 id="work-item-history-title">History</h2>
+        <h2 id="work-item-history-title">Activity</h2>
         {events.length === 0 ? (
           <p>No history events.</p>
         ) : (
@@ -624,6 +679,8 @@ export function WorkItemDetail({
           </ol>
         )}
       </section>
+        </div>
+      </div>
     </article>
   );
 }

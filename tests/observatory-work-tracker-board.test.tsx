@@ -35,6 +35,7 @@ const item: ObservatoryWorkItemRow = {
   state: "triage",
   priority: "high",
   owner_id: "22222222-2222-4222-8222-222222222222",
+  assigned_agent_id: "plato",
   acceptance_criteria: "The item reaches Done.",
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
@@ -166,6 +167,7 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByText("功能")).toHaveClass("work-tracker-type-feature");
     expect(screen.getByText("Triage")).toHaveClass("work-tracker-state-badge");
     expect(screen.queryByText(/Milestone:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Assigned · plato")).toBeVisible();
 
     fireEvent.click(
       screen.getByLabelText(/打开 build the manual board 操作菜单/i),
@@ -173,6 +175,42 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByRole("button", { name: "移动到 Inbox" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "移动到 Ready" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "移动到 Done" })).not.toBeInTheDocument();
+  });
+
+  it("closes an action menu on outside interaction, Escape, and opening another card", () => {
+    const second = {
+      ...item,
+      id: "55555555-5555-4555-8555-555555555555",
+      title: "Second card",
+      assigned_agent_id: "amou",
+    };
+    render(
+      <WorkTrackerBoard state={{ status: "ready", items: [item, second] }} />,
+    );
+
+    const firstTrigger = screen.getByLabelText(
+      /打开 build the manual board 操作菜单/i,
+    );
+    const secondTrigger = screen.getByLabelText(/打开 second card 操作菜单/i);
+    const firstMenu = firstTrigger.closest("details")!;
+    const secondMenu = secondTrigger.closest("details")!;
+
+    fireEvent.click(firstTrigger);
+    expect(firstMenu).toHaveAttribute("open");
+    expect(firstTrigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.pointerDown(document.body);
+    expect(firstMenu).not.toHaveAttribute("open");
+
+    fireEvent.click(firstTrigger);
+    fireEvent.keyDown(firstMenu, { key: "Escape" });
+    expect(firstMenu).not.toHaveAttribute("open");
+    expect(firstTrigger).toHaveFocus();
+
+    fireEvent.click(firstTrigger);
+    fireEvent.click(secondTrigger);
+    expect(firstMenu).not.toHaveAttribute("open");
+    expect(secondMenu).toHaveAttribute("open");
   });
 
   it("labels manual, eligible, and actively claimed work without drag-only semantics", () => {
