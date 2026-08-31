@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { OrchestratorArtifactFrame } from "@/components/orchestrator/OrchestratorArtifactFrame";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +39,7 @@ export default async function OrchestratorPage() {
       </header>
 
       <div className="orchestrator-artifact-shell">
-        <iframe
-          className="orchestrator-artifact-frame"
-          src="/orchestrator/artifact"
-          title="Orchestrator control surface"
-        />
+        <OrchestratorArtifactFrame />
       </div>
     </section>
   );

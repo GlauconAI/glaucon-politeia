@@ -996,6 +996,10 @@
   background: var(--panel);
 }
 
+.orchestrator-artifact-frame[data-height-synchronized="true"] {
+  min-height: 0;
+}
+
 .observatory-layout > * {
   min-width: 0;
   max-width: 100%;
