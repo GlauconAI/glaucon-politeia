@@ -929,8 +929,10 @@
 }
 
 .orchestrator-page .observatory-hero h1 {
+  max-width: 30ch;
   margin-top: 8px;
   font-size: clamp(28px, 3.6vw, 36px);
+  overflow-wrap: anywhere;
 }
 
 .orchestrator-page .observatory-hero p:not(.eyebrow) {

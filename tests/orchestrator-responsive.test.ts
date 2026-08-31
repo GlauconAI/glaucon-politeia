@@ -20,6 +20,9 @@ describe("Orchestrator responsive shell", () => {
       /\.orchestrator-page\s+\.observatory-hero\s+h1\s*\{[^}]*font-size:\s*clamp\(28px,\s*3\.6vw,\s*36px\)/u,
     );
     expect(css).toMatch(
+      /\.orchestrator-page\s+\.observatory-hero\s+h1\s*\{[^}]*max-width:\s*30ch[^}]*overflow-wrap:\s*anywhere/u,
+    );
+    expect(css).toMatch(
       /@media\s*\(max-width:\s*720px\)[\s\S]*?\.orchestrator-artifact-frame\s*\{[^}]*min-height:\s*calc\(100dvh\s*-\s*220px\)/u,
     );
   });

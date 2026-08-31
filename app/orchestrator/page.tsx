@@ -17,7 +17,7 @@ export default async function OrchestratorPage() {
       <header className="observatory-hero">
         <div>
           <p className="eyebrow shell-path">402v /orchestrator</p>
-          <h1>Orchestrator</h1>
+          <h1>Openclaw Orchestrator｜Multi-Agent 编排系统设计</h1>
           <p>&gt; coordinate projects, plans, work, and delivery</p>
         </div>
         <div className="orchestrator-hero-actions">

@@ -44,8 +44,14 @@ describe("OrchestratorPage", () => {
     render(await OrchestratorPage());
 
     expect(
-      screen.getByRole("heading", { name: /^orchestrator$/i, level: 1 }),
+      screen.getByRole("heading", {
+        name: "Openclaw Orchestrator｜Multi-Agent 编排系统设计",
+        level: 1,
+      }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /^orchestrator$/i, level: 1 }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText(/orchestrator access/i)).toHaveTextContent(
       /mode: admin/i,
     );
