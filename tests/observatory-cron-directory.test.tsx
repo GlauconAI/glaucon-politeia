@@ -93,7 +93,7 @@ describe("CronDirectory", () => {
     );
   });
 
-  it("shows total, enabled, attention, and schedule-type statistics", () => {
+  it("shows filterable total, enabled, attention, and schedule-type statistics", () => {
     render(
       <CronDirectory
         crons={crons}
@@ -103,15 +103,42 @@ describe("CronDirectory", () => {
       />,
     );
 
-    expect(screen.getByText("3 Cron Jobs")).toBeInTheDocument();
-    expect(screen.getByText("2 enabled")).toBeInTheDocument();
-    expect(screen.getByText("1 needs attention")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /all Cron Jobs.*3/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /enabled Cron Jobs.*2/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /needs attention.*1/i }))
+      .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /calendar expression.*1/i }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /fixed interval.*1/i }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /one-time task.*1/i }))
       .toBeInTheDocument();
+  });
+
+  it("filters with enabled and attention statistics and resets with total", () => {
+    render(
+      <CronDirectory
+        crons={crons}
+        initialFilters={defaults}
+        sourceStatus="fresh"
+        sourceCollectedAt={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /enabled Cron Jobs.*2/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(screen.queryByRole("heading", { name: "Quarter-hour sync" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /needs attention.*1/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Renewal reminder" }))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /all Cron Jobs.*3/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(3);
   });
 
   it("searches and filters by Owner, type, enabled state, and health", () => {
@@ -171,6 +198,25 @@ describe("CronDirectory", () => {
       .not.toBeInTheDocument();
   });
 
+  it.each([
+    ["next", ["Daily refresh", "Renewal reminder", "Quarter-hour sync"]],
+    ["name", ["Daily refresh", "Quarter-hour sync", "Renewal reminder"]],
+    ["owner", ["Daily refresh", "Renewal reminder", "Quarter-hour sync"]],
+    ["health", ["Renewal reminder", "Quarter-hour sync", "Daily refresh"]],
+  ] as const)("sorts by %s", (sort, expected) => {
+    render(
+      <CronDirectory
+        crons={crons}
+        initialFilters={{ ...defaults, sort }}
+        sourceStatus="fresh"
+        sourceCollectedAt={null}
+      />,
+    );
+
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent))
+      .toEqual(expected);
+  });
+
   it("renders every safe card field and no mutation controls", () => {
     render(
       <CronDirectory
@@ -196,17 +242,31 @@ describe("CronDirectory", () => {
       .not.toBeInTheDocument();
   });
 
-  it("renders Not reported for legacy missing fields and an empty state", () => {
+  it("renders Not reported for legacy missing fields", () => {
     render(
       <CronDirectory
         crons={[crons[1]!]}
-        initialFilters={{ ...defaults, q: "missing" }}
+        initialFilters={defaults}
         sourceStatus="failed"
         sourceCollectedAt={null}
       />,
     );
 
-    expect(screen.getByText(/No Cron Jobs match/i)).toBeInTheDocument();
+    expect(within(screen.getByRole("article")).getAllByText("Not reported"))
+      .toHaveLength(5);
     expect(screen.getByRole("status")).toHaveTextContent(/source.*failed/i);
+  });
+
+  it("renders an empty state separately", () => {
+    render(
+      <CronDirectory
+        crons={[crons[1]!]}
+        initialFilters={{ ...defaults, q: "missing" }}
+        sourceStatus="fresh"
+        sourceCollectedAt={null}
+      />,
+    );
+
+    expect(screen.getByText(/No Cron Jobs match/i)).toBeInTheDocument();
   });
 });

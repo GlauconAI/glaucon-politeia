@@ -184,11 +184,67 @@ describe("system asset command projections", () => {
       });
     expect(result.assets.find((item) => item.id === "cron:at-job"))
       .toMatchObject({
+        health: "unknown",
         summary: "Once · 2026-10-01T16:00:00.000Z",
         labels: expect.arrayContaining([
           { key: "schedule_type", value: "at" },
+          { key: "enabled", value: "unknown" },
           { key: "schedule_at", value: "2026-10-01T16:00:00.000Z" },
+          { key: "last_status", value: "unknown" },
           { key: "runtime_target", value: "main" },
+        ]),
+      });
+  });
+
+  it("keeps malformed Cron state unknown and drops invalid schedule and timestamp values", () => {
+    const result = projectCronAssets(
+      {
+        jobs: [
+          {
+            id: "unreported-job",
+            enabled: "yes",
+            schedule: {
+              kind: "cron",
+              expr: "\nprivate payload",
+              tz: "../../private",
+            },
+            state: {
+              lastRunAtMs: "not-a-timestamp",
+              nextRunAtMs: -1,
+              consecutiveErrors: -3,
+            },
+          },
+          {
+            id: "legacy-error-job",
+            schedule: { kind: "every", everyMs: 60_000 },
+            state: { lastRunStatus: "error" },
+          },
+        ],
+      },
+      collectedAt,
+    );
+
+    expect(result.assets.find((item) => item.id === "cron:unreported-job"))
+      .toMatchObject({
+      id: "cron:unreported-job",
+      health: "unknown",
+      summary: "Cron schedule",
+      labels: [
+        { key: "schedule_type", value: "cron" },
+        { key: "enabled", value: "unknown" },
+        { key: "last_status", value: "unknown" },
+        { key: "runtime_target", value: "unknown" },
+      ],
+      });
+    expect(JSON.stringify(result)).not.toMatch(
+      /private payload|\.\.\/\.\.\/private|not-a-timestamp|-3/u,
+    );
+    expect(result.assets.find((item) => item.id === "cron:legacy-error-job"))
+      .toMatchObject({
+        health: "failed",
+        labels: expect.arrayContaining([
+          { key: "enabled", value: "unknown" },
+          { key: "last_status", value: "error" },
         ]),
       });
   });

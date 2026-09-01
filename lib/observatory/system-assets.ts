@@ -179,6 +179,7 @@ function safeNonNegativeInteger(value: unknown): number | undefined {
 
 function safeIsoTimestamp(value: unknown): string | undefined {
   if (typeof value !== "number" && typeof value !== "string") return undefined;
+  if (typeof value === "number" && value < 0) return undefined;
   const timestamp = typeof value === "number" ? value : Date.parse(value);
   if (!Number.isFinite(timestamp)) return undefined;
   const date = new Date(timestamp);
@@ -198,7 +199,9 @@ function safeCronExpression(value: unknown): string | undefined {
 function safeTimezone(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().slice(0, 128);
-  return /^[a-z0-9._+-]+(?:\/[a-z0-9._+-]+)*$/iu.test(normalized)
+  const segments = normalized.split("/");
+  return /^[a-z0-9._+-]+(?:\/[a-z0-9._+-]+)*$/iu.test(normalized) &&
+    segments.every((segment) => segment !== "." && segment !== "..")
     ? normalized
     : undefined;
 }
@@ -277,7 +280,7 @@ export function projectCronAssets(
     const rawId = safeText(record?.id ?? record?.jobId, `job-${index + 1}`);
     const id = logicalToken(rawId, `job-${index + 1}`);
     const owner = logicalToken(record?.agentId, "unassigned");
-    const enabled = boolean(record?.enabled) !== false;
+    const enabled = boolean(record?.enabled);
     const lastStatus = logicalToken(
       state?.lastStatus ?? state?.lastRunStatus ?? record?.lastRunStatus,
       "unknown",
@@ -292,6 +295,16 @@ export function projectCronAssets(
       state?.nextRunAtMs ?? record?.nextRunAtMs,
     );
     const failed = ["failed", "error", "timed-out", "lost"].includes(lastStatus);
+    const health: ObservatoryAsset["health"] =
+      enabled === false
+        ? "disabled"
+        : failed
+          ? "failed"
+          : consecutiveErrors && consecutiveErrors > 0
+            ? "degraded"
+            : enabled !== true || lastStatus === "unknown"
+              ? "unknown"
+              : "healthy";
     const schedule = cronScheduleSummary(asRecord(record?.schedule));
     const cronAsset = asset({
       id: `cron:${id}`,
@@ -302,17 +315,19 @@ export function projectCronAssets(
       source: "openclaw/cron-list",
       collected_at: collectedAt,
       freshness: "fresh",
-      health: !enabled
-        ? "disabled"
-        : failed
-          ? "failed"
-          : consecutiveErrors && consecutiveErrors > 0
-            ? "degraded"
-            : "healthy",
+      health,
       summary: schedule.summary,
       labels: [
         { key: "schedule_type", value: schedule.kind },
-        { key: "enabled", value: enabled ? "enabled" : "disabled" },
+        {
+          key: "enabled",
+          value:
+            enabled === true
+              ? "enabled"
+              : enabled === false
+                ? "disabled"
+                : "unknown",
+        },
         ...(schedule.value ? [schedule.value] : []),
         ...(schedule.timezone
           ? [{ key: "timezone", value: schedule.timezone }]

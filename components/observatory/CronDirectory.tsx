@@ -86,6 +86,14 @@ function scheduleValue(cron: DashboardCronEntry): string {
   return `${cron.scheduleValue} ms`;
 }
 
+function needsAttention(cron: DashboardCronEntry): boolean {
+  return (
+    cron.health === "failed" ||
+    cron.health === "degraded" ||
+    (cron.consecutiveErrors ?? 0) > 0
+  );
+}
+
 export function CronDirectory({
   crons,
   initialFilters,
@@ -115,7 +123,11 @@ export function CronDirectory({
           filters.enabled !== "all" &&
           enabledState(cron) !== filters.enabled
         ) return false;
-        if (filters.health !== "all" && cron.health !== filters.health) return false;
+        if (
+          filters.health === "attention"
+            ? !needsAttention(cron)
+            : filters.health !== "all" && cron.health !== filters.health
+        ) return false;
         if (!query) return true;
         return [
           cron.id,
@@ -166,10 +178,7 @@ export function CronDirectory({
 
   const enabledCount = crons.filter((cron) => cron.enabled === true).length;
   const attentionCount = crons.filter(
-    (cron) =>
-      cron.health === "failed" ||
-      cron.health === "degraded" ||
-      (cron.consecutiveErrors ?? 0) > 0,
+    needsAttention,
   ).length;
   const scheduleCounts = Object.fromEntries(
     (["cron", "every", "at"] as const).map((type) => [
@@ -201,7 +210,55 @@ export function CronDirectory({
         </p>
       ) : null}
 
-      <div className="dashboard-cron-stats" aria-label="Cron schedule types">
+      <div className="dashboard-cron-stats" aria-label="Cron directory statistics">
+        <button
+          type="button"
+          aria-label={`All Cron Jobs, ${crons.length}`}
+          aria-pressed={
+            filters.type === "all" &&
+            filters.enabled === "all" &&
+            filters.health === "all"
+          }
+          onClick={() =>
+            setFilters((current) => ({
+              ...current,
+              type: "all",
+              enabled: "all",
+              health: "all",
+            }))
+          }
+        >
+          <strong>All Cron Jobs</strong>
+          <span>{crons.length} total</span>
+        </button>
+        <button
+          type="button"
+          aria-label={`Enabled Cron Jobs, ${enabledCount}`}
+          aria-pressed={filters.enabled === "enabled"}
+          onClick={() =>
+            setFilter(
+              "enabled",
+              filters.enabled === "enabled" ? "all" : "enabled",
+            )
+          }
+        >
+          <strong>Enabled Cron Jobs</strong>
+          <span>{enabledCount} enabled</span>
+        </button>
+        <button
+          type="button"
+          aria-label={`Needs attention, ${attentionCount}`}
+          aria-pressed={filters.health === "attention"}
+          onClick={() =>
+            setFilter(
+              "health",
+              filters.health === "attention" ? "all" : "attention",
+            )
+          }
+        >
+          <strong>Needs attention</strong>
+          <span>{attentionCount} Job{attentionCount === 1 ? "" : "s"}</span>
+        </button>
         {(["cron", "every", "at"] as const).map((type) => (
           <button
             key={type}
@@ -261,6 +318,7 @@ export function CronDirectory({
           <span>Run health</span>
           <select value={filters.health} onChange={(event) => setFilter("health", event.target.value)}>
             <option value="all">All health</option>
+            <option value="attention">Needs attention</option>
             {options.health.map((health) => <option key={health}>{health}</option>)}
           </select>
         </label>
