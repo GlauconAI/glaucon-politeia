@@ -47,9 +47,41 @@ Vite 8.2.2 emits a forward-looking warning that the existing CommonJS-loaded `vi
 
 The canonical local Turbopack build cannot bind its internal PostCSS worker port in the managed sandbox (`Operation not permitted`). The exact rerun with controlled escalation produced the same environment-level denial. No code or dependency error was emitted before the port-bind failure. The required canonical build gate is therefore the isolated branch's GitHub/Vercel build; `main` must not advance until that deployment reports success.
 
-## Pending production acceptance
+The branch Preview provided the canonical build before main advanced:
 
-- Preview/Production build status and deployment identifiers
-- Desktop and 390px mobile route acceptance
-- Authenticated post Proxy and Orchestrator single-scroll verification
-- Console, page-error, and horizontal-overflow checks
+- Preview deployment: `6192964660`
+- Preview state: `success`
+- Preview immutable URL: `https://glaucon-politeia-pullhat7t-plato-8448s-projects.vercel.app`
+
+The verified branch was then fast-forwarded from `575b197` to application commit `5abb4cc50ce5b284419d182bfdcd9cc77dd69135` on `origin/main`.
+
+- Production deployment: `6192984834`
+- Production state: `success`
+- Production immutable URL: `https://glaucon-politeia-4pfeev46s-plato-8448s-projects.vercel.app`
+
+## Production acceptance
+
+Authenticated acceptance at `https://402v.com` passed without mutating content or database rows.
+
+Desktop, 1280 × 900:
+
+- Page width: 1280 client / 1280 scroll; no horizontal overflow
+- Collapsed iframe: 1,198 × 11,378; `scrolling="no"`
+- Expanded System metadata iframe height: 11,660
+- Runtime navigation moved the outer document to `scrollY=1,386`
+
+Mobile, 390 × 844:
+
+- Page width: 390 client / 390 scroll; no horizontal overflow
+- Collapsed iframe: 368 × 16,269; `scrolling="no"`
+- Expanded System metadata iframe height: 16,983
+- Runtime navigation moved the outer document to `scrollY=2,220`
+
+Runtime surfaces:
+
+- Authenticated Artifact: HTTP 200, HTML, 262,605 bytes
+- Next image optimization endpoint: HTTP 200, PNG, 29,904 bytes
+- `/posts/orchestration-system-design`: standalone HTML Proxy response, correct title and doctype, no application shell
+- Authenticated `/editor`: rendered two forms and four buttons; no form was submitted
+- Publisher dry-run remained a private draft and performed no database write
+- Desktop and mobile browser console and page-error logs were empty
