@@ -26,19 +26,71 @@
 - Candidate bytes: `262605`.
 - `git diff --check`: exit 0.
 
+## Release
+
+- Application commit: `7b604adc017b49890cd1ad6eae5946aabbf4ca79`.
+- Canonical branch: `origin/main` advanced by fast-forward from `b55a98e`.
+- GitHub Production deployment: `6191753320`, status `success` (`Deployment has completed`).
+- Immutable deployment URL: `https://glaucon-politeia-58vlycvhq-plato-8448s-projects.vercel.app`.
+- Production alias accepted at `https://402v.com/orchestrator`.
+
+## Content update
+
+- Existing post ID: `aa6f7b92-376b-4957-a462-ab633d8c6468`.
+- Slug: `openclaw-orchestrator`.
+- Visibility/status remained `private` / `published`.
+- Previous HTML SHA-256: `64c8ed5aa15dd85225ea353b6cc9d0f45dd7eeeff3b948f694b302e5fcba30fa`.
+- Candidate, stored, and authenticated served HTML SHA-256: `4712ae0a3bc36486639ca0ac47d210fb107e0505150f24b3816dea589f2b0e97`.
+- Stored/served size: `262605` bytes.
+- Optimistic concurrency matched the previous `updated_at` and HTML hash before writing.
+- Only `content_html` changed; author, slug, title, excerpt, Markdown, format, visibility, status, and published timestamp were preserved.
+
+## Browser acceptance
+
+### Desktop, 1280×900
+
+- Outer heading: `Openclaw Orchestrator｜Multi-Agent 编排系统设计`.
+- Outer document had no horizontal overflow; iframe width was 1198px.
+- Initial synchronized iframe height was 11378px with `data-height-synchronized=true` and `scrolling=no`.
+- Opening `System metadata` changed the iframe height to 11660px and the outer document height from 11814px to 12096px.
+- Clicking `Runtime` moved the outer document from `scrollY=0` to `scrollY=1791`.
+- Browser console and page-error collections were empty.
+
+### Mobile, 390×844
+
+- Outer document had no horizontal overflow; iframe bounds were 11–379px (368px wide).
+- Initial synchronized iframe height was 16269px with `scrolling=no`.
+- Opening `System metadata` changed the iframe height to 16983px and the outer document height from 16877px to 17591px.
+- Browser console and page-error collections were empty.
+
+## Raw response verification
+
+- Authenticated `/orchestrator/artifact` returned HTTP 200 and began with the plain HTML doctype.
+- `Content-Type`: `text/html; charset=utf-8`.
+- `Cache-Control`: `private, no-store`.
+- `X-Content-Type-Options`: `nosniff`.
+- `Referrer-Policy`: `no-referrer`.
+- CSP retained `sandbox` without `allow-same-origin`.
+- Response bytes and SHA-256 exactly matched the stored candidate.
+- Anonymous access remained protected and redirected to `/auth?redirectTo=/orchestrator`.
+
 ## Environment findings
 
 - Sandboxed Turbopack still fails when it tries to bind a local helper port; the same exact build succeeds with bounded execution permission.
 - Sandboxed Supabase and npm checks fail at DNS resolution; bounded execution permission restores both connections.
 - The five production dependency audit findings remain the same pre-existing `nanoid`, `next`, `postcss`, `sharp`, and `undici` findings. This release does not change dependency files.
-- Git commit/push, Supabase write, Vercel deployment, and production browser acceptance remain pending at this checkpoint.
+- With bounded execution permission, Git over SSH, Supabase, GitHub status queries, and the authenticated browser all succeeded.
 
-## Pending production gate
+## Why the previous turn was blocked
 
-Once a runtime with Git/network/browser write access is available:
+- The earlier turn ran under a sandbox policy that rejected Git metadata writes, DNS/network access, browser sockets, and the requested escalation. The read-only GitHub connector also returned HTTP 403 for branch/blob writes.
+- The earlier successful compact-layout release did not depend on direct Vercel CLI deployment. Its local `vercel deploy --prebuilt --prod` attempt also returned `Not authorized`; production succeeded because an authorized Git push triggered the existing GitHub→Vercel integration.
+- This turn reused that successful path. The material difference was that bounded execution permissions were accepted: Git fetch/commit/push worked, Supabase DNS and write access worked, and agent-browser could open the dedicated authenticated profile.
+- The canonical deployment chain was therefore `fast-forward push to origin/main → GitHub Production deployment → Vercel success → 402v.com alias acceptance`. No GitHub connector write or direct Vercel CLI deployment was required.
 
-1. Commit the scoped worktree changes on top of `b55a98e` and push `main`.
-2. Run `/private/tmp/update-orchestrator-document-scroll.mjs` from the site worktree; it requires current production hash `64c8ed5a...` and preserves all non-content metadata.
-3. Require Vercel Production success for the pushed commit.
-4. Run authenticated desktop and 390px acceptance with the dedicated `402v-admin` profile.
-5. Verify one outer vertical scrollbar, synchronized disclosure height, working Runtime anchor, no horizontal overflow/errors, and exact candidate/storage/served hash equality.
+## Safety
+
+- The dirty primary worktree and all unrelated worktrees were preserved.
+- The application commit contains only the scoped Orchestrator shell, frame component, tests, and release documentation.
+- The HTML post identity and all non-content metadata were preserved.
+- The dedicated browser session was closed, releasing the persistent admin profile lock.

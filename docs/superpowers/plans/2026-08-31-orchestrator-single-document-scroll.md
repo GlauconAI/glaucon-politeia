@@ -41,7 +41,7 @@
 
 - [x] Run focused tests, full Vitest, ESLint, TypeScript, production build, readiness, production audit, and `git diff --check`.
 - [x] Run publisher tests and an exact dry run for the candidate.
-- [ ] Commit only scoped files and preserve all unrelated worktrees.
+- [x] Commit only scoped files and preserve all unrelated worktrees.
 
 ### Task 4: Publish and accept production
 
@@ -49,7 +49,7 @@
 - Update: existing private Supabase post `openclaw-orchestrator` content only.
 - Create: `docs/superpowers/evidence/2026-08-31-orchestrator-single-document-scroll.md`.
 
-- [ ] Publish with optimistic concurrency and verify candidate/storage hash equality.
-- [ ] Deploy and push the exact application commit; require successful Vercel Production status.
-- [ ] Verify authenticated desktop and 390px mobile behavior: one vertical scrollbar, live disclosure resizing, working Runtime anchor, no horizontal overflow, and zero browser errors.
-- [ ] Verify stored and served Artifact hashes and close the browser session.
+- [x] Publish with optimistic concurrency and verify candidate/storage hash equality.
+- [x] Deploy and push the exact application commit; require successful Vercel Production status.
+- [x] Verify authenticated desktop and 390px mobile behavior: one vertical scrollbar, live disclosure resizing, working Runtime anchor, no horizontal overflow, and zero browser errors.
+- [x] Verify stored and served Artifact hashes and close the browser session.
