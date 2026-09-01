@@ -215,6 +215,8 @@ export function CronDirectory({
           type="button"
           aria-label={`All Cron Jobs, ${crons.length}`}
           aria-pressed={
+            filters.q === "" &&
+            filters.owner === "all" &&
             filters.type === "all" &&
             filters.enabled === "all" &&
             filters.health === "all"
@@ -222,6 +224,8 @@ export function CronDirectory({
           onClick={() =>
             setFilters((current) => ({
               ...current,
+              q: "",
+              owner: "all",
               type: "all",
               enabled: "all",
               health: "all",

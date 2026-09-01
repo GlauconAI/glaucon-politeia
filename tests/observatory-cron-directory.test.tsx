@@ -141,6 +141,29 @@ describe("CronDirectory", () => {
     expect(screen.getAllByRole("article")).toHaveLength(3);
   });
 
+  it("clears search and Owner filters when resetting to all Cron Jobs", () => {
+    render(
+      <CronDirectory
+        crons={crons}
+        initialFilters={{ ...defaults, q: "missing", owner: "plato" }}
+        sourceStatus="fresh"
+        sourceCollectedAt={null}
+      />,
+    );
+
+    const reset = screen.getByRole("button", { name: /all Cron Jobs.*3/i });
+    expect(reset).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(/No Cron Jobs match/i)).toBeInTheDocument();
+
+    fireEvent.click(reset);
+
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getByRole("searchbox", { name: /search Cron Jobs/i }))
+      .toHaveValue("");
+    expect(screen.getByRole("combobox", { name: /Cron owner/i }))
+      .toHaveValue("all");
+  });
+
   it("searches and filters by Owner, type, enabled state, and health", () => {
     const replaceState = vi.spyOn(window.history, "replaceState");
     render(
