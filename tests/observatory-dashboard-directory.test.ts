@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCronDirectory,
   buildProjectDirectory,
   buildSkillDirectory,
 } from "@/lib/observatory/dashboard-directory";
@@ -105,6 +106,92 @@ function skill(
 }
 
 describe("Dashboard directory view models", () => {
+  it("builds a typed Cron directory from safe labels and tolerates legacy Snapshots", () => {
+    const assets: ObservatoryAsset[] = [
+      {
+        id: "cron:job-1",
+        kind: "cron",
+        name: "Dashboard refresh",
+        owner: "plato",
+        authority: "observed",
+        source: "openclaw/cron-list",
+        collected_at: "2026-08-31T18:10:00.000Z",
+        freshness: "fresh",
+        health: "healthy",
+        summary: "Cron · 0 18 * * *",
+        labels: [
+          { key: "schedule_type", value: "cron" },
+          { key: "enabled", value: "enabled" },
+          { key: "schedule_expression", value: "0 18 * * *" },
+          { key: "timezone", value: "America/Vancouver" },
+          { key: "last_status", value: "success" },
+          { key: "last_run_at", value: "2026-08-31T18:00:00.000Z" },
+          { key: "next_run_at", value: "2026-09-01T01:00:00.000Z" },
+          { key: "consecutive_errors", value: "0" },
+          { key: "runtime_target", value: "session-bound" },
+        ],
+      },
+      {
+        id: "cron:legacy-job",
+        kind: "cron",
+        name: "Legacy job",
+        owner: "giskard",
+        authority: "observed",
+        source: "openclaw/cron-list",
+        collected_at: "2026-08-30T18:10:00.000Z",
+        freshness: "stale",
+        health: "disabled",
+        summary: "Every 15 minutes",
+        labels: [
+          { key: "schedule", value: "every" },
+          { key: "last_status", value: "unknown" },
+        ],
+      },
+      skill("skill:plato:weather", "weather", "plato", "healthy"),
+    ];
+
+    expect(buildCronDirectory(assets)).toEqual([
+      {
+        assetId: "cron:job-1",
+        id: "job-1",
+        name: "Dashboard refresh",
+        owner: "plato",
+        enabled: true,
+        health: "healthy",
+        freshness: "fresh",
+        collectedAt: "2026-08-31T18:10:00.000Z",
+        scheduleType: "cron",
+        scheduleValue: "0 18 * * *",
+        scheduleSummary: "Cron · 0 18 * * *",
+        timezone: "America/Vancouver",
+        lastStatus: "success",
+        lastRunAt: "2026-08-31T18:00:00.000Z",
+        nextRunAt: "2026-09-01T01:00:00.000Z",
+        consecutiveErrors: 0,
+        runtimeTarget: "session-bound",
+      },
+      {
+        assetId: "cron:legacy-job",
+        id: "legacy-job",
+        name: "Legacy job",
+        owner: "giskard",
+        enabled: false,
+        health: "disabled",
+        freshness: "stale",
+        collectedAt: "2026-08-30T18:10:00.000Z",
+        scheduleType: "every",
+        scheduleValue: null,
+        scheduleSummary: "Every 15 minutes",
+        timezone: null,
+        lastStatus: null,
+        lastRunAt: null,
+        nextRunAt: null,
+        consecutiveErrors: null,
+        runtimeTarget: "unknown",
+      },
+    ]);
+  });
+
   it("flattens projects and attaches exact repository matches with latest activity", () => {
     expect(buildProjectDirectory(registry, repositories)).toEqual([
       {

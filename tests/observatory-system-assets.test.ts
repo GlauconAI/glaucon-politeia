@@ -90,7 +90,9 @@ describe("system asset command projections", () => {
     expect(JSON.stringify(result)).not.toMatch(/Users|secret|entry|config/u);
   });
 
-  it("projects cron schedules and state while discarding payload and delivery", () => {
+  it("projects allowlisted Cron schedule and health fields while discarding private execution data", () => {
+    const lastRunAt = Date.parse("2026-08-31T18:00:00.000Z");
+    const nextRunAt = Date.parse("2026-09-01T01:00:00.000Z");
     const result = projectCronAssets(
       {
         jobs: [
@@ -99,13 +101,20 @@ describe("system asset command projections", () => {
             name: "Dashboard refresh",
             agentId: "plato",
             enabled: true,
-            schedule: { kind: "every", everyMs: 900000 },
+            schedule: {
+              kind: "cron",
+              expr: "0 18 * * *",
+              tz: "America/Vancouver",
+            },
+            sessionTarget: "session:private-dashboard-refresh",
             payload: { message: "private instructions", token: "secret" },
             delivery: { to: "telegram:private-user" },
+            trigger: { script: "return process.env.PRIVATE_TOKEN" },
             state: {
               lastStatus: "success",
-              lastRunAtMs: 1784757600000,
-              nextRunAtMs: 1784758500000,
+              lastRunAtMs: lastRunAt,
+              nextRunAtMs: nextRunAt,
+              consecutiveErrors: 0,
             },
           },
         ],
@@ -117,10 +126,17 @@ describe("system asset command projections", () => {
       id: "cron:job-1",
       owner: "plato",
       health: "healthy",
-      summary: "Every 15 minutes",
+      summary: "Cron · 0 18 * * *",
       labels: [
-        { key: "schedule", value: "every" },
+        { key: "schedule_type", value: "cron" },
+        { key: "enabled", value: "enabled" },
+        { key: "schedule_expression", value: "0 18 * * *" },
+        { key: "timezone", value: "America/Vancouver" },
         { key: "last_status", value: "success" },
+        { key: "last_run_at", value: "2026-08-31T18:00:00.000Z" },
+        { key: "next_run_at", value: "2026-09-01T01:00:00.000Z" },
+        { key: "consecutive_errors", value: "0" },
+        { key: "runtime_target", value: "session-bound" },
       ],
     });
     expect(result.relationships[0]).toMatchObject({
@@ -129,8 +145,52 @@ describe("system asset command projections", () => {
       kind: "runs-as",
     });
     expect(JSON.stringify(result)).not.toMatch(
-      /private instructions|secret|telegram:private-user|payload|delivery/u,
+      /private instructions|secret|telegram:private-user|payload|delivery|trigger|PRIVATE_TOKEN|session:private/u,
     );
+  });
+
+  it("projects every and at schedules without failing when run state is absent", () => {
+    const result = projectCronAssets(
+      {
+        jobs: [
+          {
+            id: "every-job",
+            name: "Quarter-hour refresh",
+            enabled: false,
+            schedule: { kind: "every", everyMs: 900_000 },
+            sessionTarget: "isolated",
+          },
+          {
+            id: "at-job",
+            name: "Renewal reminder",
+            agentId: "plato",
+            schedule: { kind: "at", at: "2026-10-01T16:00:00.000Z" },
+            sessionTarget: "main",
+          },
+        ],
+      },
+      collectedAt,
+    );
+
+    expect(result.assets.find((item) => item.id === "cron:every-job"))
+      .toMatchObject({
+        health: "disabled",
+        summary: "Every 15 minutes",
+        labels: expect.arrayContaining([
+          { key: "schedule_type", value: "every" },
+          { key: "schedule_interval_ms", value: "900000" },
+          { key: "runtime_target", value: "isolated" },
+        ]),
+      });
+    expect(result.assets.find((item) => item.id === "cron:at-job"))
+      .toMatchObject({
+        summary: "Once · 2026-10-01T16:00:00.000Z",
+        labels: expect.arrayContaining([
+          { key: "schedule_type", value: "at" },
+          { key: "schedule_at", value: "2026-10-01T16:00:00.000Z" },
+          { key: "runtime_target", value: "main" },
+        ]),
+      });
   });
 
   it("projects Gateway and runtime health without URLs, tokens, or sessions", () => {

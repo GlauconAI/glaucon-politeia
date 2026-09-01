@@ -169,17 +169,101 @@ export function projectPluginAssets(
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
+function safeNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 0
+    ? value
+    : undefined;
+}
+
+function safeIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const timestamp = typeof value === "number" ? value : Date.parse(value);
+  if (!Number.isFinite(timestamp)) return undefined;
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function safeCronExpression(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().replace(/\s+/gu, " ").slice(0, 160);
+  return /^[a-z0-9*?,/\-#LW]+(?: [a-z0-9*?,/\-#LW]+){4,6}$/iu.test(
+    normalized,
+  )
+    ? normalized
+    : undefined;
+}
+
+function safeTimezone(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().slice(0, 128);
+  return /^[a-z0-9._+-]+(?:\/[a-z0-9._+-]+)*$/iu.test(normalized)
+    ? normalized
+    : undefined;
+}
+
+function runtimeTarget(value: unknown): "isolated" | "main" | "session-bound" | "unknown" {
+  if (value === "isolated") return "isolated";
+  if (value === "main") return "main";
+  if (value === "current") return "session-bound";
+  if (typeof value === "string" && value.startsWith("session:")) {
+    return "session-bound";
+  }
+  return "unknown";
+}
+
+function durationSummary(milliseconds: number): string {
+  const units = [
+    [86_400_000, "day"],
+    [3_600_000, "hour"],
+    [60_000, "minute"],
+    [1_000, "second"],
+  ] as const;
+  const [unitMs, label] =
+    units.find(([candidate]) => milliseconds >= candidate && milliseconds % candidate === 0) ??
+    ([1, "millisecond"] as const);
+  const value = Math.max(1, Math.round(milliseconds / unitMs));
+  return `${value} ${label}${value === 1 ? "" : "s"}`;
+}
+
 function cronScheduleSummary(schedule: UnknownRecord | undefined): {
   kind: string;
   summary: string;
+  value?: { key: string; value: string };
+  timezone?: string;
 } {
   const kind = safeText(schedule?.kind, "unknown").toLocaleLowerCase();
-  if (kind === "every" && typeof schedule?.everyMs === "number") {
-    const minutes = Math.max(1, Math.round(schedule.everyMs / 60_000));
-    return { kind, summary: `Every ${minutes} minute${minutes === 1 ? "" : "s"}` };
+  if (kind === "every") {
+    const everyMs = safeNonNegativeInteger(schedule?.everyMs);
+    if (everyMs !== undefined && everyMs > 0) {
+      return {
+        kind,
+        summary: `Every ${durationSummary(everyMs)}`,
+        value: { key: "schedule_interval_ms", value: String(everyMs) },
+      };
+    }
   }
-  if (kind === "cron") return { kind, summary: "Cron schedule" };
-  if (kind === "at") return { kind, summary: "One-time schedule" };
+  if (kind === "cron") {
+    const expression = safeCronExpression(schedule?.expr);
+    const timezone = safeTimezone(schedule?.tz);
+    return {
+      kind,
+      summary: expression ? `Cron · ${expression}` : "Cron schedule",
+      ...(expression
+        ? { value: { key: "schedule_expression", value: expression } }
+        : {}),
+      ...(timezone ? { timezone } : {}),
+    };
+  }
+  if (kind === "at") {
+    const at = safeIsoTimestamp(schedule?.at);
+    return {
+      kind,
+      summary: at ? `Once · ${at}` : "One-time schedule",
+      ...(at ? { value: { key: "schedule_at", value: at } } : {}),
+    };
+  }
   return { kind: "unknown", summary: "Schedule unknown" };
 }
 
@@ -194,7 +278,19 @@ export function projectCronAssets(
     const id = logicalToken(rawId, `job-${index + 1}`);
     const owner = logicalToken(record?.agentId, "unassigned");
     const enabled = boolean(record?.enabled) !== false;
-    const lastStatus = logicalToken(state?.lastStatus, "unknown");
+    const lastStatus = logicalToken(
+      state?.lastStatus ?? state?.lastRunStatus ?? record?.lastRunStatus,
+      "unknown",
+    );
+    const consecutiveErrors = safeNonNegativeInteger(
+      state?.consecutiveErrors ?? record?.consecutiveErrors,
+    );
+    const lastRunAt = safeIsoTimestamp(
+      state?.lastRunAtMs ?? record?.lastRunAtMs,
+    );
+    const nextRunAt = safeIsoTimestamp(
+      state?.nextRunAtMs ?? record?.nextRunAtMs,
+    );
     const failed = ["failed", "error", "timed-out", "lost"].includes(lastStatus);
     const schedule = cronScheduleSummary(asRecord(record?.schedule));
     const cronAsset = asset({
@@ -206,11 +302,28 @@ export function projectCronAssets(
       source: "openclaw/cron-list",
       collected_at: collectedAt,
       freshness: "fresh",
-      health: !enabled ? "disabled" : failed ? "failed" : "healthy",
+      health: !enabled
+        ? "disabled"
+        : failed
+          ? "failed"
+          : consecutiveErrors && consecutiveErrors > 0
+            ? "degraded"
+            : "healthy",
       summary: schedule.summary,
       labels: [
-        { key: "schedule", value: schedule.kind },
+        { key: "schedule_type", value: schedule.kind },
+        { key: "enabled", value: enabled ? "enabled" : "disabled" },
+        ...(schedule.value ? [schedule.value] : []),
+        ...(schedule.timezone
+          ? [{ key: "timezone", value: schedule.timezone }]
+          : []),
         { key: "last_status", value: lastStatus },
+        ...(lastRunAt ? [{ key: "last_run_at", value: lastRunAt }] : []),
+        ...(nextRunAt ? [{ key: "next_run_at", value: nextRunAt }] : []),
+        ...(consecutiveErrors !== undefined
+          ? [{ key: "consecutive_errors", value: String(consecutiveErrors) }]
+          : []),
+        { key: "runtime_target", value: runtimeTarget(record?.sessionTarget) },
       ],
     });
     return {

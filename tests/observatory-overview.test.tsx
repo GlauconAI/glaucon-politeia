@@ -358,6 +358,54 @@ describe("ObservatoryOverview", () => {
     ).toHaveAttribute("href", "/dashboard/skills");
   });
 
+  it("adds a Cron Jobs index card with the full collected job count", () => {
+    const v2 = {
+      ...snapshot,
+      schema_version: "2.0.0",
+      collector_version: "2.0.0",
+      assets: [
+        {
+          id: "cron:daily",
+          kind: "cron",
+          name: "Daily refresh",
+          owner: "plato",
+          authority: "observed",
+          source: "openclaw/cron-list",
+          collected_at: "2026-08-31T18:00:00.000Z",
+          freshness: "fresh",
+          health: "healthy",
+          summary: "Cron schedule",
+          labels: [],
+        },
+        {
+          id: "cron:reminder",
+          kind: "cron",
+          name: "Renewal reminder",
+          owner: "plato",
+          authority: "observed",
+          source: "openclaw/cron-list",
+          collected_at: "2026-08-31T18:00:00.000Z",
+          freshness: "fresh",
+          health: "healthy",
+          summary: "One-time schedule",
+          labels: [],
+        },
+      ],
+      core_endpoint_ids: [],
+      relationships: [],
+      source_health: [],
+    } as unknown as ObservatoryCollectionEnvelope;
+
+    render(<ObservatoryOverview state={readyState(v2)} />);
+
+    const summary = screen.getByRole("region", { name: /system summary/i });
+    expect(within(summary).getByText("Cron Jobs").parentElement)
+      .toHaveTextContent("2");
+    expect(
+      within(summary).getByRole("link", { name: /view Cron Jobs/i }),
+    ).toHaveAttribute("href", "/dashboard/crons");
+  });
+
   it("exposes stable anchors for the homepage section index", () => {
     render(<ObservatoryOverview state={readyState()} />);
 

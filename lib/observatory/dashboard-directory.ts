@@ -362,3 +362,104 @@ export function buildSkillDirectory(
     })
     .sort((left, right) => left.name.localeCompare(right.name));
 }
+
+export type DashboardCronScheduleType = "cron" | "every" | "at" | "unknown";
+export type DashboardCronRuntimeTarget =
+  | "isolated"
+  | "main"
+  | "session-bound"
+  | "unknown";
+
+export type DashboardCronEntry = {
+  assetId: string;
+  id: string;
+  name: string;
+  owner: string;
+  enabled: boolean | null;
+  health: ObservatoryAsset["health"];
+  freshness: ObservatoryAsset["freshness"];
+  collectedAt: string;
+  scheduleType: DashboardCronScheduleType;
+  scheduleValue: string | null;
+  scheduleSummary: string;
+  timezone: string | null;
+  lastStatus: string | null;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  consecutiveErrors: number | null;
+  runtimeTarget: DashboardCronRuntimeTarget;
+};
+
+function cronScheduleType(value: string | undefined): DashboardCronScheduleType {
+  return value === "cron" || value === "every" || value === "at"
+    ? value
+    : "unknown";
+}
+
+function cronRuntimeTarget(value: string | undefined): DashboardCronRuntimeTarget {
+  return value === "isolated" ||
+    value === "main" ||
+    value === "session-bound"
+    ? value
+    : "unknown";
+}
+
+function optionalReportedValue(value: string | undefined): string | null {
+  return value && value !== "unknown" ? value : null;
+}
+
+function nonNegativeInteger(value: string | undefined): number | null {
+  if (!value || !/^\d+$/u.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+export function buildCronDirectory(
+  assets: ObservatoryAsset[],
+): DashboardCronEntry[] {
+  return assets
+    .filter((asset) => asset.kind === "cron")
+    .map((asset) => {
+      const scheduleType = cronScheduleType(
+        labelValue(asset, "schedule_type") ?? labelValue(asset, "schedule"),
+      );
+      const enabledLabel = labelValue(asset, "enabled");
+      const enabled =
+        enabledLabel === "enabled"
+          ? true
+          : enabledLabel === "disabled" || asset.health === "disabled"
+            ? false
+            : null;
+      const scheduleValue =
+        scheduleType === "cron"
+          ? labelValue(asset, "schedule_expression")
+          : scheduleType === "every"
+            ? labelValue(asset, "schedule_interval_ms")
+            : scheduleType === "at"
+              ? labelValue(asset, "schedule_at")
+              : undefined;
+
+      return {
+        assetId: asset.id,
+        id: asset.id.startsWith("cron:") ? asset.id.slice(5) : asset.id,
+        name: asset.name,
+        owner: asset.owner,
+        enabled,
+        health: asset.health,
+        freshness: asset.freshness,
+        collectedAt: asset.collected_at,
+        scheduleType,
+        scheduleValue: scheduleValue ?? null,
+        scheduleSummary: asset.summary || "Schedule not reported",
+        timezone: labelValue(asset, "timezone") ?? null,
+        lastStatus: optionalReportedValue(labelValue(asset, "last_status")),
+        lastRunAt: labelValue(asset, "last_run_at") ?? null,
+        nextRunAt: labelValue(asset, "next_run_at") ?? null,
+        consecutiveErrors: nonNegativeInteger(
+          labelValue(asset, "consecutive_errors"),
+        ),
+        runtimeTarget: cronRuntimeTarget(labelValue(asset, "runtime_target")),
+      } satisfies DashboardCronEntry;
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+}

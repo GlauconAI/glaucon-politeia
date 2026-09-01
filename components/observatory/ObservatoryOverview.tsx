@@ -12,7 +12,10 @@ import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
 import { FlowAnalytics } from "@/components/observatory/FlowAnalytics";
 import { GovernanceReview } from "@/components/observatory/GovernanceReview";
-import { buildSkillDirectory } from "@/lib/observatory/dashboard-directory";
+import {
+  buildCronDirectory,
+  buildSkillDirectory,
+} from "@/lib/observatory/dashboard-directory";
 import type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 export type { ObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
@@ -236,6 +239,10 @@ export function ObservatoryOverview({
           label: "Skills",
           value: buildSkillDirectory(state.snapshot.assets).length,
           href: "/dashboard/skills",
+        }, {
+          label: "Cron Jobs",
+          value: buildCronDirectory(state.snapshot.assets).length,
+          href: "/dashboard/crons",
         }]
       : []),
     {

@@ -49,6 +49,15 @@ afterEach(() => {
 });
 
 describe("DashboardSectionNav", () => {
+  it("links the dedicated Cron Jobs directory from the Dashboard route bar", () => {
+    render(<DashboardRouteNav />);
+
+    expect(screen.getByRole("link", { name: "Cron Jobs" })).toHaveAttribute(
+      "href",
+      "/dashboard/crons",
+    );
+  });
+
   it("uses sticky, horizontally scrollable navigation and offset section anchors", () => {
     const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 

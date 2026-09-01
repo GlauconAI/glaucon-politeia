@@ -9,6 +9,7 @@ const routes = [
   { href: "/dashboard/projects", label: "Projects", exact: false },
   { href: "/dashboard/decisions", label: "Decisions", exact: false },
   { href: "/dashboard/skills", label: "Skills", exact: false },
+  { href: "/dashboard/crons", label: "Cron Jobs", exact: false },
 ] as const;
 
 export function DashboardRouteNav() {

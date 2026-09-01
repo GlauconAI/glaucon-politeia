@@ -5639,6 +5639,55 @@ body {
   margin: 16px 0;
 }
 
+.dashboard-cron-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.dashboard-cron-stats button {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+}
+
+.dashboard-cron-stats button:hover,
+.dashboard-cron-stats button:focus-visible {
+  border-color: rgba(124, 58, 237, 0.58);
+}
+
+.dashboard-cron-stats button[aria-pressed="true"] {
+  border-color: rgba(67, 211, 139, 0.55);
+  background: rgba(67, 211, 139, 0.1);
+}
+
+.dashboard-cron-stats strong {
+  color: var(--strong);
+}
+
+.dashboard-cron-stats span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dashboard-cron-source {
+  margin: 14px 0 0;
+  border: 1px solid rgba(255, 184, 77, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 184, 77, 0.08);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
 .dashboard-skill-category {
   display: grid;
   min-width: 0;
@@ -5878,6 +5927,10 @@ body {
   .dashboard-skill-categories {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .dashboard-cron-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -5886,6 +5939,10 @@ body {
   }
 
   .dashboard-skill-categories {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-cron-stats {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -45,6 +45,9 @@ import ProjectsPage, {
 import SkillsPage, {
   dynamic as skillsDynamic,
 } from "@/app/dashboard/skills/page";
+import CronsPage, {
+  dynamic as cronsDynamic,
+} from "@/app/dashboard/crons/page";
 
 const snapshot = {
   registry: {
@@ -79,6 +82,34 @@ const snapshot = {
       summary: "Ready",
       labels: [{ key: "eligibility", value: "ready" }],
     },
+    {
+      id: "cron:daily-refresh",
+      kind: "cron",
+      name: "Daily refresh",
+      owner: "plato",
+      authority: "observed",
+      source: "openclaw/cron-list",
+      collected_at: "2026-08-31T18:00:00.000Z",
+      freshness: "fresh",
+      health: "healthy",
+      summary: "Cron · 0 18 * * *",
+      labels: [
+        { key: "schedule_type", value: "cron" },
+        { key: "enabled", value: "enabled" },
+        { key: "schedule_expression", value: "0 18 * * *" },
+        { key: "next_run_at", value: "2026-09-01T01:00:00.000Z" },
+      ],
+    },
+  ],
+  source_health: [
+    {
+      domain: "operations",
+      status: "fresh",
+      health: "healthy",
+      collected_at: "2026-08-31T18:00:00.000Z",
+      last_success_at: "2026-08-31T18:00:00.000Z",
+      asset_count: 1,
+    },
   ],
   source_repositories: {
     repositories: [],
@@ -103,6 +134,7 @@ describe("Dashboard directory pages", () => {
   it("forces request-time authorization and data freshness", () => {
     expect(projectsDynamic).toBe("force-dynamic");
     expect(skillsDynamic).toBe("force-dynamic");
+    expect(cronsDynamic).toBe("force-dynamic");
   });
 
   it.each([
@@ -115,6 +147,11 @@ describe("Dashboard directory pages", () => {
       "Skills",
       () => SkillsPage({ searchParams: Promise.resolve({}) }),
       "/auth?redirectTo=/dashboard/skills",
+    ],
+    [
+      "Cron Jobs",
+      () => CronsPage({ searchParams: Promise.resolve({}) }),
+      "/auth?redirectTo=/dashboard/crons",
     ],
   ])("redirects anonymous visitors before loading %s", async (_, renderPage, target) => {
     mocks.getCurrentAdmin.mockResolvedValue(null);
@@ -193,6 +230,31 @@ describe("Dashboard directory pages", () => {
       .toHaveValue("shared-custom");
     expect(screen.getByRole("heading", { name: "weather" }))
       .toBeInTheDocument();
+  });
+
+  it("renders Cron Jobs with URL-derived filters and source status", async () => {
+    render(
+      await CronsPage({
+        searchParams: Promise.resolve({
+          q: "Daily",
+          owner: "plato",
+          type: "cron",
+        }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: /Cron Jobs Directory/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: /search Cron Jobs/i }))
+      .toHaveValue("Daily");
+    expect(screen.getByRole("combobox", { name: /Cron owner/i }))
+      .toHaveValue("plato");
+    expect(screen.getByRole("combobox", { name: /schedule type/i }))
+      .toHaveValue("cron");
+    expect(screen.getByRole("heading", { name: "Daily refresh" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to dashboard/i }))
+      .toHaveAttribute("href", "/dashboard");
   });
 
   it("renders safe snapshot failure states instead of directory data", async () => {
