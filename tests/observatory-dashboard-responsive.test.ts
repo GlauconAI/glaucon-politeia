@@ -36,4 +36,13 @@ describe("Dashboard responsive layout contract", () => {
       /\.dashboard-section-nav\s*\{[^}]*margin-inline:\s*-\d/u,
     );
   });
+
+  it("contains the expanded route navigation in a horizontal scroller on mobile", () => {
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)[\s\S]*?\.dashboard-route-nav\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/u,
+    );
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)[\s\S]*?\.dashboard-route-nav a\s*\{[^}]*flex:\s*0 0 auto/u,
+    );
+  });
 });
