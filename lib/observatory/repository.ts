@@ -437,6 +437,7 @@ export function createObservatoryRepository(
           p_title: input.title,
           p_description: input.description,
           p_project_ref: input.projectRef,
+          p_assigned_agent_id: input.assignedAgentId,
           p_idempotency_key: input.idempotencyKey,
         },
       );

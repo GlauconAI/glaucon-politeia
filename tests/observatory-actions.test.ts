@@ -73,6 +73,7 @@ function validFormData() {
   formData.set("title", "  Show stale sources  ");
   formData.set("description", "  Make freshness explicit.  ");
   formData.set("projectRef", "plato/dashboard");
+  formData.set("assignedAgentId", "plato");
   formData.set("idempotencyKey", "capture-20260721-1");
   return formData;
 }
@@ -89,6 +90,7 @@ describe("captureObservatoryWorkItemAction", () => {
     mocks.loadOverviewState.mockResolvedValue({
       status: "ready",
       snapshot: {
+        agents: [{ id: "plato" }, { id: "aristotle" }],
         registry: {
           project_groups: [
             {
@@ -179,6 +181,7 @@ describe("captureObservatoryWorkItemAction", () => {
       title: "Show stale sources",
       description: "Make freshness explicit.",
       projectRef: "plato/dashboard",
+      assignedAgentId: "plato",
       state: "inbox",
       idempotencyKey: "capture-20260721-1",
     });
@@ -196,6 +199,21 @@ describe("captureObservatoryWorkItemAction", () => {
       status: "error",
       fieldErrors: {
         projectRef: ["Choose a Project from the canonical registry."],
+      },
+    });
+    expect(mocks.createQuickCapture).not.toHaveBeenCalled();
+  });
+
+  it("rejects Assigned Agents that are not in the runtime Agent registry", async () => {
+    const formData = validFormData();
+    formData.set("assignedAgentId", "shared");
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, formData),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        assignedAgentId: ["Choose an Agent from the runtime registry."],
       },
     });
     expect(mocks.createQuickCapture).not.toHaveBeenCalled();
@@ -285,6 +303,7 @@ describe("Work Tracker mutation actions", () => {
     mocks.loadOverviewState.mockResolvedValue({
       status: "ready",
       snapshot: {
+        agents: [{ id: "plato" }, { id: "aristotle" }],
         registry: {
           project_groups: [
             {
@@ -390,6 +409,35 @@ describe("Work Tracker mutation actions", () => {
       status: "error",
       fieldErrors: {
         projectRef: ["Choose a Project from the canonical registry."],
+      },
+    });
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
+  });
+
+  it("rejects a detail edit assigned outside the runtime Agent registry", async () => {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("type", "feature");
+    formData.set("title", "手册看板");
+    formData.set("description", "仅管理员可用。");
+    formData.set("acceptanceCriteria", "事项可以进入 Done。");
+    formData.set("priority", "high");
+    formData.set("ownerId", ownerId);
+    formData.set("assignedAgentId", "unknown-agent");
+    formData.set("projectRef", "plato/dashboard");
+    formData.set("milestoneRef", "");
+    formData.set("projectKey", "");
+    formData.set("planRevision", "");
+    formData.set("stageId", "");
+    formData.set("workPackageId", "");
+
+    await expect(
+      updateObservatoryWorkItemAction({ status: "idle" }, formData),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        assignedAgentId: ["Choose an Agent from the runtime registry."],
       },
     });
     expect(mocks.updateWorkItem).not.toHaveBeenCalled();

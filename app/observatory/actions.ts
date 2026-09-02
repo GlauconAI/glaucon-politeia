@@ -28,6 +28,7 @@ type ObservatoryQuickCaptureField =
   | "title"
   | "description"
   | "projectRef"
+  | "assignedAgentId"
   | "idempotencyKey";
 
 export type ObservatoryQuickCaptureActionState =
@@ -76,10 +77,13 @@ function operationalError(): ObservatoryQuickCaptureActionState {
   };
 }
 
-async function loadCanonicalWorkTrackerProjects() {
+async function loadCanonicalWorkTrackerContext() {
   const overviewState = await loadObservatoryOverviewState();
   return overviewState.status === "ready"
-    ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
+    ? {
+        projects: buildWorkTrackerProjectOptions(overviewState.snapshot.registry),
+        agentIds: overviewState.snapshot.agents?.map((agent) => agent.id) ?? [],
+      }
     : null;
 }
 
@@ -206,6 +210,7 @@ export async function captureObservatoryWorkItemAction(
     title: formValue(formData, "title"),
     description: formValue(formData, "description") ?? undefined,
     projectRef: formValue(formData, "projectRef"),
+    assignedAgentId: formValue(formData, "assignedAgentId"),
     idempotencyKey: formValue(formData, "idempotencyKey"),
   });
 
@@ -218,20 +223,21 @@ export async function captureObservatoryWorkItemAction(
         title: fieldErrors.title,
         description: fieldErrors.description,
         projectRef: fieldErrors.projectRef,
+        assignedAgentId: fieldErrors.assignedAgentId,
         idempotencyKey: fieldErrors.idempotencyKey,
       },
     };
   }
 
-  let canonicalProjects;
+  let canonicalContext;
   try {
-    canonicalProjects = await loadCanonicalWorkTrackerProjects();
-    if (!canonicalProjects) return operationalError();
+    canonicalContext = await loadCanonicalWorkTrackerContext();
+    if (!canonicalContext) return operationalError();
   } catch {
     return operationalError();
   }
   if (
-    !canonicalProjects.some(
+    !canonicalContext.projects.some(
       (project) => project.projectKey === validation.data.projectRef,
     )
   ) {
@@ -239,6 +245,14 @@ export async function captureObservatoryWorkItemAction(
       status: "error",
       fieldErrors: {
         projectRef: ["Choose a Project from the canonical registry."],
+      },
+    };
+  }
+  if (!canonicalContext.agentIds.includes(validation.data.assignedAgentId)) {
+    return {
+      status: "error",
+      fieldErrors: {
+        assignedAgentId: ["Choose an Agent from the runtime registry."],
       },
     };
   }
@@ -300,28 +314,33 @@ export async function updateObservatoryWorkItemAction(
     return fieldErrorState(validation.error.flatten().fieldErrors);
   }
 
-  let canonicalProjects;
+  let canonicalContext;
   try {
-    canonicalProjects = await loadCanonicalWorkTrackerProjects();
+    canonicalContext = await loadCanonicalWorkTrackerContext();
   } catch {
     return {
       status: "error",
       formError: "Work Tracker is temporarily unavailable. Try again.",
     };
   }
-  if (!canonicalProjects) {
+  if (!canonicalContext) {
     return {
       status: "error",
       formError: "Work Tracker is temporarily unavailable. Try again.",
     };
   }
   if (
-    !canonicalProjects.some(
+    !canonicalContext.projects.some(
       (project) => project.projectKey === validation.data.projectRef,
     )
   ) {
     return fieldErrorState({
       projectRef: ["Choose a Project from the canonical registry."],
+    });
+  }
+  if (!canonicalContext.agentIds.includes(validation.data.assignedAgentId)) {
+    return fieldErrorState({
+      assignedAgentId: ["Choose an Agent from the runtime registry."],
     });
   }
 

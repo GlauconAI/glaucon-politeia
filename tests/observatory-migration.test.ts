@@ -18,6 +18,10 @@ const assignedAgentMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260827000100_work_tracker_assigned_agent.sql",
 );
+const sharedAssignmentFixMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260902000100_work_tracker_shared_assignment_fix.sql",
+);
 
 function readMigration(): string {
   return existsSync(migrationPath)
@@ -564,5 +568,39 @@ describe("Work Tracker assigned Agent migration", () => {
     expect(source).not.toMatch(
       /grant execute on function public\.update_observatory_work_item\([^)]+\) to service_role/u,
     );
+  });
+});
+
+describe("Work Tracker Shared assignment correction", () => {
+  const sql = () =>
+    existsSync(sharedAssignmentFixMigrationPath)
+      ? readFileSync(sharedAssignmentFixMigrationPath, "utf8")
+          .toLowerCase()
+          .replace(/\s+/gu, " ")
+      : "";
+
+  it("backfills the Asgard Items with canonical Agent assignments and audit events", () => {
+    const source = sql();
+    for (const agent of [
+      "socrates",
+      "aristotle",
+      "plato",
+      "amou",
+      "herodotus",
+      "alfred",
+    ]) {
+      expect(source).toContain(`'${agent}'`);
+    }
+    expect(source).toContain("shared/asgard-archaea-gacha-game");
+    expect(source).toContain("insert into public.observatory_work_item_events");
+    expect(source).toContain("work-tracker-shared-assignment-fix");
+  });
+
+  it("accepts an explicit create assignment and forbids shared as an Agent", () => {
+    const source = sql();
+    expect(source).toContain("p_assigned_agent_id text");
+    expect(source).toContain("normalized_assigned_agent_id");
+    expect(source).toContain("assigned_agent_id <> 'shared'");
+    expect(source).not.toContain("normalized_assigned_agent_id := split_part(normalized_project_ref, '/', 1)");
   });
 });

@@ -43,6 +43,10 @@ const AssignedAgentIdSchema = QuickCaptureTextSchema.min(1)
   .regex(
     /^[a-z][a-z0-9-]{0,79}$/u,
     "Use a lowercase Agent ID with letters, numbers, and hyphens.",
+  )
+  .refine(
+    (value) => value !== "shared",
+    "Choose an Agent from the runtime registry.",
   );
 const NullableReferenceSchema = QuickCaptureTextSchema.max(
   OBSERVATORY_GOVERNANCE_REF_MAX_LENGTH,
@@ -68,6 +72,7 @@ export const ObservatoryQuickCaptureInputSchema = z.strictObject({
     OBSERVATORY_QUICK_CAPTURE_DESCRIPTION_MAX_LENGTH,
   ).default(""),
   projectRef: ProjectReferenceSchema,
+  assignedAgentId: AssignedAgentIdSchema,
   state: z.literal("inbox").default("inbox"),
   idempotencyKey: QuickCaptureTextSchema.min(1)
     .max(OBSERVATORY_QUICK_CAPTURE_IDEMPOTENCY_KEY_MAX_LENGTH)

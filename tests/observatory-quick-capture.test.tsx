@@ -25,7 +25,15 @@ const projects: WorkTrackerProjectOption[] = [
     owner: "amou",
     status: "maintained",
   },
+  {
+    projectKey: "shared/asgard-archaea-gacha-game",
+    title: "阿斯加德古菌游戏",
+    owner: "Shared",
+    status: "active",
+  },
 ];
+
+const agentIds = ["amou", "aristotle", "plato"];
 
 describe("QuickCapture", () => {
   it("uses keyboard-accessible native controls for Idea, Feature, and Bug capture", () => {
@@ -79,13 +87,17 @@ describe("QuickCapture", () => {
       <QuickCapture
         action={action}
         projects={projects}
+        agentIds={agentIds}
         initialIdempotencyKey="observatory-capture-77777777-7777-4777-8777-777777777777"
       />,
     );
 
     const project = screen.getByLabelText("Project");
+    const assignedAgent = screen.getByLabelText("Assigned Agent");
     expect(project).toBeRequired();
+    expect(assignedAgent).toBeRequired();
     fireEvent.change(project, { target: { value: "amou/wenya-ai" } });
+    expect(assignedAgent).toHaveValue("amou");
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "补充问芽训练样本" },
     });
@@ -97,7 +109,29 @@ describe("QuickCapture", () => {
     expect((action.mock.calls[0][1] as FormData).get("projectRef")).toBe(
       "amou/wenya-ai",
     );
+    expect((action.mock.calls[0][1] as FormData).get("assignedAgentId")).toBe(
+      "amou",
+    );
     expect(project).toHaveValue("amou/wenya-ai");
+  });
+
+  it("requires an explicit Agent for a Shared Project instead of assigning shared", () => {
+    render(
+      <QuickCapture
+        projects={projects}
+        agentIds={agentIds}
+        initialIdempotencyKey="observatory-capture-88888888-8888-4888-8888-888888888888"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Project"), {
+      target: { value: "shared/asgard-archaea-gacha-game" },
+    });
+
+    const assignedAgent = screen.getByLabelText("Assigned Agent");
+    expect(assignedAgent).toBeRequired();
+    expect(assignedAgent).toHaveValue("");
+    expect(screen.queryByRole("option", { name: "shared" })).not.toBeInTheDocument();
   });
 
   it("announces a successful capture", () => {
