@@ -80,12 +80,18 @@ export default async function WorkTrackerPage({
       </section>
     );
   }
+  if (state.status !== "ready") {
+    return (
+      <section className="observatory-page work-tracker-page">
+        <div className="work-tracker-error">
+          <p role="alert">{state.message}</p>
+        </div>
+      </section>
+    );
+  }
   const projects = buildWorkTrackerProjectOptions(overviewState.snapshot.registry);
   const agentIds = overviewState.snapshot.agents?.map((agent) => agent.id) ?? [];
-  const trackedProjects =
-    state.status === "ready"
-      ? filterTrackedWorkTrackerProjects(projects, state.items)
-      : [];
+  const trackedProjects = filterTrackedWorkTrackerProjects(projects, state.items);
   const requestedProject = searchValue(params, "project");
   const initialProjectKey = trackedProjects.some(
     (project) => project.projectKey === requestedProject,
@@ -94,8 +100,8 @@ export default async function WorkTrackerPage({
     : "all";
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
   const requestedVersion = searchValue(params, "version");
-  let versions = state.status === "ready" ? state.versions ?? [] : [];
-  if (state.status === "ready" && projects.length > 0) {
+  let versions = state.versions ?? [];
+  if (projects.length > 0) {
     const missingBacklogs = projects
       .filter((project) => !versions.some((version) => version.project_key === project.projectKey && version.is_backlog))
       .map((project) => project.projectKey);

@@ -204,6 +204,9 @@ describe("WorkTrackerPage", () => {
       /work tracker is temporarily unavailable/i,
     );
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /新建 item/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/管理版本/i)).not.toBeInTheDocument();
   });
 
   it("fails closed when the canonical Project registry is unavailable", async () => {
