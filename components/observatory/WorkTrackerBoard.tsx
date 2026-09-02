@@ -83,7 +83,6 @@ const typeLabels: Record<ObservatoryWorkItemType, string> = {
 
 const idleState: ObservatoryWorkItemMutationActionState = { status: "idle" };
 const noProjectPreferenceSubscription = () => () => undefined;
-
 function browserRememberedProject() {
   try {
     return readRememberedProject(window.localStorage);
@@ -135,6 +134,11 @@ export function WorkTrackerBoard({
     }),
     () => initialProjectKey,
   );
+  const projectPreferenceReady = useSyncExternalStore(
+    noProjectPreferenceSubscription,
+    () => true,
+    () => false,
+  );
   const projectKey = projectSelection ?? rememberedProjectKey;
 
   const filteredItems = useMemo(() => {
@@ -155,14 +159,14 @@ export function WorkTrackerBoard({
   );
 
   useEffect(() => {
-    if (!projects) return;
+    if (!projects || !projectPreferenceReady) return;
     rememberBrowserProject(projectKey);
     window.history.replaceState(null, "", buildWorkTrackerHref({
       projectKey,
       projectVersionId: projectKey === "all" ? undefined : projectVersionId,
       view,
     }));
-  }, [projectKey, projectVersionId, projects, view]);
+  }, [projectKey, projectPreferenceReady, projectVersionId, projects, view]);
 
   useEffect(() => {
     if (!openMenuId) return;

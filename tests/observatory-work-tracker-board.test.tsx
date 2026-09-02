@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
@@ -178,6 +180,37 @@ describe("WorkTrackerBoard", () => {
     expect(screen.queryByText(item.title)).not.toBeInTheDocument();
     expect(screen.getByText(otherProjectItem.title)).toBeInTheDocument();
     expect(window.location.search).toBe("?project=amou%2Fwenya-ai");
+  });
+
+  it("preserves the stored Project through server render and hydration", async () => {
+    const otherProjectItem = {
+      ...item,
+      id: "55555555-5555-4555-8555-555555555555",
+      title: "训练问芽模型",
+      project_ref: "amou/wenya-ai",
+    };
+    window.localStorage.setItem("work-tracker:last-project", "amou/wenya-ai");
+    const element = (
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item, otherProjectItem] }}
+        projects={projects}
+        initialProjectKey="all"
+      />
+    );
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, element);
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Filter by Project")).toHaveValue("amou/wenya-ai"));
+    expect(window.localStorage.getItem("work-tracker:last-project")).toBe("amou/wenya-ai");
+    expect(window.location.search).toBe("?project=amou%2Fwenya-ai");
+    await act(async () => root?.unmount());
+    container.remove();
   });
 
   it("lets a valid URL Project override storage and persists the URL choice", async () => {
