@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
 import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
 import type { ObservatoryWorkItemClaimRow } from "@/lib/observatory/repository";
+import type { ObservatoryProjectVersionRow } from "@/lib/observatory/repository";
 import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
 
 const projects: WorkTrackerProjectOption[] = [
@@ -40,6 +41,7 @@ const item: ObservatoryWorkItemRow = {
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
   project_key: null,
+  project_version_id: "33333333-3333-4333-8333-333333333333",
   plan_revision: null,
   stage_id: null,
   work_package_id: null,
@@ -56,7 +58,159 @@ const item: ObservatoryWorkItemRow = {
   claim_approved_at: null,
 };
 
+const versions: ObservatoryProjectVersionRow[] = [
+  {
+    id: "33333333-3333-4333-8333-333333333333",
+    project_key: "plato/dashboard",
+    version_label: "v1.0",
+    title: "First release",
+    description: "",
+    status: "active",
+    target_date: null,
+    released_at: null,
+    is_backlog: false,
+    row_version: 1,
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_by: item.created_by,
+    updated_at: item.updated_at,
+  },
+  {
+    id: "44444444-4444-4444-8444-444444444444",
+    project_key: "plato/dashboard",
+    version_label: "Backlog",
+    title: "待规划",
+    description: "",
+    status: "planned",
+    target_date: null,
+    released_at: null,
+    is_backlog: true,
+    row_version: 1,
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_by: item.created_by,
+    updated_at: item.updated_at,
+  },
+  {
+    id: "66666666-6666-4666-8666-666666666666",
+    project_key: "plato/dashboard",
+    version_label: "v0.9",
+    title: "Archived release",
+    description: "",
+    status: "archived",
+    target_date: null,
+    released_at: null,
+    is_backlog: false,
+    row_version: 2,
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_by: item.created_by,
+    updated_at: item.updated_at,
+  },
+];
+
 describe("WorkTrackerBoard", () => {
+  beforeAll(() => {
+    const values = new Map<string, string>();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        clear: () => values.clear(),
+        getItem: (key: string) => values.get(key) ?? null,
+        removeItem: (key: string) => values.delete(key),
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+  });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.history.replaceState(null, "", "/work-tracker");
+  });
+
+  it("shows and filters Project Versions while preserving detail return context", () => {
+    const backlogItem = {
+      ...item,
+      id: "77777777-7777-4777-8777-777777777777",
+      title: "Backlog card",
+      project_version_id: versions[1].id,
+    };
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item, backlogItem] }}
+        projects={projects}
+        versions={versions}
+        initialProjectKey="plato/dashboard"
+        urlProjectKey="plato/dashboard"
+      />,
+    );
+    expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("v1.0 · 进行中")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Project Version" }), {
+      target: { value: versions[0].id },
+    });
+    expect(screen.getByText(item.title)).toBeInTheDocument();
+    expect(screen.queryByText(backlogItem.title)).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "待规划 · 计划中" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "v0.9 · 已归档" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: item.title })).toHaveAttribute(
+      "href",
+      `/work-tracker/items/${item.id}?project=plato%2Fdashboard&version=${versions[0].id}`,
+    );
+  });
+
+  it("restores a valid stored Project on a clean URL", async () => {
+    const otherProjectItem = {
+      ...item,
+      id: "55555555-5555-4555-8555-555555555555",
+      title: "训练问芽模型",
+      project_ref: "amou/wenya-ai",
+    };
+    window.localStorage.setItem("work-tracker:last-project", "amou/wenya-ai");
+
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item, otherProjectItem] }}
+        projects={projects}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Filter by Project")).toHaveValue("amou/wenya-ai"));
+    expect(screen.queryByText(item.title)).not.toBeInTheDocument();
+    expect(screen.getByText(otherProjectItem.title)).toBeInTheDocument();
+    expect(window.location.search).toBe("?project=amou%2Fwenya-ai");
+  });
+
+  it("lets a valid URL Project override storage and persists the URL choice", async () => {
+    window.localStorage.setItem("work-tracker:last-project", "amou/wenya-ai");
+    window.history.replaceState(null, "", "/work-tracker?project=plato%2Fdashboard");
+
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item] }}
+        projects={projects}
+        initialProjectKey="plato/dashboard"
+        urlProjectKey="plato/dashboard"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Filter by Project")).toHaveValue("plato/dashboard"));
+    expect(window.localStorage.getItem("work-tracker:last-project")).toBe("plato/dashboard");
+  });
+
+  it("clears a stale stored Project that has no Work Items", async () => {
+    window.localStorage.setItem("work-tracker:last-project", "plato/unused");
+
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item] }}
+        projects={projects}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Filter by Project")).toHaveValue("all"));
+    expect(window.localStorage.getItem("work-tracker:last-project")).toBeNull();
+    expect(window.location.pathname + window.location.search).toBe("/work-tracker");
+  });
   it("renders four active work groups and keeps Done in a separate view", () => {
     render(
       <WorkTrackerBoard state={{ status: "ready", items: [item] }} />,
@@ -130,6 +284,7 @@ describe("WorkTrackerBoard", () => {
     expect(window.location.pathname + window.location.search).toBe(
       "/work-tracker?project=amou%2Fwenya-ai",
     );
+    expect(window.localStorage.getItem("work-tracker:last-project")).toBe("amou/wenya-ai");
 
     fireEvent.change(screen.getByLabelText("Filter by Project"), {
       target: { value: "all" },
@@ -137,6 +292,7 @@ describe("WorkTrackerBoard", () => {
     expect(window.location.pathname + window.location.search).toBe(
       "/work-tracker",
     );
+    expect(window.localStorage.getItem("work-tracker:last-project")).toBeNull();
   });
 
   it("labels unresolved legacy Project references without inventing registry membership", () => {

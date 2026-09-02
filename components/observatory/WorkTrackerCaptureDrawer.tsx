@@ -4,17 +4,20 @@ import { useEffect, useRef, useState } from "react";
 
 import { QuickCapture } from "@/components/observatory/QuickCapture";
 import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
+import type { ObservatoryProjectVersionRow } from "@/lib/observatory/repository";
 
 type WorkTrackerCaptureDrawerProps = {
   initialIdempotencyKey: string;
   projects: WorkTrackerProjectOption[];
   agentIds: string[];
+  versions: ObservatoryProjectVersionRow[];
 };
 
 export function WorkTrackerCaptureDrawer({
   initialIdempotencyKey,
   projects,
   agentIds,
+  versions,
 }: WorkTrackerCaptureDrawerProps) {
   const [open, setOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -72,6 +75,7 @@ export function WorkTrackerCaptureDrawer({
               initialIdempotencyKey={initialIdempotencyKey}
               projects={projects}
               agentIds={agentIds}
+              versions={versions}
             />
           </section>
         </div>

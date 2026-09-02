@@ -25,6 +25,7 @@ const item: ObservatoryWorkItemRow = {
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
   project_key: null,
+  project_version_id: "33333333-3333-4333-8333-333333333333",
   plan_revision: null,
   stage_id: null,
   work_package_id: null,
@@ -147,6 +148,7 @@ describe("WorkItemDetail", () => {
     expect(screen.getByLabelText(/^project$/i)).toHaveValue(
       "asgard/archaea-gacha-game",
     );
+    expect(screen.getByLabelText(/project version/i)).toHaveValue("");
 
     fireEvent.submit(screen.getByRole("button", { name: /save fields/i }).closest("form")!);
     await waitFor(() => expect(updateAction).toHaveBeenCalledTimes(1));

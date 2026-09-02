@@ -270,6 +270,60 @@ describe("getCurrentObservatoryAdmin", () => {
   });
 });
 
+describe("Project Version repository", () => {
+  it("creates an audited version through its bounded RPC", async () => {
+    const version = { id: "33333333-3333-4333-8333-333333333333", row_version: 1 };
+    const boundary = repositoryClient({ rpcData: version });
+    const repository = createObservatoryRepository(boundary.client);
+    await expect(repository.createProjectVersion({
+      projectKey: "plato/dashboard",
+      versionLabel: "v1.0",
+      title: "First release",
+      description: "Version management",
+      targetDate: "2026-09-30",
+    })).resolves.toEqual(version);
+    expect(boundary.rpc).toHaveBeenCalledWith("create_observatory_project_version", {
+      p_project_key: "plato/dashboard",
+      p_version_label: "v1.0",
+      p_title: "First release",
+      p_description: "Version management",
+      p_target_date: "2026-09-30",
+    });
+  });
+
+  it("ensures canonical Project Backlogs in one idempotent RPC", async () => {
+    const versions = [{ id: "33333333-3333-4333-8333-333333333333", is_backlog: true }];
+    const boundary = repositoryClient({ rpcData: versions });
+    const repository = createObservatoryRepository(boundary.client);
+    await expect(repository.ensureProjectBacklogs(["plato/dashboard"])).resolves.toEqual(versions);
+    expect(boundary.rpc).toHaveBeenCalledWith("ensure_observatory_project_backlog_versions", {
+      p_project_keys: ["plato/dashboard"],
+    });
+  });
+
+  it.each([
+    {
+      error: { code: "40001", message: "OBSERVATORY_PROJECT_VERSION_CONFLICT" },
+      expectedCode: "PROJECT_VERSION_CONFLICT",
+    },
+    {
+      error: { code: "P0002", message: "OBSERVATORY_PROJECT_VERSION_NOT_FOUND" },
+      expectedCode: "PROJECT_VERSION_NOT_FOUND",
+    },
+  ])("maps Project Version markers before generic SQLSTATE errors", async ({ error, expectedCode }) => {
+    const repository = createObservatoryRepository(repositoryClient({ rpcError: error }).client);
+
+    await expect(repository.updateProjectVersion({
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
+      expectedVersion: 1,
+      versionLabel: "v1.0",
+      title: "First release",
+      description: "Version management",
+      targetDate: null,
+    })).rejects.toMatchObject({ code: expectedCode });
+  });
+});
+
 describe("Observatory repository", () => {
   it("reads only the latest successful snapshot", async () => {
     const snapshot = {
@@ -347,6 +401,7 @@ describe("Observatory repository", () => {
         title: "Map runtime health",
         description: "",
         projectRef: "plato/dashboard",
+        projectVersionId: "33333333-3333-4333-8333-333333333333",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-1",
@@ -359,6 +414,7 @@ describe("Observatory repository", () => {
         p_title: "Map runtime health",
         p_description: "",
         p_project_ref: "plato/dashboard",
+        p_project_version_id: "33333333-3333-4333-8333-333333333333",
         p_assigned_agent_id: "plato",
         p_idempotency_key: "capture-1",
       },
@@ -381,6 +437,7 @@ describe("Observatory repository", () => {
         title: "Different payload",
         description: "",
         projectRef: "plato/dashboard",
+        projectVersionId: "33333333-3333-4333-8333-333333333333",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-1",
@@ -411,6 +468,7 @@ describe("Observatory repository", () => {
         ownerId: "22222222-2222-4222-8222-222222222222",
         assignedAgentId: "plato",
         projectRef: "asgard/archaea-gacha-game",
+        projectVersionId: "33333333-3333-4333-8333-333333333333",
         milestoneRef: "OBS-M3",
         projectKey: "asgard/archaea-gacha-game",
         planRevision: 3,
@@ -433,6 +491,7 @@ describe("Observatory repository", () => {
         p_owner_id: "22222222-2222-4222-8222-222222222222",
         p_assigned_agent_id: "plato",
         p_project_ref: "asgard/archaea-gacha-game",
+        p_project_version_id: "33333333-3333-4333-8333-333333333333",
         p_milestone_ref: "OBS-M3",
         p_project_key: "asgard/archaea-gacha-game",
         p_plan_revision: 3,
@@ -464,6 +523,7 @@ describe("Observatory repository", () => {
         ownerId: null,
         assignedAgentId: "plato",
         projectRef: "plato/dashboard",
+        projectVersionId: "33333333-3333-4333-8333-333333333333",
         milestoneRef: null,
         projectKey: null,
         planRevision: null,
@@ -489,6 +549,7 @@ describe("Observatory repository", () => {
               title: "Capture",
               description: "",
               projectRef: "plato/dashboard",
+              projectVersionId: "33333333-3333-4333-8333-333333333333",
               assignedAgentId: "plato",
               state: "inbox",
               idempotencyKey: "capture-generic-error",
@@ -504,6 +565,7 @@ describe("Observatory repository", () => {
               ownerId: null,
               assignedAgentId: "plato",
               projectRef: "plato/dashboard",
+              projectVersionId: "33333333-3333-4333-8333-333333333333",
               milestoneRef: null,
               projectKey: null,
               planRevision: null,
@@ -532,6 +594,7 @@ describe("Observatory repository", () => {
         title: "Unauthorized",
         description: "",
         projectRef: "plato/dashboard",
+        projectVersionId: "33333333-3333-4333-8333-333333333333",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-2",

@@ -9,12 +9,14 @@ import {
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
 import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
+import { buildWorkTrackerHref } from "@/lib/observatory/work-tracker-navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type WorkItemPageProps = {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 function unavailableState() {
@@ -26,8 +28,9 @@ function unavailableState() {
   );
 }
 
-export default async function WorkItemPage({ params }: WorkItemPageProps) {
+export default async function WorkItemPage({ params, searchParams = Promise.resolve({}) }: WorkItemPageProps) {
   const { id } = await params;
+  const requestedContext = await searchParams;
   const currentAdmin = await getCurrentObservatoryAdmin();
 
   if (!currentAdmin) {
@@ -61,16 +64,36 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
   let events;
   let claims;
   let overviewState;
+  let versions;
   try {
-    [evidence, events, claims, overviewState] = await Promise.all([
+    [evidence, events, claims, overviewState, versions] = await Promise.all([
       repository.listWorkItemEvidence(id),
       repository.listWorkItemEvents(id),
       repository.listWorkItemClaims(id),
       loadObservatoryOverviewState(),
+      repository.listProjectVersions(),
     ]);
   } catch {
     return unavailableState();
   }
+
+  if (overviewState.status !== "ready") {
+    return unavailableState();
+  }
+  const projects = buildWorkTrackerProjectOptions(overviewState.snapshot.registry);
+  const value = (key: string) => {
+    const entry = requestedContext[key];
+    return Array.isArray(entry) ? entry[0] : entry;
+  };
+  const requestedProject = value("project");
+  const projectKey = projects.some((project) => project.projectKey === requestedProject)
+    ? requestedProject
+    : undefined;
+  const requestedVersion = value("version");
+  const projectVersionId = projectKey && versions.some(
+    (version) => version.id === requestedVersion && version.project_key === projectKey,
+  ) ? requestedVersion : undefined;
+  const view = value("view") === "completed" ? "completed" : "active";
 
   return (
     <WorkItemDetail
@@ -80,18 +103,11 @@ export default async function WorkItemPage({ params }: WorkItemPageProps) {
       claims={claims}
       evaluatedAt={new Date().toISOString()}
       currentAdmin={currentAdmin}
-      projects={
-        overviewState.status === "ready"
-          ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
-          : []
-      }
-      agentIds={
-        overviewState.status === "ready"
-          ? (overviewState.snapshot.agents ?? []).map((agent) => agent.id)
-          : []
-      }
+      projects={projects}
+      versions={versions}
+      backHref={buildWorkTrackerHref({ projectKey, projectVersionId, view })}
+      agentIds={(overviewState.snapshot.agents ?? []).map((agent) => agent.id)}
       projectControls={
-        overviewState.status === "ready" &&
         "project_controls" in overviewState.snapshot
           ? overviewState.snapshot.project_controls
           : null

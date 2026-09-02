@@ -13,11 +13,13 @@ import {
   updateObservatoryWorkItemAction,
 } from "@/app/observatory/actions";
 import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
+import { ProjectVersionPicker } from "@/components/observatory/ProjectVersionPicker";
 import type {
   ObservatoryWorkItemEventRow,
   ObservatoryWorkItemEvidenceRow,
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
+  ObservatoryProjectVersionRow,
 } from "@/lib/observatory/repository";
 import type { ProjectControlSnapshot } from "@/lib/observatory/project-control-schema";
 import { classifyProjectControlBinding } from "@/lib/observatory/project-control";
@@ -62,6 +64,8 @@ type WorkItemDetailProps = {
   projectControls?: ProjectControlSnapshot | null;
   projects: WorkTrackerProjectOption[];
   agentIds?: readonly string[];
+  versions?: ObservatoryProjectVersionRow[];
+  backHref?: string;
 };
 
 const stateLabels = {
@@ -167,6 +171,8 @@ export function WorkItemDetail({
   projectControls = null,
   projects,
   agentIds = [],
+  versions = [],
+  backHref = "/work-tracker",
 }: WorkItemDetailProps) {
   const [updateState, updateFormAction, updating] = useActionState(
     updateAction,
@@ -198,6 +204,7 @@ export function WorkItemDetail({
   const [projectRef, setProjectRef] = useState(
     resolveWorkItemProject(item, projects)?.projectKey ?? "",
   );
+  const [projectVersionId, setProjectVersionId] = useState(item.project_version_id ?? "");
   const bindingOptions = projectControls?.projects.flatMap((project) =>
     project.work_packages.map((workPackage) => {
       const stage = project.stages.find((candidate) => candidate.stage_id === workPackage.stage_id);
@@ -231,7 +238,10 @@ export function WorkItemDetail({
     const nextBinding = allBindingOptions.find(
       (option) => option.key === nextBindingKey,
     );
-    if (nextBinding) setProjectRef(nextBinding.projectKey);
+    if (nextBinding) {
+      if (nextBinding.projectKey !== projectRef) setProjectVersionId("");
+      setProjectRef(nextBinding.projectKey);
+    }
   }
   const bindingStatus = currentBinding
     ? classifyProjectControlBinding(currentBinding, projectControls)
@@ -278,8 +288,9 @@ export function WorkItemDetail({
       <header className="work-item-detail-header">
         <div>
           <p className="eyebrow">
-            <Link href="/work-tracker">Work Tracker</Link> / Item
+            Work Tracker / Item
           </p>
+          <Link className="work-item-back-link" href={backHref}>← 返回 Work Tracker</Link>
           <h1>{item.title}</h1>
           <div className="work-item-detail-badges">
             <span>{stateLabels[item.state]}</span>
@@ -419,10 +430,22 @@ export function WorkItemDetail({
               id="work-item-project"
               projects={projects}
               value={projectRef}
-              onChange={setProjectRef}
+              onChange={(nextProjectRef) => {
+                setProjectRef(nextProjectRef);
+                setProjectVersionId("");
+                setBindingKey("");
+              }}
               required
             />
           </div>
+          <ProjectVersionPicker
+            id="work-item-project-version"
+            versions={versions}
+            projectKey={projectRef}
+            value={projectVersionId}
+            onChange={setProjectVersionId}
+            required
+          />
           <label>
             <span>Milestone reference</span>
             <input

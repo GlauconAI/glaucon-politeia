@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAdmin: vi.fn(),
   listWorkItems: vi.fn(),
   listActiveWorkItemClaims: vi.fn(),
+  listProjectVersions: vi.fn(),
   loadOverviewState: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -25,6 +26,7 @@ vi.mock("@/lib/observatory/repository", () => ({
   createObservatoryRepository: () => ({
     listWorkItems: mocks.listWorkItems,
     listActiveWorkItemClaims: mocks.listActiveWorkItemClaims,
+    listProjectVersions: mocks.listProjectVersions,
   }),
 }));
 
@@ -47,6 +49,23 @@ describe("WorkTrackerPage", () => {
     mocks.listWorkItems.mockResolvedValue([]);
     mocks.listActiveWorkItemClaims.mockReset();
     mocks.listActiveWorkItemClaims.mockResolvedValue([]);
+    mocks.listProjectVersions.mockReset();
+    mocks.listProjectVersions.mockResolvedValue([{
+      id: "33333333-3333-4333-8333-333333333333",
+      project_key: "plato/dashboard",
+      version_label: "Backlog",
+      title: "待规划",
+      description: "",
+      status: "planned",
+      target_date: null,
+      released_at: null,
+      is_backlog: true,
+      row_version: 1,
+      created_by: "admin-1",
+      created_at: "2026-09-02T00:00:00Z",
+      updated_by: "admin-1",
+      updated_at: "2026-09-02T00:00:00Z",
+    }]);
     mocks.loadOverviewState.mockReset();
     mocks.loadOverviewState.mockResolvedValue({
       status: "ready",
@@ -119,6 +138,7 @@ describe("WorkTrackerPage", () => {
         project_ref: "plato/dashboard",
         milestone_ref: null,
         project_key: null,
+        project_version_id: null,
         plan_revision: null,
         stage_id: null,
         work_package_id: null,
@@ -184,5 +204,23 @@ describe("WorkTrackerPage", () => {
       /work tracker is temporarily unavailable/i,
     );
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /新建 item/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/管理版本/i)).not.toBeInTheDocument();
+  });
+
+  it("fails closed when the canonical Project registry is unavailable", async () => {
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "error",
+      message: "private registry detail",
+    });
+
+    render(await WorkTrackerPage());
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /work tracker is temporarily unavailable/i,
+    );
+    expect(screen.queryByText(/private registry detail/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
   });
 });

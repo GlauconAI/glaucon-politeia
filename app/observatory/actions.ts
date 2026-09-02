@@ -13,6 +13,11 @@ import {
   ObservatoryRepositoryError,
   type ObservatoryRepositoryClient,
 } from "@/lib/observatory/repository";
+import {
+  ProjectVersionCreateInputSchema,
+  ProjectVersionTransitionInputSchema,
+  ProjectVersionUpdateInputSchema,
+} from "@/lib/observatory/project-versions";
 import { buildWorkTrackerProjectOptions } from "@/lib/observatory/work-tracker-projects";
 import {
   ObservatoryEvidenceInputSchema,
@@ -28,6 +33,7 @@ type ObservatoryQuickCaptureField =
   | "title"
   | "description"
   | "projectRef"
+  | "projectVersionId"
   | "assignedAgentId"
   | "idempotencyKey";
 
@@ -65,6 +71,8 @@ function formError(error: unknown): string {
       return "Administrator access is required.";
     case "IDEMPOTENCY_CONFLICT":
       return "This capture key was already used for different content. Refresh and try again.";
+    case "PROJECT_VERSION_ARCHIVED":
+      return "That Project Version was archived. Refresh and choose another version.";
     default:
       return "The work item could not be captured. Try again.";
   }
@@ -151,6 +159,22 @@ function mutationFormError(error: unknown): string {
       return "This Agent Claim changed. Refresh before trying again.";
     case "PROJECT_CONTROL_BINDING_INVALID":
       return "Choose one complete Project, Plan, Stage, and Work Package binding.";
+    case "PROJECT_VERSION_DUPLICATE":
+      return "This Project already has that version label.";
+    case "PROJECT_VERSION_CONFLICT":
+      return "This Project Version changed. Refresh before trying again.";
+    case "PROJECT_VERSION_NOT_FOUND":
+      return "This Project Version no longer exists.";
+    case "PROJECT_VERSION_TRANSITION_INVALID":
+      return "That Project Version status transition is not allowed.";
+    case "PROJECT_VERSION_MISMATCH":
+      return "Choose a version from the selected Project.";
+    case "PROJECT_VERSION_REQUIRED":
+      return "Choose a Project Version.";
+    case "PROJECT_VERSION_ARCHIVED":
+      return "Choose a Project Version that is not archived.";
+    case "PROJECT_VERSION_BACKLOG_IMMUTABLE":
+      return "The system Backlog version cannot be edited or transitioned.";
     default:
       return "The work item could not be changed. Try again.";
   }
@@ -210,6 +234,7 @@ export async function captureObservatoryWorkItemAction(
     title: formValue(formData, "title"),
     description: formValue(formData, "description") ?? undefined,
     projectRef: formValue(formData, "projectRef"),
+    projectVersionId: formValue(formData, "projectVersionId"),
     assignedAgentId: formValue(formData, "assignedAgentId"),
     idempotencyKey: formValue(formData, "idempotencyKey"),
   });
@@ -223,6 +248,7 @@ export async function captureObservatoryWorkItemAction(
         title: fieldErrors.title,
         description: fieldErrors.description,
         projectRef: fieldErrors.projectRef,
+        projectVersionId: fieldErrors.projectVersionId,
         assignedAgentId: fieldErrors.assignedAgentId,
         idempotencyKey: fieldErrors.idempotencyKey,
       },
@@ -267,6 +293,25 @@ export async function captureObservatoryWorkItemAction(
     return operationalError();
   }
 
+  let selectedVersion;
+  try {
+    selectedVersion = await repository.getProjectVersion(validation.data.projectVersionId);
+  } catch {
+    return operationalError();
+  }
+  if (!selectedVersion || selectedVersion.status === "archived") {
+    return {
+      status: "error",
+      fieldErrors: { projectVersionId: ["Choose an available Project Version."] },
+    };
+  }
+  if (selectedVersion.project_key !== validation.data.projectRef) {
+    return {
+      status: "error",
+      fieldErrors: { projectVersionId: ["Choose a version from the selected Project."] },
+    };
+  }
+
   let workItem;
   try {
     workItem = await repository.createQuickCapture(validation.data);
@@ -302,6 +347,7 @@ export async function updateObservatoryWorkItemAction(
     ownerId: nullableText(formData, "ownerId"),
     assignedAgentId: nullableText(formData, "assignedAgentId"),
     projectRef: nullableText(formData, "projectRef"),
+    projectVersionId: formData.get("projectVersionId"),
     milestoneRef: nullableText(formData, "milestoneRef"),
     projectKey: nullableText(formData, "projectKey"),
     planRevision: nullableText(formData, "planRevision") === null
@@ -344,10 +390,128 @@ export async function updateObservatoryWorkItemAction(
     });
   }
 
+  let selectedVersion;
+  try {
+    selectedVersion = await boundary.repository.getProjectVersion(validation.data.projectVersionId);
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+  if (!selectedVersion || selectedVersion.status === "archived") {
+    return fieldErrorState({ projectVersionId: ["Choose an available Project Version."] });
+  }
+  if (selectedVersion.project_key !== validation.data.projectRef) {
+    return fieldErrorState({ projectVersionId: ["Choose a version from the selected Project."] });
+  }
+
   try {
     const item = await boundary.repository.updateWorkItem(validation.data);
     revalidateWorkItem(item.id);
     return { status: "success", version: item.version };
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+}
+
+export async function createObservatoryProjectVersionAction(
+  previousState: ObservatoryWorkItemMutationActionState,
+  formData: FormData,
+): Promise<ObservatoryWorkItemMutationActionState> {
+  void previousState;
+  const boundary = await authorizedRepository();
+  if (!boundary.ok) return boundary.error;
+  const validation = ProjectVersionCreateInputSchema.safeParse({
+    projectKey: formData.get("projectKey"),
+    versionLabel: formData.get("versionLabel"),
+    title: formData.get("title"),
+    description: formData.get("description") ?? "",
+    targetDate: formData.get("targetDate") ?? null,
+  });
+  if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
+
+  let canonicalContext;
+  try {
+    canonicalContext = await loadCanonicalWorkTrackerContext();
+  } catch {
+    return {
+      status: "error",
+      formError: "Work Tracker is temporarily unavailable. Try again.",
+    };
+  }
+  if (
+    !canonicalContext?.projects.some(
+      (project) => project.projectKey === validation.data.projectKey,
+    )
+  ) {
+    return fieldErrorState({
+      projectKey: ["Choose a Project from the canonical registry."],
+    });
+  }
+
+  try {
+    const version = await boundary.repository.createProjectVersion(validation.data);
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
+    return { status: "success", version: version.row_version };
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+}
+
+export async function updateObservatoryProjectVersionAction(
+  previousState: ObservatoryWorkItemMutationActionState,
+  formData: FormData,
+): Promise<ObservatoryWorkItemMutationActionState> {
+  void previousState;
+  const boundary = await authorizedRepository();
+  if (!boundary.ok) return boundary.error;
+  const validation = ProjectVersionUpdateInputSchema.safeParse({
+    projectVersionId: formData.get("projectVersionId"),
+    expectedVersion: versionValue(formData),
+    versionLabel: formData.get("versionLabel"),
+    title: formData.get("title"),
+    description: formData.get("description") ?? "",
+    targetDate: formData.get("targetDate") ?? null,
+  });
+  if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
+
+  try {
+    const version = await boundary.repository.updateProjectVersion(validation.data);
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
+    return { status: "success", version: version.row_version };
+  } catch (error) {
+    return { status: "error", formError: mutationFormError(error) };
+  }
+}
+
+export async function transitionObservatoryProjectVersionAction(
+  previousState: ObservatoryWorkItemMutationActionState,
+  formData: FormData,
+): Promise<ObservatoryWorkItemMutationActionState> {
+  void previousState;
+  const boundary = await authorizedRepository();
+  if (!boundary.ok) return boundary.error;
+  const validation = ProjectVersionTransitionInputSchema.safeParse({
+    projectVersionId: formData.get("projectVersionId"),
+    expectedVersion: versionValue(formData),
+    targetStatus: formData.get("targetStatus"),
+  });
+  if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
+
+  try {
+    const version = await boundary.repository.transitionProjectVersion(validation.data);
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
+    return { status: "success", version: version.row_version };
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
   }

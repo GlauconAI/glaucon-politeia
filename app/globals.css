@@ -125,7 +125,8 @@
 .work-tracker-state-badge,
 .work-tracker-priority-badge,
 .work-tracker-assignee-badge,
-.work-tracker-claim-badge {
+.work-tracker-claim-badge,
+.work-tracker-version-badge {
   display: inline-flex;
   min-height: 20px;
   align-items: center;
@@ -135,6 +136,11 @@
   font-size: 10px;
   line-height: 1;
 }
+
+.work-tracker-version-planned { background: #f8fafc; color: #475569; }
+.work-tracker-version-active { background: #dcfce7; color: #166534; border-color: #86efac; }
+.work-tracker-version-released { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+.work-tracker-version-archived { background: #f3f4f6; color: #6b7280; }
 
 .work-tracker-type-badge {
   font-weight: 800;
@@ -243,6 +249,25 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.work-tracker-version-picker {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.work-tracker-version-picker select {
+  min-width: 180px;
+  height: 36px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 12px;
 }
 
 .work-tracker-filter {
@@ -437,6 +462,36 @@
   gap: 12px;
 }
 
+.project-version-manager { position: relative; }
+.project-version-manager > summary { cursor: pointer; color: var(--accent-strong); font-size: 12px; font-weight: 700; }
+.project-version-manager-panel {
+  display: grid;
+  position: absolute;
+  z-index: 30;
+  top: 28px;
+  right: 0;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: auto;
+  gap: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 18px 60px rgba(0,0,0,.22);
+  padding: 16px;
+  text-align: left;
+}
+.project-version-manager-panel label,
+.project-version-manager-form { display: grid; gap: 6px; }
+.project-version-manager-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.project-version-manager-form label:last-of-type,
+.project-version-manager-form button { grid-column: 1 / -1; }
+.project-version-manager-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.project-version-manager-row { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.project-version-manager-row > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.project-version-manager-row small { width: 100%; color: var(--muted); }
+.project-version-transition-form { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .work-tracker-capture-trigger {
   min-height: 36px;
   font-size: 12px;
@@ -526,6 +581,12 @@
 
 .work-item-detail-header {
   padding: 22px;
+}
+
+.work-item-back-link {
+  display: inline-flex;
+  margin-top: 10px;
+  font-weight: 750;
 }
 
 .work-item-detail-header h1 {

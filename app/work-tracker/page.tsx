@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 
 import { WorkTrackerCaptureDrawer } from "@/components/observatory/WorkTrackerCaptureDrawer";
+import { ProjectVersionManager } from "@/components/observatory/ProjectVersionManager";
 import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
@@ -27,14 +28,16 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
     const repository = createObservatoryRepository(
       supabase as unknown as ObservatoryRepositoryClient,
     );
-    const [items, activeClaims] = await Promise.all([
+    const [items, activeClaims, versions] = await Promise.all([
       repository.listWorkItems(),
       repository.listActiveWorkItemClaims(),
+      repository.listProjectVersions(),
     ]);
     return {
       status: "ready",
       items,
       activeClaims,
+      versions,
       evaluatedAt: new Date().toISOString(),
     };
   } catch {
@@ -68,18 +71,27 @@ export default async function WorkTrackerPage({
     loadObservatoryOverviewState(),
     searchParams,
   ]);
-  const projects =
-    overviewState.status === "ready"
-      ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
-      : [];
-  const agentIds =
-    overviewState.status === "ready"
-      ? overviewState.snapshot.agents?.map((agent) => agent.id) ?? []
-      : [];
-  const trackedProjects =
-    state.status === "ready"
-      ? filterTrackedWorkTrackerProjects(projects, state.items)
-      : [];
+  if (overviewState.status !== "ready") {
+    return (
+      <section className="observatory-page work-tracker-page">
+        <div className="work-tracker-error">
+          <p role="alert">Work Tracker is temporarily unavailable. Try again.</p>
+        </div>
+      </section>
+    );
+  }
+  if (state.status !== "ready") {
+    return (
+      <section className="observatory-page work-tracker-page">
+        <div className="work-tracker-error">
+          <p role="alert">{state.message}</p>
+        </div>
+      </section>
+    );
+  }
+  const projects = buildWorkTrackerProjectOptions(overviewState.snapshot.registry);
+  const agentIds = overviewState.snapshot.agents?.map((agent) => agent.id) ?? [];
+  const trackedProjects = filterTrackedWorkTrackerProjects(projects, state.items);
   const requestedProject = searchValue(params, "project");
   const initialProjectKey = trackedProjects.some(
     (project) => project.projectKey === requestedProject,
@@ -87,6 +99,30 @@ export default async function WorkTrackerPage({
     ? requestedProject!
     : "all";
   const initialIdempotencyKey = `observatory-capture-${randomUUID()}`;
+  const requestedVersion = searchValue(params, "version");
+  let versions = state.versions ?? [];
+  if (projects.length > 0) {
+    const missingBacklogs = projects
+      .filter((project) => !versions.some((version) => version.project_key === project.projectKey && version.is_backlog))
+      .map((project) => project.projectKey);
+    if (missingBacklogs.length > 0) {
+      try {
+        const supabase = await createSupabaseServerClient();
+        const repository = createObservatoryRepository(supabase as unknown as ObservatoryRepositoryClient);
+        versions = await repository.ensureProjectBacklogs(projects.map((project) => project.projectKey));
+      } catch {
+        return (
+          <section className="observatory-page work-tracker-page">
+            <div className="work-tracker-error"><p role="alert">Work Tracker Project Versions are temporarily unavailable. Try again.</p></div>
+          </section>
+        );
+      }
+    }
+  }
+  const initialProjectVersionId = initialProjectKey !== "all" && versions.some(
+    (version) => version.id === requestedVersion && version.project_key === initialProjectKey,
+  ) ? requestedVersion! : "all";
+  const initialView = searchValue(params, "view") === "completed" ? "completed" : "active";
 
   return (
     <section className="observatory-page work-tracker-page">
@@ -106,7 +142,9 @@ export default async function WorkTrackerPage({
             initialIdempotencyKey={initialIdempotencyKey}
             projects={projects}
             agentIds={agentIds}
+            versions={versions}
           />
+          <ProjectVersionManager projects={projects} versions={versions} />
         </div>
       </header>
 
@@ -115,6 +153,10 @@ export default async function WorkTrackerPage({
           state={state}
           projects={projects}
           initialProjectKey={initialProjectKey}
+          initialProjectVersionId={initialProjectVersionId}
+          initialView={initialView}
+          versions={versions}
+          urlProjectKey={requestedProject}
         />
       </div>
     </section>
