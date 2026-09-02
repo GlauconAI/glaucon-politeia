@@ -19,6 +19,7 @@ const boundWorkItem: ObservatoryWorkItemRow = {
   project_ref: null,
   milestone_ref: null,
   project_key: "asgard/archaea-gacha-game",
+  project_version_id: "33333333-3333-4333-8333-333333333333",
   plan_revision: 3,
   stage_id: "stage-05b",
   work_package_id: "wp-05b-coordinate-slice",

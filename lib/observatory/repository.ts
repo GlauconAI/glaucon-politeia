@@ -17,6 +17,12 @@ import type {
   ObservatoryWorkItemType,
   ObservatoryWorkItemUpdateInput,
 } from "@/lib/observatory/work-items";
+import type {
+  ProjectVersionCreateInput,
+  ProjectVersionStatus,
+  ProjectVersionTransitionInput,
+  ProjectVersionUpdateInput,
+} from "@/lib/observatory/project-versions";
 
 export interface ObservatorySnapshotRow {
   id: string;
@@ -43,6 +49,7 @@ export interface ObservatoryWorkItemRow {
   project_ref: string | null;
   milestone_ref: string | null;
   project_key: string | null;
+  project_version_id: string | null;
   plan_revision: number | null;
   stage_id: string | null;
   work_package_id: string | null;
@@ -57,6 +64,23 @@ export interface ObservatoryWorkItemRow {
   allowed_action_classes: ObservatoryAgentActionClass[];
   claim_approved_by: string | null;
   claim_approved_at: string | null;
+}
+
+export interface ObservatoryProjectVersionRow {
+  id: string;
+  project_key: string;
+  version_label: string;
+  title: string;
+  description: string;
+  status: ProjectVersionStatus;
+  target_date: string | null;
+  released_at: string | null;
+  is_backlog: boolean;
+  row_version: number;
+  created_by: string;
+  created_at: string;
+  updated_by: string;
+  updated_at: string;
 }
 
 export interface ObservatoryWorkItemEventRow {
@@ -142,7 +166,7 @@ interface ObservatoryWorkTrackerQuery
   eq(column: string, value: string): ObservatoryWorkTrackerQuery;
   is(column: "removed_at", value: null): ObservatoryWorkTrackerQuery;
   order(
-    column: "created_at" | "updated_at",
+    column: "created_at" | "updated_at" | "target_date" | "status",
     options: { ascending: boolean },
   ): ObservatoryWorkTrackerQuery;
   maybeSingle(): PromiseLike<{
@@ -158,7 +182,9 @@ export interface ObservatoryRepositoryClient {
       | "observatory_work_items"
       | "observatory_work_item_events"
       | "observatory_work_item_evidence"
-      | "observatory_work_item_claims",
+      | "observatory_work_item_claims"
+      | "observatory_project_versions"
+      | "observatory_project_version_events",
   ): ObservatoryWorkTrackerQuery;
   rpc(
     functionName:
@@ -168,10 +194,13 @@ export interface ObservatoryRepositoryClient {
       | "add_observatory_work_item_evidence"
       | "remove_observatory_work_item_evidence"
       | "configure_observatory_agent_claim_policy"
-      | "cancel_observatory_work_item_claim",
+      | "cancel_observatory_work_item_claim"
+      | "create_observatory_project_version"
+      | "update_observatory_project_version"
+      | "transition_observatory_project_version",
     arguments_: Record<string, unknown>,
   ): PromiseLike<{
-    data: ObservatoryWorkItemRow | null;
+    data: ObservatoryWorkItemRow | ObservatoryProjectVersionRow | null;
     error: ObservatoryDatabaseError | null;
   }>;
 }
@@ -191,6 +220,14 @@ export type ObservatoryRepositoryErrorCode =
   | "CLAIM_ACTIVE"
   | "CLAIM_POLICY_INVALID"
   | "PROJECT_CONTROL_BINDING_INVALID"
+  | "PROJECT_VERSION_INVALID"
+  | "PROJECT_VERSION_DUPLICATE"
+  | "PROJECT_VERSION_CONFLICT"
+  | "PROJECT_VERSION_NOT_FOUND"
+  | "PROJECT_VERSION_TRANSITION_INVALID"
+  | "PROJECT_VERSION_MISMATCH"
+  | "PROJECT_VERSION_REQUIRED"
+  | "PROJECT_VERSION_BACKLOG_IMMUTABLE"
   | "CLAIM_VERSION_CONFLICT";
 
 export class ObservatoryRepositoryError extends Error {
@@ -280,6 +317,30 @@ function mutationError(
       "The Project Control binding must be fully specified or empty.",
     );
   }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_DUPLICATE")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_DUPLICATE", "That version label already exists for this Project.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_CONFLICT")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_CONFLICT", "The Project Version changed after it was loaded.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_NOT_FOUND")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_NOT_FOUND", "The Project Version no longer exists.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_TRANSITION_INVALID")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_TRANSITION_INVALID", "That Project Version status transition is not allowed.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_MISMATCH")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_MISMATCH", "Choose a version from the selected Project.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_REQUIRED")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_REQUIRED", "Choose a Project Version.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_BACKLOG_IMMUTABLE", "The system Backlog version cannot be edited or transitioned.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_INVALID")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_INVALID", "The Project Version details are invalid.");
+  }
 
   return operation === "create"
     ? new ObservatoryRepositoryError(
@@ -347,7 +408,7 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_items")
           .select(
-            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
           )
           .order("updated_at", { ascending: false }),
       );
@@ -357,7 +418,7 @@ export function createObservatoryRepository(
       const { data, error } = await client
         .from("observatory_work_items")
         .select(
-          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -415,6 +476,25 @@ export function createObservatoryRepository(
       );
     },
 
+    async listProjectVersions(): Promise<ObservatoryProjectVersionRow[]> {
+      return readRows<ObservatoryProjectVersionRow>(
+        client
+          .from("observatory_project_versions")
+          .select("id,project_key,version_label,title,description,status,target_date,released_at,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
+          .order("created_at", { ascending: true }),
+      );
+    },
+
+    async getProjectVersion(id: string): Promise<ObservatoryProjectVersionRow | null> {
+      const { data, error } = await client
+        .from("observatory_project_versions")
+        .select("id,project_key,version_label,title,description,status,target_date,released_at,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw mutationError("update", error);
+      return data as ObservatoryProjectVersionRow | null;
+    },
+
     async listActiveWorkItemClaims(): Promise<ObservatoryWorkItemClaimRow[]> {
       return readRows<ObservatoryWorkItemClaimRow>(
         client
@@ -438,6 +518,7 @@ export function createObservatoryRepository(
           p_description: input.description,
           p_project_ref: input.projectRef,
           p_assigned_agent_id: input.assignedAgentId,
+          p_project_version_id: input.projectVersionId,
           p_idempotency_key: input.idempotencyKey,
         },
       );
@@ -452,7 +533,7 @@ export function createObservatoryRepository(
         );
       }
 
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async updateWorkItem(
@@ -476,6 +557,7 @@ export function createObservatoryRepository(
           p_plan_revision: input.planRevision,
           p_stage_id: input.stageId,
           p_work_package_id: input.workPackageId,
+          p_project_version_id: input.projectVersionId,
         },
       );
 
@@ -489,7 +571,7 @@ export function createObservatoryRepository(
         );
       }
 
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async transitionWorkItem(
@@ -510,7 +592,7 @@ export function createObservatoryRepository(
           "The work item could not be moved.",
         );
       }
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async addWorkItemEvidence(
@@ -532,7 +614,7 @@ export function createObservatoryRepository(
           "The evidence link could not be added.",
         );
       }
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async removeWorkItemEvidence(
@@ -553,7 +635,7 @@ export function createObservatoryRepository(
           "The evidence link could not be removed.",
         );
       }
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async configureAgentClaimPolicy(
@@ -577,7 +659,7 @@ export function createObservatoryRepository(
           "The Agent Claim policy could not be updated.",
         );
       }
-      return data;
+      return data as ObservatoryWorkItemRow;
     },
 
     async cancelAgentClaim(
@@ -599,6 +681,44 @@ export function createObservatoryRepository(
         );
       }
       return data;
+    },
+
+    async createProjectVersion(input: ProjectVersionCreateInput): Promise<ObservatoryProjectVersionRow> {
+      const { data, error } = await client.rpc("create_observatory_project_version", {
+        p_project_key: input.projectKey,
+        p_version_label: input.versionLabel,
+        p_title: input.title,
+        p_description: input.description,
+        p_target_date: input.targetDate,
+      });
+      if (error) throw mutationError("create", error);
+      if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_CREATE_FAILED", "The Project Version could not be created.");
+      return data as ObservatoryProjectVersionRow;
+    },
+
+    async updateProjectVersion(input: ProjectVersionUpdateInput): Promise<ObservatoryProjectVersionRow> {
+      const { data, error } = await client.rpc("update_observatory_project_version", {
+        p_project_version_id: input.projectVersionId,
+        p_expected_version: input.expectedVersion,
+        p_version_label: input.versionLabel,
+        p_title: input.title,
+        p_description: input.description,
+        p_target_date: input.targetDate,
+      });
+      if (error) throw mutationError("update", error);
+      if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_UPDATE_FAILED", "The Project Version could not be updated.");
+      return data as ObservatoryProjectVersionRow;
+    },
+
+    async transitionProjectVersion(input: ProjectVersionTransitionInput): Promise<ObservatoryProjectVersionRow> {
+      const { data, error } = await client.rpc("transition_observatory_project_version", {
+        p_project_version_id: input.projectVersionId,
+        p_expected_version: input.expectedVersion,
+        p_target_status: input.targetStatus,
+      });
+      if (error) throw mutationError("update", error);
+      if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_UPDATE_FAILED", "The Project Version status could not be changed.");
+      return data as ObservatoryProjectVersionRow;
     },
   };
 }

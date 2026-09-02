@@ -72,6 +72,7 @@ export const ObservatoryQuickCaptureInputSchema = z.strictObject({
     OBSERVATORY_QUICK_CAPTURE_DESCRIPTION_MAX_LENGTH,
   ).default(""),
   projectRef: ProjectReferenceSchema,
+  projectVersionId: z.uuid(),
   assignedAgentId: AssignedAgentIdSchema,
   state: z.literal("inbox").default("inbox"),
   idempotencyKey: QuickCaptureTextSchema.min(1)
@@ -190,6 +191,7 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   ownerId: NullableOwnerSchema,
   assignedAgentId: AssignedAgentIdSchema,
   projectRef: ProjectReferenceSchema,
+  projectVersionId: z.uuid(),
   milestoneRef: NullableReferenceSchema,
   projectKey: NullableProjectKeySchema,
   planRevision: z.number().int().nonnegative().nullable(),

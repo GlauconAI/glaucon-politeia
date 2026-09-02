@@ -24,6 +24,7 @@ function validQuickCapture() {
     description: "Keep the source observation read-only.",
     state: "inbox",
     projectRef: "plato/dashboard",
+    projectVersionId: "33333333-3333-4333-8333-333333333333",
     assignedAgentId: "plato",
     idempotencyKey: "capture-20260721-0001",
   } as const;
@@ -95,6 +96,7 @@ describe("Observatory Quick Capture validation", () => {
       type: "feature",
       title: "  A bounded title  ",
       projectRef: "  plato/dashboard  ",
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
       assignedAgentId: "  plato  ",
       idempotencyKey: "  capture-0002  ",
     });
@@ -246,6 +248,7 @@ describe("Work Tracker workflow contract", () => {
       ownerId: "22222222-2222-4222-8222-222222222222",
       assignedAgentId: "plato",
       projectRef: "asgard/archaea-gacha-game",
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
       milestoneRef: "OBS-M3",
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
@@ -291,6 +294,7 @@ describe("Work Tracker workflow contract", () => {
       ownerId: "22222222-2222-4222-8222-222222222222",
       assignedAgentId: "lord-guan",
       projectRef: "asgard/archaea-gacha-game",
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
       milestoneRef: null,
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
