@@ -8,11 +8,13 @@ import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-pr
 type WorkTrackerCaptureDrawerProps = {
   initialIdempotencyKey: string;
   projects: WorkTrackerProjectOption[];
+  agentIds: string[];
 };
 
 export function WorkTrackerCaptureDrawer({
   initialIdempotencyKey,
   projects,
+  agentIds,
 }: WorkTrackerCaptureDrawerProps) {
   const [open, setOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -69,6 +71,7 @@ export function WorkTrackerCaptureDrawer({
             <QuickCapture
               initialIdempotencyKey={initialIdempotencyKey}
               projects={projects}
+              agentIds={agentIds}
             />
           </section>
         </div>

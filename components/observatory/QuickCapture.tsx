@@ -19,6 +19,7 @@ type QuickCaptureProps = {
   initialIdempotencyKey: string;
   initialState?: ObservatoryQuickCaptureActionState;
   projects?: WorkTrackerProjectOption[];
+  agentIds?: string[];
 };
 
 const idleState: ObservatoryQuickCaptureActionState = { status: "idle" };
@@ -28,6 +29,7 @@ export function QuickCapture({
   initialIdempotencyKey,
   initialState = idleState,
   projects,
+  agentIds = [],
 }: QuickCaptureProps) {
   const [selectedType, setSelectedType] = useState<
     "idea" | "feature" | "bug"
@@ -35,6 +37,7 @@ export function QuickCapture({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [projectRef, setProjectRef] = useState("");
+  const [assignedAgentId, setAssignedAgentId] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(
     initialIdempotencyKey,
   );
@@ -62,6 +65,7 @@ export function QuickCapture({
   const descriptionError = fieldErrors?.description?.[0];
   const typeError = fieldErrors?.type?.[0];
   const projectError = fieldErrors?.projectRef?.[0];
+  const assignedAgentError = fieldErrors?.assignedAgentId?.[0];
   const idempotencyError = fieldErrors?.idempotencyKey?.[0];
 
   return (
@@ -103,11 +107,52 @@ export function QuickCapture({
               id="observatory-capture-project"
               projects={projects}
               value={projectRef}
-              onChange={setProjectRef}
+              onChange={(nextProjectRef) => {
+                setProjectRef(nextProjectRef);
+                const project = projects.find(
+                  (candidate) => candidate.projectKey === nextProjectRef,
+                );
+                const owner = project?.owner.toLowerCase() ?? "";
+                setAssignedAgentId(agentIds.includes(owner) ? owner : "");
+              }}
               required
             />
             {projectError ? (
               <p className="observatory-field-error">{projectError}</p>
+            ) : null}
+            <label
+              className="observatory-field"
+              htmlFor="observatory-capture-assigned-agent"
+            >
+              <span>Assigned Agent</span>
+              <select
+                id="observatory-capture-assigned-agent"
+                name="assignedAgentId"
+                required
+                value={assignedAgentId}
+                aria-invalid={assignedAgentError ? true : undefined}
+                aria-describedby={
+                  assignedAgentError
+                    ? "observatory-assigned-agent-error"
+                    : undefined
+                }
+                onChange={(event) => setAssignedAgentId(event.target.value)}
+              >
+                <option value="">Choose an Agent</option>
+                {[...agentIds].sort().map((agentId) => (
+                  <option key={agentId} value={agentId}>
+                    {agentId}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {assignedAgentError ? (
+              <p
+                id="observatory-assigned-agent-error"
+                className="observatory-field-error"
+              >
+                {assignedAgentError}
+              </p>
             ) : null}
           </>
         ) : null}

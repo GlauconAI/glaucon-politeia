@@ -72,6 +72,10 @@ export default async function WorkTrackerPage({
     overviewState.status === "ready"
       ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
       : [];
+  const agentIds =
+    overviewState.status === "ready"
+      ? overviewState.snapshot.agents?.map((agent) => agent.id) ?? []
+      : [];
   const trackedProjects =
     state.status === "ready"
       ? filterTrackedWorkTrackerProjects(projects, state.items)
@@ -101,6 +105,7 @@ export default async function WorkTrackerPage({
           <WorkTrackerCaptureDrawer
             initialIdempotencyKey={initialIdempotencyKey}
             projects={projects}
+            agentIds={agentIds}
           />
         </div>
       </header>

@@ -24,6 +24,7 @@ function validQuickCapture() {
     description: "Keep the source observation read-only.",
     state: "inbox",
     projectRef: "plato/dashboard",
+    assignedAgentId: "plato",
     idempotencyKey: "capture-20260721-0001",
   } as const;
 }
@@ -94,6 +95,7 @@ describe("Observatory Quick Capture validation", () => {
       type: "feature",
       title: "  A bounded title  ",
       projectRef: "  plato/dashboard  ",
+      assignedAgentId: "  plato  ",
       idempotencyKey: "  capture-0002  ",
     });
 
@@ -105,6 +107,7 @@ describe("Observatory Quick Capture validation", () => {
         description: "",
         state: "inbox",
         projectRef: "plato/dashboard",
+        assignedAgentId: "plato",
         idempotencyKey: "capture-0002",
       },
     });
@@ -127,6 +130,18 @@ describe("Observatory Quick Capture validation", () => {
       { ...validQuickCapture(), title: "   " },
       { ...validQuickCapture(), idempotencyKey: "contains whitespace" },
       { ...validQuickCapture(), idempotencyKey: "../escape" },
+    ]) {
+      expect(ObservatoryQuickCaptureInputSchema.safeParse(input).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it("requires a normalized explicit Agent assignment", () => {
+    for (const input of [
+      { ...validQuickCapture(), assignedAgentId: undefined },
+      { ...validQuickCapture(), assignedAgentId: "Shared" },
+      { ...validQuickCapture(), assignedAgentId: "not valid" },
     ]) {
       expect(ObservatoryQuickCaptureInputSchema.safeParse(input).success).toBe(
         false,
