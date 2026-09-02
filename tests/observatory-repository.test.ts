@@ -270,6 +270,38 @@ describe("getCurrentObservatoryAdmin", () => {
   });
 });
 
+describe("Project Version repository", () => {
+  it("creates an audited version through its bounded RPC", async () => {
+    const version = { id: "33333333-3333-4333-8333-333333333333", row_version: 1 };
+    const boundary = repositoryClient({ rpcData: version });
+    const repository = createObservatoryRepository(boundary.client);
+    await expect(repository.createProjectVersion({
+      projectKey: "plato/dashboard",
+      versionLabel: "v1.0",
+      title: "First release",
+      description: "Version management",
+      targetDate: "2026-09-30",
+    })).resolves.toEqual(version);
+    expect(boundary.rpc).toHaveBeenCalledWith("create_observatory_project_version", {
+      p_project_key: "plato/dashboard",
+      p_version_label: "v1.0",
+      p_title: "First release",
+      p_description: "Version management",
+      p_target_date: "2026-09-30",
+    });
+  });
+
+  it("ensures canonical Project Backlogs in one idempotent RPC", async () => {
+    const versions = [{ id: "33333333-3333-4333-8333-333333333333", is_backlog: true }];
+    const boundary = repositoryClient({ rpcData: versions });
+    const repository = createObservatoryRepository(boundary.client);
+    await expect(repository.ensureProjectBacklogs(["plato/dashboard"])).resolves.toEqual(versions);
+    expect(boundary.rpc).toHaveBeenCalledWith("ensure_observatory_project_backlog_versions", {
+      p_project_keys: ["plato/dashboard"],
+    });
+  });
+});
+
 describe("Observatory repository", () => {
   it("reads only the latest successful snapshot", async () => {
     const snapshot = {

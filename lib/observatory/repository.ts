@@ -197,10 +197,11 @@ export interface ObservatoryRepositoryClient {
       | "cancel_observatory_work_item_claim"
       | "create_observatory_project_version"
       | "update_observatory_project_version"
-      | "transition_observatory_project_version",
+      | "transition_observatory_project_version"
+      | "ensure_observatory_project_backlog_versions",
     arguments_: Record<string, unknown>,
   ): PromiseLike<{
-    data: ObservatoryWorkItemRow | ObservatoryProjectVersionRow | null;
+    data: unknown;
     error: ObservatoryDatabaseError | null;
   }>;
 }
@@ -694,6 +695,14 @@ export function createObservatoryRepository(
       if (error) throw mutationError("create", error);
       if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_CREATE_FAILED", "The Project Version could not be created.");
       return data as ObservatoryProjectVersionRow;
+    },
+
+    async ensureProjectBacklogs(projectKeys: string[]): Promise<ObservatoryProjectVersionRow[]> {
+      const { data, error } = await client.rpc("ensure_observatory_project_backlog_versions", {
+        p_project_keys: projectKeys,
+      });
+      if (error) throw mutationError("update", error);
+      return (data ?? []) as ObservatoryProjectVersionRow[];
     },
 
     async updateProjectVersion(input: ProjectVersionUpdateInput): Promise<ObservatoryProjectVersionRow> {

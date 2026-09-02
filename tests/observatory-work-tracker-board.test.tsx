@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkTrackerBoard } from "@/components/observatory/WorkTrackerBoard";
 import type { ObservatoryWorkItemRow } from "@/lib/observatory/repository";
 import type { ObservatoryWorkItemClaimRow } from "@/lib/observatory/repository";
+import type { ObservatoryProjectVersionRow } from "@/lib/observatory/repository";
 import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
 
 const projects: WorkTrackerProjectOption[] = [
@@ -57,7 +58,45 @@ const item: ObservatoryWorkItemRow = {
   claim_approved_at: null,
 };
 
+const versions: ObservatoryProjectVersionRow[] = [
+  {
+    id: "33333333-3333-4333-8333-333333333333",
+    project_key: "plato/dashboard",
+    version_label: "v1.0",
+    title: "First release",
+    description: "",
+    status: "active",
+    target_date: null,
+    released_at: null,
+    is_backlog: false,
+    row_version: 1,
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_by: item.created_by,
+    updated_at: item.updated_at,
+  },
+];
+
 describe("WorkTrackerBoard", () => {
+  it("shows and filters Project Versions while preserving detail return context", () => {
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item] }}
+        projects={projects}
+        versions={versions}
+        initialProjectKey="plato/dashboard"
+        urlProjectKey="plato/dashboard"
+      />,
+    );
+    expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("v1.0 · 进行中")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Project Version" }), {
+      target: { value: versions[0].id },
+    });
+    expect(screen.getByRole("link", { name: item.title })).toHaveAttribute(
+      "href",
+      `/work-tracker/items/${item.id}?project=plato%2Fdashboard&version=${versions[0].id}`,
+    );
+  });
   it("renders four active work groups and keeps Done in a separate view", () => {
     render(
       <WorkTrackerBoard state={{ status: "ready", items: [item] }} />,

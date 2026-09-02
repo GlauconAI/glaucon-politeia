@@ -7,6 +7,8 @@ import {
   type ObservatoryQuickCaptureActionState,
 } from "@/app/observatory/actions";
 import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
+import { ProjectVersionPicker } from "@/components/observatory/ProjectVersionPicker";
+import type { ObservatoryProjectVersionRow } from "@/lib/observatory/repository";
 import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
 
 type QuickCaptureAction = (
@@ -20,6 +22,7 @@ type QuickCaptureProps = {
   initialState?: ObservatoryQuickCaptureActionState;
   projects?: WorkTrackerProjectOption[];
   agentIds?: string[];
+  versions?: ObservatoryProjectVersionRow[];
 };
 
 const idleState: ObservatoryQuickCaptureActionState = { status: "idle" };
@@ -30,6 +33,7 @@ export function QuickCapture({
   initialState = idleState,
   projects,
   agentIds = [],
+  versions = [],
 }: QuickCaptureProps) {
   const [selectedType, setSelectedType] = useState<
     "idea" | "feature" | "bug"
@@ -38,6 +42,7 @@ export function QuickCapture({
   const [description, setDescription] = useState("");
   const [projectRef, setProjectRef] = useState("");
   const [assignedAgentId, setAssignedAgentId] = useState("");
+  const [projectVersionId, setProjectVersionId] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(
     initialIdempotencyKey,
   );
@@ -65,6 +70,7 @@ export function QuickCapture({
   const descriptionError = fieldErrors?.description?.[0];
   const typeError = fieldErrors?.type?.[0];
   const projectError = fieldErrors?.projectRef?.[0];
+  const projectVersionError = fieldErrors?.projectVersionId?.[0];
   const assignedAgentError = fieldErrors?.assignedAgentId?.[0];
   const idempotencyError = fieldErrors?.idempotencyKey?.[0];
 
@@ -109,6 +115,7 @@ export function QuickCapture({
               value={projectRef}
               onChange={(nextProjectRef) => {
                 setProjectRef(nextProjectRef);
+                setProjectVersionId("");
                 const project = projects.find(
                   (candidate) => candidate.projectKey === nextProjectRef,
                 );
@@ -119,6 +126,17 @@ export function QuickCapture({
             />
             {projectError ? (
               <p className="observatory-field-error">{projectError}</p>
+            ) : null}
+            <ProjectVersionPicker
+              id="observatory-capture-project-version"
+              versions={versions}
+              projectKey={projectRef}
+              value={projectVersionId}
+              onChange={setProjectVersionId}
+              required
+            />
+            {projectVersionError ? (
+              <p className="observatory-field-error">{projectVersionError}</p>
             ) : null}
             <label
               className="observatory-field"

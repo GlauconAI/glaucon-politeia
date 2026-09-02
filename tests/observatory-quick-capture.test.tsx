@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ObservatoryQuickCaptureActionState } from "@/app/observatory/actions";
 import { QuickCapture } from "@/components/observatory/QuickCapture";
 import type { WorkTrackerProjectOption } from "@/lib/observatory/work-tracker-projects";
+import type { ObservatoryProjectVersionRow } from "@/lib/observatory/repository";
 
 const projects: WorkTrackerProjectOption[] = [
   {
@@ -34,6 +35,15 @@ const projects: WorkTrackerProjectOption[] = [
 ];
 
 const agentIds = ["amou", "aristotle", "plato"];
+const versionBase = {
+  description: "", target_date: null, released_at: null, is_backlog: false,
+  row_version: 1, created_by: "admin", created_at: "2026-09-02T00:00:00Z",
+  updated_by: "admin", updated_at: "2026-09-02T00:00:00Z",
+} as const;
+const versions: ObservatoryProjectVersionRow[] = [
+  { ...versionBase, id: "11111111-1111-4111-8111-111111111111", project_key: "plato/dashboard", version_label: "v1.0", title: "Dashboard release", status: "active" },
+  { ...versionBase, id: "22222222-2222-4222-8222-222222222222", project_key: "amou/wenya-ai", version_label: "v0.2", title: "问芽版本", status: "planned" },
+];
 
 describe("QuickCapture", () => {
   it("uses keyboard-accessible native controls for Idea, Feature, and Bug capture", () => {
@@ -88,6 +98,7 @@ describe("QuickCapture", () => {
         action={action}
         projects={projects}
         agentIds={agentIds}
+        versions={versions}
         initialIdempotencyKey="observatory-capture-77777777-7777-4777-8777-777777777777"
       />,
     );
@@ -98,6 +109,8 @@ describe("QuickCapture", () => {
     expect(assignedAgent).toBeRequired();
     fireEvent.change(project, { target: { value: "amou/wenya-ai" } });
     expect(assignedAgent).toHaveValue("amou");
+    const projectVersion = screen.getByLabelText("Project Version");
+    fireEvent.change(projectVersion, { target: { value: versions[1].id } });
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "补充问芽训练样本" },
     });
@@ -112,7 +125,10 @@ describe("QuickCapture", () => {
     expect((action.mock.calls[0][1] as FormData).get("assignedAgentId")).toBe(
       "amou",
     );
+    expect((action.mock.calls[0][1] as FormData).get("projectVersionId")).toBe(versions[1].id);
     expect(project).toHaveValue("amou/wenya-ai");
+    fireEvent.change(project, { target: { value: "plato/dashboard" } });
+    expect(projectVersion).toHaveValue("");
   });
 
   it("requires an explicit Agent for a Shared Project instead of assigning shared", () => {

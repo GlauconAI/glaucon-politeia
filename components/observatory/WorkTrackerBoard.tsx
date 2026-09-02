@@ -1,18 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   transitionObservatoryWorkItemAction,
   type ObservatoryWorkItemMutationActionState,
 } from "@/app/observatory/actions";
 import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
+import { ProjectVersionPicker } from "@/components/observatory/ProjectVersionPicker";
 import { getAgentClaimEligibility } from "@/lib/observatory/agent-claims";
 import type {
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
+  ObservatoryProjectVersionRow,
 } from "@/lib/observatory/repository";
+import { PROJECT_VERSION_STATUS_LABELS } from "@/lib/observatory/project-versions";
+import {
+  buildWorkItemDetailHref,
+  buildWorkTrackerHref,
+  readRememberedProject,
+  rememberProject,
+  resolveRememberedProject,
+  type WorkTrackerView,
+} from "@/lib/observatory/work-tracker-navigation";
 import {
   filterTrackedWorkTrackerProjects,
   resolveWorkItemProject,
@@ -30,6 +41,7 @@ export type WorkTrackerBoardState =
   | {
       status: "ready";
       items: ObservatoryWorkItemRow[];
+      versions?: ObservatoryProjectVersionRow[];
       activeClaims?: ObservatoryWorkItemClaimRow[];
       evaluatedAt?: string;
     }
@@ -45,6 +57,10 @@ type WorkTrackerBoardProps = {
   action?: TransitionAction;
   projects?: WorkTrackerProjectOption[];
   initialProjectKey?: string;
+  initialProjectVersionId?: string;
+  initialView?: WorkTrackerView;
+  versions?: ObservatoryProjectVersionRow[];
+  urlProjectKey?: string;
 };
 
 const stateLabels: Record<ObservatoryWorkItemState, string> = {
@@ -66,15 +82,37 @@ const typeLabels: Record<ObservatoryWorkItemType, string> = {
 };
 
 const idleState: ObservatoryWorkItemMutationActionState = { status: "idle" };
+const noProjectPreferenceSubscription = () => () => undefined;
+
+function browserRememberedProject() {
+  try {
+    return readRememberedProject(window.localStorage);
+  } catch {
+    return null;
+  }
+}
+
+function rememberBrowserProject(projectKey: string) {
+  try {
+    rememberProject(window.localStorage, projectKey);
+  } catch {
+    // Accessing localStorage itself may be blocked by the browser.
+  }
+}
 
 export function WorkTrackerBoard({
   state,
   action = transitionObservatoryWorkItemAction,
   projects,
   initialProjectKey = "all",
+  initialProjectVersionId = "all",
+  initialView = "active",
+  versions = [],
+  urlProjectKey,
 }: WorkTrackerBoardProps) {
-  const [projectKey, setProjectKey] = useState(initialProjectKey);
-  const [view, setView] = useState<"active" | "completed">("active");
+  const [projectSelection, setProjectSelection] = useState<string | null>(null);
+  const [projectVersionId, setProjectVersionId] = useState(initialProjectVersionId);
+  const [view, setView] = useState<WorkTrackerView>(initialView);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRefs = useRef(new Map<string, HTMLDetailsElement>());
   const menuTriggerRefs = useRef(new Map<string, HTMLElement>());
@@ -88,27 +126,43 @@ export function WorkTrackerBoard({
     return filterTrackedWorkTrackerProjects(projects, state.items);
   }, [projects, state]);
 
+  const rememberedProjectKey = useSyncExternalStore(
+    noProjectPreferenceSubscription,
+    () => resolveRememberedProject({
+      urlProject: urlProjectKey ?? new URLSearchParams(window.location.search).get("project") ?? undefined,
+      storedProject: browserRememberedProject(),
+      validProjectKeys: trackedProjects.map((project) => project.projectKey),
+    }),
+    () => initialProjectKey,
+  );
+  const projectKey = projectSelection ?? rememberedProjectKey;
+
   const filteredItems = useMemo(() => {
     if (state.status !== "ready") return [];
     if (projectKey === "all" || !projects) return state.items;
-    return state.items.filter(
+    const projectItems = state.items.filter(
       (item) =>
         resolveWorkItemProject(item, projects)?.projectKey === projectKey,
     );
-  }, [projectKey, projects, state]);
+    return projectVersionId === "all"
+      ? projectItems
+      : projectItems.filter((item) => item.project_version_id === projectVersionId);
+  }, [projectKey, projectVersionId, projects, state]);
+
+  const versionsById = useMemo(
+    () => new Map(versions.map((version) => [version.id, version])),
+    [versions],
+  );
 
   useEffect(() => {
     if (!projects) return;
-    const search = new URLSearchParams(window.location.search);
-    if (projectKey === "all") search.delete("project");
-    else search.set("project", projectKey);
-    const query = search.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `/work-tracker${query ? `?${query}` : ""}`,
-    );
-  }, [projectKey, projects]);
+    rememberBrowserProject(projectKey);
+    window.history.replaceState(null, "", buildWorkTrackerHref({
+      projectKey,
+      projectVersionId: projectKey === "all" ? undefined : projectVersionId,
+      view,
+    }));
+  }, [projectKey, projectVersionId, projects, view]);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -158,6 +212,9 @@ export function WorkTrackerBoard({
 
   function renderCard(item: ObservatoryWorkItemRow) {
     const project = projects ? resolveWorkItemProject(item, projects) : null;
+    const projectVersion = item.project_version_id
+      ? versionsById.get(item.project_version_id)
+      : null;
     const targets = allowedObservatoryWorkItemTransitions(item.state);
     const claim = activeClaims.get(item.id);
     const readyGateComplete = Boolean(
@@ -271,7 +328,11 @@ export function WorkTrackerBoard({
           ) : null}
         </div>
 
-        <Link href={`/work-tracker/items/${item.id}`}>{item.title}</Link>
+        <Link href={buildWorkItemDetailHref(item.id, {
+          projectKey,
+          projectVersionId,
+          view,
+        })}>{item.title}</Link>
 
         <div className="work-tracker-card-footer">
           {project ? (
@@ -290,6 +351,11 @@ export function WorkTrackerBoard({
           <span className="work-tracker-assignee-badge">
             Assigned · {item.assigned_agent_id}
           </span>
+          {projectVersion ? (
+            <span className={`work-tracker-version-badge work-tracker-version-${projectVersion.status}`}>
+              {projectVersion.is_backlog ? "待规划" : projectVersion.version_label} · {PROJECT_VERSION_STATUS_LABELS[projectVersion.status]}
+            </span>
+          ) : null}
           <span className="work-tracker-claim-badge">{claimLabel}</span>
         </div>
       </li>
@@ -310,11 +376,27 @@ export function WorkTrackerBoard({
               name="projectFilter"
               projects={trackedProjects}
               value={projectKey}
-              onChange={setProjectKey}
+              onChange={(nextProjectKey) => {
+                setProjectSelection(nextProjectKey);
+                setProjectVersionId("all");
+              }}
               allowAll
               selectLabel="Filter by Project"
               allLabel="全部有 Item 的 Project"
               showAvailabilityCount={false}
+            />
+          </div>
+        ) : null}
+        {projectKey !== "all" ? (
+          <div className="work-tracker-filter">
+            <ProjectVersionPicker
+              id="work-tracker-version-filter"
+              name="versionFilter"
+              versions={versions}
+              projectKey={projectKey}
+              value={projectVersionId}
+              onChange={setProjectVersionId}
+              allowAll
             />
           </div>
         ) : null}

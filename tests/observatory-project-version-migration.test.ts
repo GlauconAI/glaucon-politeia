@@ -21,10 +21,16 @@ describe("Project Version migration", () => {
       "update_observatory_project_version",
       "transition_observatory_project_version",
       "OBSERVATORY_PROJECT_VERSION_MISMATCH",
+      "alter column project_version_id set not null",
+      "observatory_work_items_validate_project_version",
+      "ensure_observatory_project_backlog_versions",
       "enable row level security",
       "grant execute",
     ]) expect(sql.toLowerCase()).toContain(fragment.toLowerCase());
     expect(sql).toMatch(/planned[\s\S]*active[\s\S]*released[\s\S]*archived/u);
     expect(sql).toContain("Backlog");
+    expect(sql).toContain("set project_ref = 'plato/dashboard'");
+    expect(sql).toContain("else current_version.released_at");
+    expect(sql).toContain("status <> 'released' or released_at is not null");
   });
 });

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   listWorkItemEvidence: vi.fn(),
   listWorkItemEvents: vi.fn(),
   listWorkItemClaims: vi.fn(),
+  listProjectVersions: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -41,7 +42,8 @@ vi.mock("@/lib/observatory/repository", () => ({
     getWorkItem: mocks.getWorkItem,
     listWorkItemEvidence: mocks.listWorkItemEvidence,
     listWorkItemEvents: mocks.listWorkItemEvents,
-    listWorkItemClaims: mocks.listWorkItemClaims,
+      listWorkItemClaims: mocks.listWorkItemClaims,
+      listProjectVersions: mocks.listProjectVersions,
   }),
 }));
 vi.mock("@/lib/observatory/dashboard-state", () => ({
@@ -63,6 +65,7 @@ const item = {
   project_ref: "Dashboard",
   milestone_ref: null,
   project_key: null,
+  project_version_id: "33333333-3333-4333-8333-333333333333",
   plan_revision: null,
   stage_id: null,
   work_package_id: null,
@@ -95,6 +98,8 @@ describe("WorkItemPage", () => {
     mocks.listWorkItemEvents.mockResolvedValue([]);
     mocks.listWorkItemClaims.mockReset();
     mocks.listWorkItemClaims.mockResolvedValue([]);
+    mocks.listProjectVersions.mockReset();
+    mocks.listProjectVersions.mockResolvedValue([]);
     mocks.loadOverviewState.mockReset();
     mocks.loadOverviewState.mockResolvedValue({
       status: "ready",
@@ -133,8 +138,31 @@ describe("WorkItemPage", () => {
   });
 
   it("renders an authorized item with detail data", async () => {
+    mocks.listProjectVersions.mockResolvedValueOnce([{
+      id: item.project_version_id,
+      project_key: "plato/dashboard",
+      version_label: "v1.0",
+      title: "Release",
+      description: "",
+      status: "active",
+      target_date: null,
+      released_at: null,
+      is_backlog: false,
+      row_version: 1,
+      created_by: item.created_by,
+      created_at: item.created_at,
+      updated_by: item.created_by,
+      updated_at: item.updated_at,
+    }]);
     render(
-      await WorkItemPage({ params: Promise.resolve({ id: item.id }) }),
+      await WorkItemPage({
+        params: Promise.resolve({ id: item.id }),
+        searchParams: Promise.resolve({
+          project: "plato/dashboard",
+          version: item.project_version_id,
+          view: "completed",
+        }),
+      }),
     );
 
     expect(
@@ -144,6 +172,10 @@ describe("WorkItemPage", () => {
     expect(mocks.listWorkItemEvents).toHaveBeenCalledWith(item.id);
     expect(mocks.listWorkItemClaims).toHaveBeenCalledWith(item.id);
     expect(screen.getByLabelText(/^project$/i)).toHaveValue("plato/dashboard");
+    expect(screen.getByRole("link", { name: "← 返回 Work Tracker" })).toHaveAttribute(
+      "href",
+      `/work-tracker?project=plato%2Fdashboard&version=${item.project_version_id}&view=completed`,
+    );
   });
 
   it("uses the not-found boundary for a missing item", async () => {

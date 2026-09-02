@@ -20,7 +20,7 @@ create table public.observatory_project_versions (
   created_at timestamptz not null default now(),
   updated_by uuid not null references public.profiles(user_id) on delete restrict,
   updated_at timestamptz not null default now(),
-  check ((status = 'released') = (released_at is not null))
+  check (status <> 'released' or released_at is not null)
 );
 
 create unique index observatory_project_versions_project_label_idx
@@ -65,6 +65,10 @@ create policy observatory_project_version_events_select_admin
 on public.observatory_project_version_events for select
 to authenticated
 using (public.is_current_user_admin());
+
+update public.observatory_work_items
+set project_ref = 'plato/dashboard'
+where project_key is null and btrim(project_ref) = 'Dashboard';
 
 insert into public.observatory_project_versions (
   project_key,
@@ -112,6 +116,36 @@ from public.observatory_project_versions version
 where version.project_key = coalesce(item.project_key, item.project_ref)
   and version.is_backlog
   and item.project_version_id is null;
+
+alter table public.observatory_work_items
+  alter column project_version_id set not null;
+
+create or replace function public.validate_observatory_work_item_project_version()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $$
+declare
+  version_project_key text;
+  item_project_key text := coalesce(new.project_key, new.project_ref);
+begin
+  select project_key into version_project_key
+  from public.observatory_project_versions
+  where id = new.project_version_id;
+  if version_project_key is null then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_REQUIRED' using errcode = '22023';
+  end if;
+  if item_project_key is null or version_project_key <> item_project_key then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_MISMATCH' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger observatory_work_items_validate_project_version
+before insert or update of project_ref, project_key, project_version_id
+on public.observatory_work_items
+for each row execute function public.validate_observatory_work_item_project_version();
 
 create index observatory_work_items_project_version_idx
 on public.observatory_work_items(project_version_id);
@@ -166,6 +200,59 @@ begin
 exception
   when unique_violation then
     raise exception 'OBSERVATORY_PROJECT_VERSION_DUPLICATE' using errcode = '23505';
+end;
+$$;
+
+create or replace function public.ensure_observatory_project_backlog_versions(
+  p_project_keys text[]
+)
+returns setof public.observatory_project_versions
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  calling_user uuid := auth.uid();
+  invalid_key text;
+begin
+  if calling_user is null or not public.is_current_user_admin() then
+    raise exception 'Administrator access required' using errcode = '42501';
+  end if;
+  select project_key into invalid_key
+  from unnest(coalesce(p_project_keys, array[]::text[])) project_key
+  where project_key !~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$'
+  limit 1;
+  if invalid_key is not null then
+    raise exception 'OBSERVATORY_PROJECT_REQUIRED' using errcode = '22023';
+  end if;
+
+  with inserted as (
+    insert into public.observatory_project_versions (
+      project_key, version_label, title, description, status, is_backlog,
+      created_by, updated_by
+    )
+    select distinct
+      project_key, 'Backlog', '待规划',
+      '系统保留版本，用于承接尚未归入正式版本的 Work Items。',
+      'planned', true, calling_user, calling_user
+    from unnest(coalesce(p_project_keys, array[]::text[])) project_key
+    on conflict do nothing
+    returning *
+  ), audited as (
+    insert into public.observatory_project_version_events (
+      project_version_id, event_type, actor_id, data
+    )
+    select id, 'created', calling_user,
+      jsonb_build_object('reason', 'work-tracker-project-version-canonical-sync')
+    from inserted
+  )
+  select 1;
+
+  return query
+  select version.*
+  from public.observatory_project_versions version
+  where version.project_key = any(coalesce(p_project_keys, array[]::text[]))
+  order by version.project_key, version.created_at;
 end;
 $$;
 
@@ -272,7 +359,10 @@ begin
 
   update public.observatory_project_versions
   set status = target_status,
-    released_at = case when target_status = 'released' then now() else null end,
+    released_at = case
+      when target_status = 'released' then now()
+      else current_version.released_at
+    end,
     row_version = current_version.row_version + 1,
     updated_by = calling_user,
     updated_at = now()
@@ -297,6 +387,10 @@ $$;
 revoke all privileges on function public.create_observatory_project_version(text, text, text, text, date)
 from public, anon, authenticated, service_role;
 grant execute on function public.create_observatory_project_version(text, text, text, text, date)
+to authenticated;
+revoke all privileges on function public.ensure_observatory_project_backlog_versions(text[])
+from public, anon, authenticated, service_role;
+grant execute on function public.ensure_observatory_project_backlog_versions(text[])
 to authenticated;
 revoke all privileges on function public.update_observatory_project_version(uuid, integer, text, text, text, date)
 from public, anon, authenticated, service_role;
@@ -402,6 +496,43 @@ $$;
 revoke all privileges on function public.create_observatory_work_item(text, text, text, text, text, uuid, text)
 from public, anon, authenticated, service_role;
 grant execute on function public.create_observatory_work_item(text, text, text, text, text, uuid, text)
+to authenticated;
+
+create or replace function public.create_observatory_work_item(
+  p_type text,
+  p_title text,
+  p_description text,
+  p_project_ref text,
+  p_assigned_agent_id text,
+  p_idempotency_key text
+)
+returns public.observatory_work_items
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  selected_version_id uuid;
+begin
+  perform public.ensure_observatory_project_backlog_versions(array[btrim(p_project_ref)]);
+  select id into selected_version_id
+  from public.observatory_project_versions
+  where project_key = btrim(p_project_ref) and is_backlog;
+  return public.create_observatory_work_item(
+    p_type,
+    p_title,
+    p_description,
+    p_project_ref,
+    p_assigned_agent_id,
+    selected_version_id,
+    p_idempotency_key
+  );
+end;
+$$;
+
+revoke all privileges on function public.create_observatory_work_item(text, text, text, text, text, text)
+from public, anon, authenticated, service_role;
+grant execute on function public.create_observatory_work_item(text, text, text, text, text, text)
 to authenticated;
 
 create or replace function public.update_observatory_work_item(
