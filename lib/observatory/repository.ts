@@ -228,6 +228,7 @@ export type ObservatoryRepositoryErrorCode =
   | "PROJECT_VERSION_TRANSITION_INVALID"
   | "PROJECT_VERSION_MISMATCH"
   | "PROJECT_VERSION_REQUIRED"
+  | "PROJECT_VERSION_ARCHIVED"
   | "PROJECT_VERSION_BACKLOG_IMMUTABLE"
   | "CLAIM_VERSION_CONFLICT";
 
@@ -263,6 +264,33 @@ function mutationError(
       "CLAIM_VERSION_CONFLICT",
       "The agent claim changed after it was loaded.",
     );
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_DUPLICATE")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_DUPLICATE", "That version label already exists for this Project.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_CONFLICT")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_CONFLICT", "The Project Version changed after it was loaded.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_NOT_FOUND")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_NOT_FOUND", "The Project Version no longer exists.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_TRANSITION_INVALID")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_TRANSITION_INVALID", "That Project Version status transition is not allowed.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_MISMATCH")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_MISMATCH", "Choose a version from the selected Project.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_REQUIRED")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_REQUIRED", "Choose a Project Version.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_ARCHIVED")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_ARCHIVED", "Choose a Project Version that is not archived.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_BACKLOG_IMMUTABLE", "The system Backlog version cannot be edited or transitioned.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_INVALID")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_INVALID", "The Project Version details are invalid.");
   }
   if (
     error.code === "40001" ||
@@ -318,31 +346,6 @@ function mutationError(
       "The Project Control binding must be fully specified or empty.",
     );
   }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_DUPLICATE")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_DUPLICATE", "That version label already exists for this Project.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_CONFLICT")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_CONFLICT", "The Project Version changed after it was loaded.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_NOT_FOUND")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_NOT_FOUND", "The Project Version no longer exists.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_TRANSITION_INVALID")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_TRANSITION_INVALID", "That Project Version status transition is not allowed.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_MISMATCH")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_MISMATCH", "Choose a version from the selected Project.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_REQUIRED")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_REQUIRED", "Choose a Project Version.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_BACKLOG_IMMUTABLE", "The system Backlog version cannot be edited or transitioned.");
-  }
-  if (marker.includes("OBSERVATORY_PROJECT_VERSION_INVALID")) {
-    return new ObservatoryRepositoryError("PROJECT_VERSION_INVALID", "The Project Version details are invalid.");
-  }
-
   return operation === "create"
     ? new ObservatoryRepositoryError(
         "WORK_ITEM_CREATE_FAILED",

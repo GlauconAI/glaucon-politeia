@@ -37,8 +37,11 @@ export function ProjectVersionPicker({
         disabled={!projectKey || projectKey === "all"}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">{projectKey && projectKey !== "all" ? "Choose a version" : "Choose a Project first"}</option>
-        {allowAll ? <option value="all">全部版本</option> : null}
+        {allowAll ? (
+          <option value="all">全部版本</option>
+        ) : (
+          <option value="">{projectKey && projectKey !== "all" ? "Choose a version" : "Choose a Project first"}</option>
+        )}
         {value && value !== "all" && !selectedAvailable ? (
           <option value={value}>Current version</option>
         ) : null}

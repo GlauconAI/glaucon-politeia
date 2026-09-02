@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DERIVED_PROJECT_KEY_PATTERN } from "@/lib/observatory/schema";
 
 export const PROJECT_VERSION_STATUSES = [
   "planned",
@@ -33,8 +34,8 @@ const ProjectKeySchema = z
   .string()
   .trim()
   .min(3)
-  .max(256)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/u);
+  .max(160)
+  .regex(DERIVED_PROJECT_KEY_PATTERN);
 const VersionLabelSchema = z.string().trim().min(1).max(64);
 const VersionTitleSchema = z.string().trim().min(1).max(200);
 const VersionDescriptionSchema = z.string().trim().max(4_000);

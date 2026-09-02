@@ -300,6 +300,28 @@ describe("Project Version repository", () => {
       p_project_keys: ["plato/dashboard"],
     });
   });
+
+  it.each([
+    {
+      error: { code: "40001", message: "OBSERVATORY_PROJECT_VERSION_CONFLICT" },
+      expectedCode: "PROJECT_VERSION_CONFLICT",
+    },
+    {
+      error: { code: "P0002", message: "OBSERVATORY_PROJECT_VERSION_NOT_FOUND" },
+      expectedCode: "PROJECT_VERSION_NOT_FOUND",
+    },
+  ])("maps Project Version markers before generic SQLSTATE errors", async ({ error, expectedCode }) => {
+    const repository = createObservatoryRepository(repositoryClient({ rpcError: error }).client);
+
+    await expect(repository.updateProjectVersion({
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
+      expectedVersion: 1,
+      versionLabel: "v1.0",
+      title: "First release",
+      description: "Version management",
+      targetDate: null,
+    })).rejects.toMatchObject({ code: expectedCode });
+  });
 });
 
 describe("Observatory repository", () => {

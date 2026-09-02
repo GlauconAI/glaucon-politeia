@@ -71,6 +71,8 @@ function formError(error: unknown): string {
       return "Administrator access is required.";
     case "IDEMPOTENCY_CONFLICT":
       return "This capture key was already used for different content. Refresh and try again.";
+    case "PROJECT_VERSION_ARCHIVED":
+      return "That Project Version was archived. Refresh and choose another version.";
     default:
       return "The work item could not be captured. Try again.";
   }
@@ -169,6 +171,8 @@ function mutationFormError(error: unknown): string {
       return "Choose a version from the selected Project.";
     case "PROJECT_VERSION_REQUIRED":
       return "Choose a Project Version.";
+    case "PROJECT_VERSION_ARCHIVED":
+      return "Choose a Project Version that is not archived.";
     case "PROJECT_VERSION_BACKLOG_IMMUTABLE":
       return "The system Backlog version cannot be edited or transitioned.";
     default:
@@ -424,9 +428,32 @@ export async function createObservatoryProjectVersionAction(
   });
   if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
 
+  let canonicalContext;
+  try {
+    canonicalContext = await loadCanonicalWorkTrackerContext();
+  } catch {
+    return {
+      status: "error",
+      formError: "Work Tracker is temporarily unavailable. Try again.",
+    };
+  }
+  if (
+    !canonicalContext?.projects.some(
+      (project) => project.projectKey === validation.data.projectKey,
+    )
+  ) {
+    return fieldErrorState({
+      projectKey: ["Choose a Project from the canonical registry."],
+    });
+  }
+
   try {
     const version = await boundary.repository.createProjectVersion(validation.data);
-    revalidatePath("/work-tracker");
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
     return { status: "success", version: version.row_version };
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
@@ -452,7 +479,11 @@ export async function updateObservatoryProjectVersionAction(
 
   try {
     const version = await boundary.repository.updateProjectVersion(validation.data);
-    revalidatePath("/work-tracker");
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
     return { status: "success", version: version.row_version };
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
@@ -475,7 +506,11 @@ export async function transitionObservatoryProjectVersionAction(
 
   try {
     const version = await boundary.repository.transitionProjectVersion(validation.data);
-    revalidatePath("/work-tracker");
+    try {
+      revalidatePath("/work-tracker");
+    } catch {
+      // The RPC already committed; cache invalidation remains best-effort.
+    }
     return { status: "success", version: version.row_version };
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };

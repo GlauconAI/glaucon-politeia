@@ -310,6 +310,22 @@ describe("captureObservatoryWorkItemAction", () => {
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
+
+  it("reports when a Project Version is archived during capture", async () => {
+    mocks.createQuickCapture.mockRejectedValue(
+      new ObservatoryRepositoryError(
+        "PROJECT_VERSION_ARCHIVED",
+        "The selected Project Version is archived.",
+      ),
+    );
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, validFormData()),
+    ).resolves.toEqual({
+      status: "error",
+      formError: "That Project Version was archived. Refresh and choose another version.",
+    });
+  });
 });
 
 describe("Project Version actions", () => {
@@ -319,6 +335,46 @@ describe("Project Version actions", () => {
     mocks.updateProjectVersion.mockReset();
     mocks.transitionProjectVersion.mockReset();
     mocks.revalidatePath.mockReset();
+    mocks.loadOverviewState.mockReset();
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "ready",
+      snapshot: {
+        agents: [{ id: "plato" }],
+        registry: {
+          project_groups: [{
+            owner: "plato",
+            focus: "Product delivery",
+            projects: [{
+              project_key: "plato/dashboard",
+              name: "dashboard",
+              title: "Dashboard",
+              status: "active",
+              description: "Operational system view.",
+              scene_ids: ["S13"],
+            }],
+          }],
+        },
+      },
+    });
+  });
+
+  it("rejects a version for a Project outside the canonical registry", async () => {
+    const formData = new FormData();
+    formData.set("projectKey", "plato/unknown");
+    formData.set("versionLabel", "v1.0");
+    formData.set("title", "Unknown release");
+    formData.set("description", "");
+    formData.set("targetDate", "");
+
+    await expect(
+      createObservatoryProjectVersionAction({ status: "idle" }, formData),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        projectKey: ["Choose a Project from the canonical registry."],
+      },
+    });
+    expect(mocks.createProjectVersion).not.toHaveBeenCalled();
   });
 
   it("creates a normalized planned version", async () => {
@@ -363,6 +419,24 @@ describe("Project Version actions", () => {
     await expect(
       transitionObservatoryProjectVersionAction({ status: "idle" }, transitionData),
     ).resolves.toEqual({ status: "success", version: 4 });
+  });
+
+  it("reports a committed version mutation as successful when cache revalidation fails", async () => {
+    mocks.createProjectVersion.mockResolvedValue({ row_version: 1 });
+    mocks.revalidatePath.mockImplementation(() => {
+      throw new Error("cache unavailable");
+    });
+    const formData = new FormData();
+    formData.set("projectKey", "plato/dashboard");
+    formData.set("versionLabel", "v1.1");
+    formData.set("title", "Second release");
+    formData.set("description", "");
+    formData.set("targetDate", "");
+
+    await expect(
+      createObservatoryProjectVersionAction({ status: "idle" }, formData),
+    ).resolves.toEqual({ status: "success", version: 1 });
+    expect(mocks.createProjectVersion).toHaveBeenCalledTimes(1);
   });
 });
 

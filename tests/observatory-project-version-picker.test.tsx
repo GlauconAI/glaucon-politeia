@@ -38,4 +38,15 @@ describe("ProjectVersionPicker", () => {
     render(<ProjectVersionPicker id="version" versions={versions} projectKey="" value="" onChange={() => undefined} />);
     expect(screen.getByRole("combobox", { name: "Project Version" })).toBeDisabled();
   });
+
+  it("does not expose an empty value in filter mode", () => {
+    render(<ProjectVersionPicker id="version-filter" versions={versions} projectKey="plato/dashboard" value="all" onChange={() => undefined} allowAll />);
+    const values = Array.from(
+      (screen.getByRole("combobox", { name: "Project Version" }) as HTMLSelectElement).options,
+      (option) => option.value,
+    );
+    expect(values[0]).toBe("all");
+    expect(values).not.toContain("");
+    expect(values).toContain(versions[3].id);
+  });
 });

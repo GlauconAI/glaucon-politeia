@@ -148,6 +148,7 @@ describe("WorkItemDetail", () => {
     expect(screen.getByLabelText(/^project$/i)).toHaveValue(
       "asgard/archaea-gacha-game",
     );
+    expect(screen.getByLabelText(/project version/i)).toHaveValue("");
 
     fireEvent.submit(screen.getByRole("button", { name: /save fields/i }).closest("form")!);
     await waitFor(() => expect(updateAction).toHaveBeenCalledTimes(1));

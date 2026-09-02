@@ -71,14 +71,17 @@ export default async function WorkTrackerPage({
     loadObservatoryOverviewState(),
     searchParams,
   ]);
-  const projects =
-    overviewState.status === "ready"
-      ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
-      : [];
-  const agentIds =
-    overviewState.status === "ready"
-      ? overviewState.snapshot.agents?.map((agent) => agent.id) ?? []
-      : [];
+  if (overviewState.status !== "ready") {
+    return (
+      <section className="observatory-page work-tracker-page">
+        <div className="work-tracker-error">
+          <p role="alert">Work Tracker is temporarily unavailable. Try again.</p>
+        </div>
+      </section>
+    );
+  }
+  const projects = buildWorkTrackerProjectOptions(overviewState.snapshot.registry);
+  const agentIds = overviewState.snapshot.agents?.map((agent) => agent.id) ?? [];
   const trackedProjects =
     state.status === "ready"
       ? filterTrackedWorkTrackerProjects(projects, state.items)

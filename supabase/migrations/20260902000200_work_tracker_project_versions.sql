@@ -3,8 +3,13 @@ begin;
 create table public.observatory_project_versions (
   id uuid primary key default gen_random_uuid(),
   project_key text not null check (
-    length(project_key) between 3 and 256
-    and project_key ~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$'
+    length(project_key) between 3 and 160
+    and array_length(string_to_array(project_key, '/'), 1) = 2
+    and split_part(project_key, '/', 1) ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+    and btrim(split_part(project_key, '/', 2)) <> ''
+    and split_part(project_key, '/', 2) not in ('.', '..')
+    and position(chr(92) in split_part(project_key, '/', 2)) = 0
+    and split_part(project_key, '/', 2) !~ '[[:cntrl:]]'
   ),
   version_label text not null check (length(btrim(version_label)) between 1 and 64),
   title text not null check (length(btrim(title)) between 1 and 200),
@@ -66,6 +71,9 @@ on public.observatory_project_version_events for select
 to authenticated
 using (public.is_current_user_admin());
 
+alter table public.observatory_work_items
+  disable trigger observatory_work_items_set_updated_at;
+
 update public.observatory_work_items
 set project_ref = 'plato/dashboard'
 where project_key is null and btrim(project_ref) = 'Dashboard';
@@ -90,7 +98,13 @@ select distinct
   item.created_by,
   item.created_by
 from public.observatory_work_items item
-where coalesce(item.project_key, item.project_ref) ~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$'
+where length(coalesce(item.project_key, item.project_ref)) between 3 and 160
+  and array_length(string_to_array(coalesce(item.project_key, item.project_ref), '/'), 1) = 2
+  and split_part(coalesce(item.project_key, item.project_ref), '/', 1) ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+  and btrim(split_part(coalesce(item.project_key, item.project_ref), '/', 2)) <> ''
+  and split_part(coalesce(item.project_key, item.project_ref), '/', 2) not in ('.', '..')
+  and position(chr(92) in split_part(coalesce(item.project_key, item.project_ref), '/', 2)) = 0
+  and split_part(coalesce(item.project_key, item.project_ref), '/', 2) !~ '[[:cntrl:]]'
 on conflict do nothing;
 
 insert into public.observatory_project_version_events (
@@ -118,7 +132,7 @@ where version.project_key = coalesce(item.project_key, item.project_ref)
   and item.project_version_id is null;
 
 alter table public.observatory_work_items
-  alter column project_version_id set not null;
+  enable trigger observatory_work_items_set_updated_at;
 
 create or replace function public.validate_observatory_work_item_project_version()
 returns trigger
@@ -127,9 +141,10 @@ set search_path = pg_catalog
 as $$
 declare
   version_project_key text;
+  version_status text;
   item_project_key text := coalesce(new.project_key, new.project_ref);
 begin
-  select project_key into version_project_key
+  select project_key, status into version_project_key, version_status
   from public.observatory_project_versions
   where id = new.project_version_id;
   if version_project_key is null then
@@ -137,6 +152,9 @@ begin
   end if;
   if item_project_key is null or version_project_key <> item_project_key then
     raise exception 'OBSERVATORY_PROJECT_VERSION_MISMATCH' using errcode = '22023';
+  end if;
+  if version_status = 'archived' then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_ARCHIVED' using errcode = '22023';
   end if;
   return new;
 end;
@@ -173,7 +191,15 @@ begin
   if calling_user is null or not public.is_current_user_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
   end if;
-  if normalized_project_key !~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$' then
+  if not (
+    length(normalized_project_key) between 3 and 160
+    and array_length(string_to_array(normalized_project_key, '/'), 1) = 2
+    and split_part(normalized_project_key, '/', 1) ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+    and btrim(split_part(normalized_project_key, '/', 2)) <> ''
+    and split_part(normalized_project_key, '/', 2) not in ('.', '..')
+    and position(chr(92) in split_part(normalized_project_key, '/', 2)) = 0
+    and split_part(normalized_project_key, '/', 2) !~ '[[:cntrl:]]'
+  ) then
     raise exception 'OBSERVATORY_PROJECT_REQUIRED' using errcode = '22023';
   end if;
   if length(normalized_version_label) not between 1 and 64
@@ -220,7 +246,15 @@ begin
   end if;
   select project_key into invalid_key
   from unnest(coalesce(p_project_keys, array[]::text[])) project_key
-  where project_key !~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$'
+  where not (
+    length(project_key) between 3 and 160
+    and array_length(string_to_array(project_key, '/'), 1) = 2
+    and split_part(project_key, '/', 1) ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+    and btrim(split_part(project_key, '/', 2)) <> ''
+    and split_part(project_key, '/', 2) not in ('.', '..')
+    and position(chr(92) in split_part(project_key, '/', 2)) = 0
+    and split_part(project_key, '/', 2) !~ '[[:cntrl:]]'
+  )
   limit 1;
   if invalid_key is not null then
     raise exception 'OBSERVATORY_PROJECT_REQUIRED' using errcode = '22023';
@@ -238,15 +272,13 @@ begin
     from unnest(coalesce(p_project_keys, array[]::text[])) project_key
     on conflict do nothing
     returning *
-  ), audited as (
-    insert into public.observatory_project_version_events (
-      project_version_id, event_type, actor_id, data
-    )
-    select id, 'created', calling_user,
-      jsonb_build_object('reason', 'work-tracker-project-version-canonical-sync')
-    from inserted
   )
-  select 1;
+  insert into public.observatory_project_version_events (
+    project_version_id, event_type, actor_id, data
+  )
+  select id, 'created', calling_user,
+    jsonb_build_object('reason', 'work-tracker-project-version-canonical-sync')
+  from inserted;
 
   return query
   select version.*
@@ -430,7 +462,15 @@ begin
   if calling_user is null or not public.is_current_user_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
   end if;
-  if normalized_project_ref !~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$' then
+  if not (
+    length(normalized_project_ref) between 3 and 160
+    and array_length(string_to_array(normalized_project_ref, '/'), 1) = 2
+    and split_part(normalized_project_ref, '/', 1) ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+    and btrim(split_part(normalized_project_ref, '/', 2)) <> ''
+    and split_part(normalized_project_ref, '/', 2) not in ('.', '..')
+    and position(chr(92) in split_part(normalized_project_ref, '/', 2)) = 0
+    and split_part(normalized_project_ref, '/', 2) !~ '[[:cntrl:]]'
+  ) then
     raise exception 'OBSERVATORY_PROJECT_REQUIRED' using errcode = '22023';
   end if;
   if normalized_assigned_agent_id = 'shared'
@@ -446,6 +486,9 @@ begin
   end if;
   if selected_version.project_key <> normalized_project_ref then
     raise exception 'OBSERVATORY_PROJECT_VERSION_MISMATCH' using errcode = '22023';
+  end if;
+  if selected_version.status = 'archived' then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_ARCHIVED' using errcode = '22023';
   end if;
 
   insert into public.observatory_work_items (
@@ -606,6 +649,9 @@ begin
   if selected_version.project_key <> effective_project_key then
     raise exception 'OBSERVATORY_PROJECT_VERSION_MISMATCH' using errcode = '22023';
   end if;
+  if selected_version.status = 'archived' then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_ARCHIVED' using errcode = '22023';
+  end if;
 
   update public.observatory_work_items
   set type = btrim(p_type),
@@ -632,19 +678,39 @@ begin
     updated_item.id, 'updated', calling_user,
     jsonb_build_object(
       'before', jsonb_build_object(
-        'type', current_item.type, 'title', current_item.title,
+        'type', current_item.type,
+        'title', current_item.title,
+        'description', current_item.description,
+        'acceptance_criteria', current_item.acceptance_criteria,
+        'priority', current_item.priority,
+        'owner_id', current_item.owner_id,
         'project_ref', current_item.project_ref,
+        'milestone_ref', current_item.milestone_ref,
         'project_key', current_item.project_key,
+        'plan_revision', current_item.plan_revision,
+        'stage_id', current_item.stage_id,
+        'work_package_id', current_item.work_package_id,
         'project_version_id', current_item.project_version_id,
         'assigned_agent_id', current_item.assigned_agent_id,
+        'state', current_item.state,
         'version', current_item.version
       ),
       'after', jsonb_build_object(
-        'type', updated_item.type, 'title', updated_item.title,
+        'type', updated_item.type,
+        'title', updated_item.title,
+        'description', updated_item.description,
+        'acceptance_criteria', updated_item.acceptance_criteria,
+        'priority', updated_item.priority,
+        'owner_id', updated_item.owner_id,
         'project_ref', updated_item.project_ref,
+        'milestone_ref', updated_item.milestone_ref,
         'project_key', updated_item.project_key,
+        'plan_revision', updated_item.plan_revision,
+        'stage_id', updated_item.stage_id,
+        'work_package_id', updated_item.work_package_id,
         'project_version_id', updated_item.project_version_id,
         'assigned_agent_id', updated_item.assigned_agent_id,
+        'state', updated_item.state,
         'version', updated_item.version
       )
     )

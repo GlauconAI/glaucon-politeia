@@ -77,9 +77,10 @@ export default async function WorkItemPage({ params, searchParams = Promise.reso
     return unavailableState();
   }
 
-  const projects = overviewState.status === "ready"
-    ? buildWorkTrackerProjectOptions(overviewState.snapshot.registry)
-    : [];
+  if (overviewState.status !== "ready") {
+    return unavailableState();
+  }
+  const projects = buildWorkTrackerProjectOptions(overviewState.snapshot.registry);
   const value = (key: string) => {
     const entry = requestedContext[key];
     return Array.isArray(entry) ? entry[0] : entry;
@@ -105,13 +106,8 @@ export default async function WorkItemPage({ params, searchParams = Promise.reso
       projects={projects}
       versions={versions}
       backHref={buildWorkTrackerHref({ projectKey, projectVersionId, view })}
-      agentIds={
-        overviewState.status === "ready"
-          ? (overviewState.snapshot.agents ?? []).map((agent) => agent.id)
-          : []
-      }
+      agentIds={(overviewState.snapshot.agents ?? []).map((agent) => agent.id)}
       projectControls={
-        overviewState.status === "ready" &&
         "project_controls" in overviewState.snapshot
           ? overviewState.snapshot.project_controls
           : null

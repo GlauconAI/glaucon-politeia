@@ -205,4 +205,19 @@ describe("WorkTrackerPage", () => {
     );
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
   });
+
+  it("fails closed when the canonical Project registry is unavailable", async () => {
+    mocks.loadOverviewState.mockResolvedValue({
+      status: "error",
+      message: "private registry detail",
+    });
+
+    render(await WorkTrackerPage());
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /work tracker is temporarily unavailable/i,
+    );
+    expect(screen.queryByText(/private registry detail/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
+  });
 });

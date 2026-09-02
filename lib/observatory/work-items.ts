@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DERIVED_PROJECT_KEY_PATTERN } from "@/lib/observatory/schema";
 
 export const OBSERVATORY_WORK_ITEM_TYPES = [
   "idea",
@@ -56,8 +57,8 @@ const NullableReferenceSchema = QuickCaptureTextSchema.max(
 const ProjectReferenceSchema = QuickCaptureTextSchema.min(1).max(
   OBSERVATORY_GOVERNANCE_REF_MAX_LENGTH,
 );
-const NullableProjectKeySchema = QuickCaptureTextSchema.max(256)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/u)
+const NullableProjectKeySchema = QuickCaptureTextSchema.max(160)
+  .regex(DERIVED_PROJECT_KEY_PATTERN)
   .nullable();
 const NullableControlIdSchema = QuickCaptureTextSchema.max(128)
   .regex(/^[a-z0-9][a-z0-9._:-]{0,127}$/iu)

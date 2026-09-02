@@ -37,6 +37,16 @@ describe("Project Versions", () => {
     }).success).toBe(false);
   });
 
+  it("accepts canonical Project keys with spaces, underscores, and Unicode names", () => {
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "aristotle/LLM Wiki_第二版",
+      versionLabel: "v1",
+      title: "Knowledge release",
+      description: "",
+      targetDate: null,
+    }).success).toBe(true);
+  });
+
   it("requires optimistic concurrency for transitions", () => {
     expect(ProjectVersionTransitionInputSchema.safeParse({
       projectVersionId: "11111111-1111-4111-8111-111111111111",

@@ -238,7 +238,10 @@ export function WorkItemDetail({
     const nextBinding = allBindingOptions.find(
       (option) => option.key === nextBindingKey,
     );
-    if (nextBinding) setProjectRef(nextBinding.projectKey);
+    if (nextBinding) {
+      if (nextBinding.projectKey !== projectRef) setProjectVersionId("");
+      setProjectRef(nextBinding.projectKey);
+    }
   }
   const bindingStatus = currentBinding
     ? classifyProjectControlBinding(currentBinding, projectControls)
@@ -430,6 +433,7 @@ export function WorkItemDetail({
               onChange={(nextProjectRef) => {
                 setProjectRef(nextProjectRef);
                 setProjectVersionId("");
+                setBindingKey("");
               }}
               required
             />
