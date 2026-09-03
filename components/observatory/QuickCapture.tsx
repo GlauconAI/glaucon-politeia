@@ -43,6 +43,7 @@ export function QuickCapture({
   const [projectRef, setProjectRef] = useState("");
   const [assignedAgentId, setAssignedAgentId] = useState("");
   const [projectVersionId, setProjectVersionId] = useState("");
+  const [versionBindingKind, setVersionBindingKind] = useState<"required" | "optional">("optional");
   const [idempotencyKey, setIdempotencyKey] = useState(
     initialIdempotencyKey,
   );
@@ -71,6 +72,7 @@ export function QuickCapture({
   const typeError = fieldErrors?.type?.[0];
   const projectError = fieldErrors?.projectRef?.[0];
   const projectVersionError = fieldErrors?.projectVersionId?.[0];
+  const versionBindingKindError = fieldErrors?.versionBindingKind?.[0];
   const assignedAgentError = fieldErrors?.assignedAgentId?.[0];
   const idempotencyError = fieldErrors?.idempotencyKey?.[0];
 
@@ -138,6 +140,13 @@ export function QuickCapture({
             {projectVersionError ? (
               <p className="observatory-field-error">{projectVersionError}</p>
             ) : null}
+            <fieldset className="work-tracker-version-binding" aria-describedby={versionBindingKindError ? "capture-version-binding-help capture-version-binding-error" : "capture-version-binding-help"}>
+              <legend>Version scope</legend>
+              <label><input aria-describedby="capture-version-binding-help" type="radio" name="versionBindingKind" value="required" checked={versionBindingKind === "required"} onChange={() => setVersionBindingKind("required")} /><span>Required version scope</span></label>
+              <label><input aria-describedby="capture-version-binding-help" type="radio" name="versionBindingKind" value="optional" checked={versionBindingKind === "optional"} onChange={() => setVersionBindingKind("optional")} /><span>Optional version scope</span></label>
+              <small id="capture-version-binding-help">Required scope must be accepted before release. This binding does not authorize execution.</small>
+              {versionBindingKindError ? <p id="capture-version-binding-error" className="observatory-field-error">{versionBindingKindError}</p> : null}
+            </fieldset>
             <label
               className="observatory-field"
               htmlFor="observatory-capture-assigned-agent"

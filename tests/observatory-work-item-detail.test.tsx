@@ -26,6 +26,7 @@ const item: ObservatoryWorkItemRow = {
   milestone_ref: "OBS-M3",
   project_key: null,
   project_version_id: "33333333-3333-4333-8333-333333333333",
+  version_binding_kind: "required",
   plan_revision: null,
   stage_id: null,
   work_package_id: null,
@@ -197,6 +198,8 @@ describe("WorkItemDetail", () => {
     expect(screen.getByRole("complementary", { name: /item properties/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^activity$/i })).toBeInTheDocument();
     expect(screen.getByText(/ready gate requires/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Required version scope")).toBeChecked();
+    expect(screen.getByText(/does not grant execution authority/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /move to inbox/i }),
     ).toBeInTheDocument();
@@ -206,6 +209,43 @@ describe("WorkItemDetail", () => {
     expect(
       screen.queryByRole("button", { name: /move to done/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("submits optional Product Version binding and defaults missing legacy kind safely", async () => {
+    const updateAction = vi.fn().mockResolvedValue({ status: "success", version: 4 });
+    const { unmount } = render(
+      <WorkItemDetail
+        item={item}
+        evidence={[]}
+        events={events}
+        projects={projects}
+        currentAdmin={{ user_id: item.created_by, display_name: "Glaucon", username: "glaucon" }}
+        updateAction={updateAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Optional version scope"));
+    fireEvent.submit(screen.getByRole("button", { name: /save fields/i }).closest("form")!);
+    await waitFor(() => expect(updateAction).toHaveBeenCalledTimes(1));
+    expect((updateAction.mock.calls[0][1] as FormData).get("versionBindingKind")).toBe("optional");
+
+    unmount();
+    render(
+      <WorkItemDetail
+        item={{ ...item, version_binding_kind: undefined }}
+        evidence={[]}
+        events={events}
+        projects={projects}
+        currentAdmin={{ user_id: item.created_by, display_name: "Glaucon", username: "glaucon" }}
+        updateAction={updateAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+    expect(screen.getByLabelText("Optional version scope")).toBeChecked();
   });
 
   it("renders Item dates in the operator timezone regardless of server timezone", () => {

@@ -111,6 +111,9 @@ describe("QuickCapture", () => {
     expect(assignedAgent).toHaveValue("amou");
     const projectVersion = screen.getByLabelText("Project Version");
     fireEvent.change(projectVersion, { target: { value: versions[1].id } });
+    const bindingKind = screen.getByLabelText("Required version scope");
+    expect(bindingKind).toHaveAccessibleDescription(/does not authorize execution/i);
+    fireEvent.click(bindingKind);
     fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "补充问芽训练样本" },
     });
@@ -126,9 +129,17 @@ describe("QuickCapture", () => {
       "amou",
     );
     expect((action.mock.calls[0][1] as FormData).get("projectVersionId")).toBe(versions[1].id);
+    expect((action.mock.calls[0][1] as FormData).get("versionBindingKind")).toBe("required");
     expect(project).toHaveValue("amou/wenya-ai");
     fireEvent.change(project, { target: { value: "plato/dashboard" } });
     expect(projectVersion).toHaveValue("");
+  });
+
+  it("defaults legacy-compatible Product Version binding to optional", () => {
+    render(<QuickCapture projects={projects} versions={versions} agentIds={agentIds} initialIdempotencyKey="observatory-capture-12121212-1212-4212-8212-121212121212" initialState={{ status: "error", fieldErrors: { versionBindingKind: ["Choose required or optional version scope."] } }} />);
+    expect(screen.getByLabelText("Optional version scope")).toBeChecked();
+    expect(screen.getByLabelText("Required version scope")).not.toBeChecked();
+    expect(screen.getByText("Choose required or optional version scope.")).toBeInTheDocument();
   });
 
   it("requires an explicit Agent for a Shared Project instead of assigning shared", () => {

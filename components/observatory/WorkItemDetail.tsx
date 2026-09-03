@@ -205,6 +205,7 @@ export function WorkItemDetail({
     resolveWorkItemProject(item, projects)?.projectKey ?? "",
   );
   const [projectVersionId, setProjectVersionId] = useState(item.project_version_id ?? "");
+  const [versionBindingKind, setVersionBindingKind] = useState<"required" | "optional">(item.version_binding_kind ?? "optional");
   const bindingOptions = projectControls?.projects.flatMap((project) =>
     project.work_packages.map((workPackage) => {
       const stage = project.stages.find((candidate) => candidate.stage_id === workPackage.stage_id);
@@ -446,6 +447,12 @@ export function WorkItemDetail({
             onChange={setProjectVersionId}
             required
           />
+          <fieldset className="work-tracker-version-binding" aria-describedby="detail-version-binding-help">
+            <legend>Version scope</legend>
+            <label><input aria-describedby="detail-version-binding-help" type="radio" name="versionBindingKind" value="required" checked={versionBindingKind === "required"} onChange={() => setVersionBindingKind("required")} /><span>Required version scope</span></label>
+            <label><input aria-describedby="detail-version-binding-help" type="radio" name="versionBindingKind" value="optional" checked={versionBindingKind === "optional"} onChange={() => setVersionBindingKind("optional")} /><span>Optional version scope</span></label>
+            <small id="detail-version-binding-help">Required scope contributes to the Product Version Release Gate. Version binding does not grant execution authority.</small>
+          </fieldset>
           <label>
             <span>Milestone reference</span>
             <input

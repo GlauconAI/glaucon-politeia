@@ -369,6 +369,11 @@ export function WorkTrackerBoard({
               })}
             </span>
           ) : null}
+          {projectVersion ? (
+            <span className={`work-tracker-binding-badge work-tracker-binding-${item.version_binding_kind ?? "optional"}`}>
+              {item.version_binding_kind === "required" ? "Required scope" : "Optional scope"}
+            </span>
+          ) : null}
           <span className="work-tracker-claim-badge">{claimLabel}</span>
         </div>
       </li>

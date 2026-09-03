@@ -47,7 +47,7 @@ export function ProjectVersionPicker({
         ) : null}
         {available.map((version) => (
           <option key={version.id} value={version.id}>
-            {version.is_backlog ? "待规划" : version.version_label} · {PROJECT_VERSION_STATUS_LABELS[version.status]}
+            {version.is_backlog ? "待规划" : version.semver ?? version.version_label} · {PROJECT_VERSION_STATUS_LABELS[version.status]}{version.is_release_target ? " · Release target" : ""}
           </option>
         ))}
       </select>

@@ -49,4 +49,19 @@ describe("ProjectVersionPicker", () => {
     expect(values).not.toContain("");
     expect(values).toContain(versions[3].id);
   });
+
+  it("uses formal SemVer and marks the release target while preserving legacy labels", () => {
+    render(<ProjectVersionPicker
+      id="version-contract"
+      versions={[
+        { ...versions[1], semver: "1.0.0", is_release_target: true },
+        { ...versions[0], semver: null },
+      ]}
+      projectKey="plato/dashboard"
+      value=""
+      onChange={() => undefined}
+    />);
+    expect(screen.getByRole("option", { name: "1.0.0 · 进行中 · Release target" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "待规划 · 计划中" })).toBeInTheDocument();
+  });
 });

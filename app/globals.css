@@ -126,6 +126,7 @@
 .work-tracker-priority-badge,
 .work-tracker-assignee-badge,
 .work-tracker-claim-badge,
+.work-tracker-binding-badge,
 .work-tracker-version-badge {
   display: inline-flex;
   min-height: 20px;
@@ -139,8 +140,10 @@
 
 .work-tracker-version-planned { background: #f8fafc; color: #475569; }
 .work-tracker-version-active { background: #dcfce7; color: #166534; border-color: #86efac; }
+.work-tracker-version-gate_ready { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
 .work-tracker-version-released { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
 .work-tracker-version-archived { background: #f3f4f6; color: #6b7280; }
+.work-tracker-version-cancelled { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
 
 .work-tracker-type-badge {
   font-weight: 800;
@@ -504,13 +507,40 @@
 .project-version-manager-panel label,
 .project-version-manager-form { display: grid; gap: 6px; }
 .project-version-manager-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.project-version-manager-form label:last-of-type,
+.project-version-wide-field,
 .project-version-manager-form button { grid-column: 1 / -1; }
-.project-version-manager-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.project-version-manager-row { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
-.project-version-manager-row > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.project-version-manager-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.project-version-manager-row { display: grid; gap: 8px; border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 10px; }
+.project-version-manager-row-active { border-left-color: #22c55e; }
+.project-version-manager-row-gate_ready { border-left-color: #f97316; }
+.project-version-manager-row-released { border-left-color: #3b82f6; }
+.project-version-manager-row-cancelled { border-left-color: #ef4444; }
+.project-version-roadmap-summary { display: grid; gap: 7px; }
+.project-version-roadmap-summary p { margin: 0; }
+.project-version-roadmap-heading { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.project-version-status,
+.project-version-release-target { border: 1px solid var(--border); border-radius: 999px; padding: 2px 6px; font-size: 10px; }
+.project-version-release-target { border-color: #f59e0b; background: #fffbeb; color: #92400e; font-weight: 700; }
+.project-version-roadmap-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 0; font-size: 11px; }
+.project-version-roadmap-meta div { min-width: 0; }
+.project-version-roadmap-meta dt { color: var(--muted); }
+.project-version-roadmap-meta dd { overflow-wrap: anywhere; margin: 1px 0 0; }
+.project-version-gate-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; border-radius: 7px; background: var(--panel-soft); padding: 7px 8px; font-size: 11px; }
+.project-version-gate-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; border: 1px solid var(--border); border-radius: 8px; padding: 9px; }
+.project-version-checkbox { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
+.project-version-checkbox input { width: auto; }
+.project-version-authority-note { margin: 0; color: var(--muted); font-size: 11px; }
 .project-version-manager-row small { width: 100%; color: var(--muted); }
 .project-version-transition-form { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.work-tracker-version-binding { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; border: 1px solid var(--border); border-radius: 8px; padding: 9px; }
+.work-tracker-version-binding legend { padding: 0 4px; color: var(--muted); font-size: 11px; }
+.work-tracker-version-binding label { display: flex; align-items: center; gap: 5px; }
+.work-tracker-version-binding input { width: auto; }
+.work-tracker-version-binding small { grid-column: 1 / -1; color: var(--muted); }
+.work-tracker-version-binding .observatory-field-error { grid-column: 1 / -1; }
+.work-tracker-binding-required { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+.work-tracker-binding-optional { color: var(--muted); }
 
 .work-tracker-capture-trigger {
   min-height: 36px;
