@@ -44,6 +44,7 @@ const item: ObservatoryWorkItemRow = {
   milestone_ref: "OBS-M3",
   project_key: null,
   project_version_id: "33333333-3333-4333-8333-333333333333",
+  version_binding_kind: "required",
   plan_revision: null,
   stage_id: null,
   work_package_id: null,
@@ -163,6 +164,7 @@ describe("WorkTrackerBoard", () => {
       />,
     );
     expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("V1")).toBeInTheDocument();
+    expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("Required scope")).toBeInTheDocument();
     expect(within(screen.getByTestId(`work-item-${backlogItem.id}`)).getByText("待")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Project Version" }), {
       target: { value: versions[0].id },

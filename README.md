@@ -167,6 +167,22 @@ npm run observatory:pilot-local
 supabase stop --no-backup
 ```
 
+After the Project Version contract migration is applied to the disposable
+Supabase CLI database, its release/state lock protocol has an explicit
+two-connection exercise:
+
+```bash
+npm run observatory:project-version-contract-v1 -- \
+  --mode concurrency --confirm-local-concurrency
+```
+
+Set `OBSERVATORY_LOCAL_DB_URL` through the local host environment before
+running the command; do not place database credentials in shell history. This
+mode rejects every non-loopback/non-CLI target, uses bounded lock and
+statement timeouts, commits only a uniquely named fixture Work Item state
+change, rolls the release transaction back, and removes the event-free fixture
+rows. It is opt-in and must never be run against Production.
+
 The core verifier requires 32 passing checks. The Agent Claim verifier adds
 42 checks for exact grants/RLS, principals, eligibility, idempotency,
 concurrency, leases, recovery, completion, human approval, evidence, and

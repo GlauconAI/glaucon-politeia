@@ -9,6 +9,7 @@ import {
   OBSERVATORY_QUICK_CAPTURE_TITLE_MAX_LENGTH,
   OBSERVATORY_WORK_ITEM_STATES,
   OBSERVATORY_WORK_ITEM_TYPES,
+  OBSERVATORY_VERSION_BINDING_KINDS,
   ObservatoryEvidenceInputSchema,
   ObservatoryQuickCaptureInputSchema,
   ObservatoryWorkItemTransitionInputSchema,
@@ -25,6 +26,7 @@ function validQuickCapture() {
     state: "inbox",
     projectRef: "plato/dashboard",
     projectVersionId: "33333333-3333-4333-8333-333333333333",
+    versionBindingKind: "required",
     assignedAgentId: "plato",
     idempotencyKey: "capture-20260721-0001",
   } as const;
@@ -80,6 +82,31 @@ describe("Observatory Quick Capture validation", () => {
       "high",
       "urgent",
     ]);
+    expect(OBSERVATORY_VERSION_BINDING_KINDS).toEqual([
+      "required",
+      "optional",
+    ]);
+  });
+
+  it.each(OBSERVATORY_VERSION_BINDING_KINDS)(
+    "accepts a %s Product Version binding",
+    (versionBindingKind) => {
+      expect(
+        ObservatoryQuickCaptureInputSchema.safeParse({
+          ...validQuickCapture(),
+          versionBindingKind,
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("rejects an unsupported Product Version binding kind", () => {
+    expect(
+      ObservatoryQuickCaptureInputSchema.safeParse({
+        ...validQuickCapture(),
+        versionBindingKind: "automatic",
+      }).success,
+    ).toBe(false);
   });
 
   it.each(OBSERVATORY_WORK_ITEM_TYPES)("accepts the %s capture type", (type) => {
@@ -97,6 +124,7 @@ describe("Observatory Quick Capture validation", () => {
       title: "  A bounded title  ",
       projectRef: "  plato/dashboard  ",
       projectVersionId: "33333333-3333-4333-8333-333333333333",
+      versionBindingKind: "required",
       assignedAgentId: "  plato  ",
       idempotencyKey: "  capture-0002  ",
     });
@@ -249,6 +277,7 @@ describe("Work Tracker workflow contract", () => {
       assignedAgentId: "plato",
       projectRef: "asgard/archaea-gacha-game",
       projectVersionId: "33333333-3333-4333-8333-333333333333",
+      versionBindingKind: "optional",
       milestoneRef: "OBS-M3",
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,

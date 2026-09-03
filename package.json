@@ -43,6 +43,8 @@
     "observatory:retention": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/retention.ts",
     "observatory:mark-release": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/mark-release.ts",
     "observatory:project-versions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/apply-project-version-migration.ts",
+    "observatory:project-version-contract-v1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-project-version-contract-v1.ts",
+    "observatory:project-version-contract-v1:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-project-version-contract-v1.ts",
     "observatory:verify-snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-snapshot.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "observatory:verify-local-claims": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-agent-claim-db.ts",

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   removeWorkItemEvidence: vi.fn(),
   configureAgentClaimPolicy: vi.fn(),
   cancelAgentClaim: vi.fn(),
+  getWorkItem: vi.fn(),
   getProjectVersion: vi.fn(),
   createProjectVersion: vi.fn(),
   updateProjectVersion: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("@/lib/observatory/repository", async (importOriginal) => {
       removeWorkItemEvidence: mocks.removeWorkItemEvidence,
       configureAgentClaimPolicy: mocks.configureAgentClaimPolicy,
       cancelAgentClaim: mocks.cancelAgentClaim,
+      getWorkItem: mocks.getWorkItem,
       getProjectVersion: mocks.getProjectVersion,
       createProjectVersion: mocks.createProjectVersion,
       updateProjectVersion: mocks.updateProjectVersion,
@@ -86,6 +88,7 @@ function validFormData() {
   formData.set("description", "  Make freshness explicit.  ");
   formData.set("projectRef", "plato/dashboard");
   formData.set("projectVersionId", projectVersionId);
+  formData.set("versionBindingKind", "required");
   formData.set("assignedAgentId", "plato");
   formData.set("idempotencyKey", "capture-20260721-1");
   return formData;
@@ -201,6 +204,7 @@ describe("captureObservatoryWorkItemAction", () => {
       description: "Make freshness explicit.",
       projectRef: "plato/dashboard",
       projectVersionId,
+      versionBindingKind: "required",
       assignedAgentId: "plato",
       state: "inbox",
       idempotencyKey: "capture-20260721-1",
@@ -256,6 +260,27 @@ describe("captureObservatoryWorkItemAction", () => {
     });
     expect(mocks.createQuickCapture).not.toHaveBeenCalled();
   });
+
+  it.each(["released", "archived", "cancelled"])(
+    "rejects a %s version during capture",
+    async (status) => {
+      mocks.getProjectVersion.mockResolvedValueOnce({
+        id: projectVersionId,
+        project_key: "plato/dashboard",
+        status,
+      });
+
+      await expect(
+        captureObservatoryWorkItemAction(initialState, validFormData()),
+      ).resolves.toEqual({
+        status: "error",
+        fieldErrors: {
+          projectVersionId: ["Choose an available Project Version."],
+        },
+      });
+      expect(mocks.createQuickCapture).not.toHaveBeenCalled();
+    },
+  );
 
   it("fails closed when the canonical Project registry is unavailable", async () => {
     mocks.loadOverviewState.mockResolvedValue({ status: "empty" });
@@ -326,6 +351,25 @@ describe("captureObservatoryWorkItemAction", () => {
       formError: "That Project Version was archived. Refresh and choose another version.",
     });
   });
+
+  it.each([
+    {
+      code: "PROJECT_VERSION_BINDING_CLOSED" as const,
+      expected: "That Project Version no longer accepts Work Item bindings. Refresh and choose another version.",
+    },
+    {
+      code: "VERSION_BINDING_KIND_INVALID" as const,
+      expected: "Choose whether the Product Version binding is required or optional.",
+    },
+  ])("returns a stable capture error for $code", async ({ code, expected }) => {
+    mocks.createQuickCapture.mockRejectedValue(
+      new ObservatoryRepositoryError(code, "private database detail"),
+    );
+
+    await expect(
+      captureObservatoryWorkItemAction(initialState, validFormData()),
+    ).resolves.toEqual({ status: "error", formError: expected });
+  });
 });
 
 describe("Project Version actions", () => {
@@ -361,7 +405,7 @@ describe("Project Version actions", () => {
   it("rejects a version for a Project outside the canonical registry", async () => {
     const formData = new FormData();
     formData.set("projectKey", "plato/unknown");
-    formData.set("versionLabel", "v1.0");
+    formData.set("versionLabel", "1.0.0");
     formData.set("title", "Unknown release");
     formData.set("description", "");
     formData.set("targetDate", "");
@@ -381,20 +425,45 @@ describe("Project Version actions", () => {
     mocks.createProjectVersion.mockResolvedValue({ row_version: 1 });
     const formData = new FormData();
     formData.set("projectKey", " plato/dashboard ");
-    formData.set("versionLabel", " v1.0 ");
+    formData.set("versionLabel", " 1.0.0 ");
     formData.set("title", " First release ");
     formData.set("description", " Stable versioning. ");
     formData.set("targetDate", "2026-09-30");
+    formData.set("isReleaseTarget", "on");
+    formData.set("milestoneRef", " OBS-M1 ");
+    formData.set("roadmapRef", " docs/product-version-roadmap.md ");
+    formData.set("approvedPlanRef", " plans/revision-3.md ");
+    formData.set("acceptanceSummary", " Release contract accepted. ");
+    formData.set("dependenciesSummary", " Database contract v1. ");
+    formData.set("dependenciesSatisfied", "on");
+    formData.set("artifactsAccepted", "on");
+    formData.set("verificationComplete", "on");
+    formData.set("roadmapReconciled", "on");
+    formData.set("userGateDecisionRef", " decision:user-gate-1 ");
 
     await expect(
       createObservatoryProjectVersionAction({ status: "idle" }, formData),
     ).resolves.toEqual({ status: "success", version: 1 });
     expect(mocks.createProjectVersion).toHaveBeenCalledWith({
       projectKey: "plato/dashboard",
-      versionLabel: "v1.0",
+      versionLabel: "1.0.0",
       title: "First release",
       description: "Stable versioning.",
       targetDate: "2026-09-30",
+      semver: "1.0.0",
+      isReleaseTarget: true,
+      milestoneRef: "OBS-M1",
+      predecessorVersionId: null,
+      roadmapRef: "docs/product-version-roadmap.md",
+      approvedPlanRef: "plans/revision-3.md",
+      acceptanceSummary: "Release contract accepted.",
+      actualDate: null,
+      dependenciesSummary: "Database contract v1.",
+      dependenciesSatisfied: true,
+      artifactsAccepted: true,
+      verificationComplete: true,
+      roadmapReconciled: true,
+      userGateDecisionRef: "decision:user-gate-1",
     });
   });
 
@@ -405,6 +474,7 @@ describe("Project Version actions", () => {
     updateData.set("projectVersionId", projectVersionId);
     updateData.set("expectedVersion", "2");
     updateData.set("versionLabel", "v1.0");
+    updateData.set("semver", "1.0.0");
     updateData.set("title", "Release");
     updateData.set("description", "");
     updateData.set("targetDate", "");
@@ -421,6 +491,33 @@ describe("Project Version actions", () => {
     ).resolves.toEqual({ status: "success", version: 4 });
   });
 
+  it.each([
+    {
+      code: "PROJECT_VERSION_EXECUTION_CONFLICT" as const,
+      expected: "This Project already has an active or gate-ready version.",
+    },
+    {
+      code: "PROJECT_VERSION_RELEASE_GATE_INCOMPLETE" as const,
+      expected: "Complete required Work Items and every release Gate check before release.",
+    },
+    {
+      code: "PROJECT_VERSION_IMMUTABLE" as const,
+      expected: "Released and archived Project Versions cannot be edited.",
+    },
+  ])("returns a stable version action error for $code", async ({ code, expected }) => {
+    mocks.transitionProjectVersion.mockRejectedValue(
+      new ObservatoryRepositoryError(code, "private database detail"),
+    );
+    const formData = new FormData();
+    formData.set("projectVersionId", projectVersionId);
+    formData.set("expectedVersion", "3");
+    formData.set("targetStatus", "released");
+
+    await expect(
+      transitionObservatoryProjectVersionAction({ status: "idle" }, formData),
+    ).resolves.toEqual({ status: "error", formError: expected });
+  });
+
   it("reports a committed version mutation as successful when cache revalidation fails", async () => {
     mocks.createProjectVersion.mockResolvedValue({ row_version: 1 });
     mocks.revalidatePath.mockImplementation(() => {
@@ -428,7 +525,7 @@ describe("Project Version actions", () => {
     });
     const formData = new FormData();
     formData.set("projectKey", "plato/dashboard");
-    formData.set("versionLabel", "v1.1");
+    formData.set("versionLabel", "1.1.0");
     formData.set("title", "Second release");
     formData.set("description", "");
     formData.set("targetDate", "");
@@ -444,6 +541,28 @@ describe("Work Tracker mutation actions", () => {
   const workItemId = "11111111-1111-4111-8111-111111111111";
   const ownerId = "22222222-2222-4222-8222-222222222222";
 
+  function updateFormData(versionId = projectVersionId) {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("type", "feature");
+    formData.set("title", "Manual board");
+    formData.set("description", "Admin only.");
+    formData.set("acceptanceCriteria", "Reaches Done.");
+    formData.set("priority", "high");
+    formData.set("ownerId", ownerId);
+    formData.set("assignedAgentId", "plato");
+    formData.set("projectRef", "plato/dashboard");
+    formData.set("projectVersionId", versionId);
+    formData.set("versionBindingKind", "required");
+    formData.set("milestoneRef", "");
+    formData.set("projectKey", "plato/dashboard");
+    formData.set("planRevision", "3");
+    formData.set("stageId", "stage-05b");
+    formData.set("workPackageId", "wp-05b-coordinate-slice");
+    return formData;
+  }
+
   beforeEach(() => {
     mocks.currentAdmin = { user_id: ownerId };
     mocks.authError = null;
@@ -454,6 +573,11 @@ describe("Work Tracker mutation actions", () => {
     mocks.removeWorkItemEvidence.mockReset();
     mocks.configureAgentClaimPolicy.mockReset();
     mocks.cancelAgentClaim.mockReset();
+    mocks.getWorkItem.mockReset();
+    mocks.getWorkItem.mockResolvedValue({
+      id: workItemId,
+      project_version_id: projectVersionId,
+    });
     mocks.getProjectVersion.mockReset();
     mocks.getProjectVersion.mockResolvedValue({
       id: projectVersionId,
@@ -526,6 +650,7 @@ describe("Work Tracker mutation actions", () => {
     formData.set("assignedAgentId", "  plato  ");
     formData.set("projectRef", "  plato/dashboard  ");
     formData.set("projectVersionId", projectVersionId);
+    formData.set("versionBindingKind", "required");
     formData.set("milestoneRef", "");
     formData.set("projectKey", "plato/dashboard");
     formData.set("planRevision", "3");
@@ -547,6 +672,7 @@ describe("Work Tracker mutation actions", () => {
       assignedAgentId: "plato",
       projectRef: "plato/dashboard",
       projectVersionId,
+      versionBindingKind: "required",
       milestoneRef: null,
       projectKey: "plato/dashboard",
       planRevision: 3,
@@ -557,6 +683,43 @@ describe("Work Tracker mutation actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
       `/work-tracker/items/${workItemId}`,
     );
+  });
+
+  it("allows an unrelated edit that preserves a historical terminal binding", async () => {
+    mocks.getProjectVersion.mockResolvedValue({
+      id: projectVersionId,
+      project_key: "plato/dashboard",
+      status: "released",
+    });
+
+    await expect(
+      updateObservatoryWorkItemAction({ status: "idle" }, updateFormData()),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.getWorkItem).toHaveBeenCalledWith(workItemId);
+    expect(mocks.updateWorkItem).toHaveBeenCalledOnce();
+  });
+
+  it("rejects rebinding a Work Item to a terminal Project Version", async () => {
+    const terminalVersionId = "44444444-4444-4444-8444-444444444444";
+    mocks.getProjectVersion.mockResolvedValue({
+      id: terminalVersionId,
+      project_key: "plato/dashboard",
+      status: "cancelled",
+    });
+
+    await expect(
+      updateObservatoryWorkItemAction(
+        { status: "idle" },
+        updateFormData(terminalVersionId),
+      ),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        projectVersionId: ["Choose an available Project Version."],
+      },
+    });
+    expect(mocks.getWorkItem).toHaveBeenCalledWith(workItemId);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
   });
 
   it("rejects a detail edit with a non-canonical Project", async () => {

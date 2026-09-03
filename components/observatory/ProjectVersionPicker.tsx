@@ -22,8 +22,9 @@ export function ProjectVersionPicker({
   required = false,
   allowAll = false,
 }: ProjectVersionPickerProps) {
+  const closedBindingStatuses = new Set(["released", "archived", "cancelled"]);
   const available = versions.filter(
-    (version) => version.project_key === projectKey && (allowAll || version.status !== "archived"),
+    (version) => version.project_key === projectKey && (allowAll || !closedBindingStatuses.has(version.status)),
   );
   const selectedAvailable = available.some((version) => version.id === value);
   return (
@@ -47,7 +48,7 @@ export function ProjectVersionPicker({
         ) : null}
         {available.map((version) => (
           <option key={version.id} value={version.id}>
-            {version.is_backlog ? "待规划" : version.version_label} · {PROJECT_VERSION_STATUS_LABELS[version.status]}
+            {version.is_backlog ? "待规划" : version.semver ?? version.version_label} · {PROJECT_VERSION_STATUS_LABELS[version.status]}{version.is_release_target ? " · Release target" : ""}
           </option>
         ))}
       </select>

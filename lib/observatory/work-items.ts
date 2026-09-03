@@ -23,6 +23,10 @@ export const OBSERVATORY_WORK_ITEM_PRIORITIES = [
   "high",
   "urgent",
 ] as const;
+export const OBSERVATORY_VERSION_BINDING_KINDS = [
+  "required",
+  "optional",
+] as const;
 
 export const OBSERVATORY_QUICK_CAPTURE_TITLE_MAX_LENGTH = 200;
 export const OBSERVATORY_QUICK_CAPTURE_DESCRIPTION_MAX_LENGTH = 4_000;
@@ -74,6 +78,7 @@ export const ObservatoryQuickCaptureInputSchema = z.strictObject({
   ).default(""),
   projectRef: ProjectReferenceSchema,
   projectVersionId: z.uuid(),
+  versionBindingKind: z.enum(OBSERVATORY_VERSION_BINDING_KINDS).default("optional"),
   assignedAgentId: AssignedAgentIdSchema,
   state: z.literal("inbox").default("inbox"),
   idempotencyKey: QuickCaptureTextSchema.min(1)
@@ -90,6 +95,8 @@ export type ObservatoryWorkItemState =
   (typeof OBSERVATORY_WORK_ITEM_STATES)[number];
 export type ObservatoryWorkItemPriority =
   (typeof OBSERVATORY_WORK_ITEM_PRIORITIES)[number];
+export type ObservatoryVersionBindingKind =
+  (typeof OBSERVATORY_VERSION_BINDING_KINDS)[number];
 
 export const OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS = [
   {
@@ -193,6 +200,7 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   assignedAgentId: AssignedAgentIdSchema,
   projectRef: ProjectReferenceSchema,
   projectVersionId: z.uuid(),
+  versionBindingKind: z.enum(OBSERVATORY_VERSION_BINDING_KINDS).default("optional"),
   milestoneRef: NullableReferenceSchema,
   projectKey: NullableProjectKeySchema,
   planRevision: z.number().int().nonnegative().nullable(),

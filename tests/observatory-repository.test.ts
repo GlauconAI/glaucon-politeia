@@ -277,17 +277,45 @@ describe("Project Version repository", () => {
     const repository = createObservatoryRepository(boundary.client);
     await expect(repository.createProjectVersion({
       projectKey: "plato/dashboard",
-      versionLabel: "v1.0",
+      versionLabel: "1.0.0",
       title: "First release",
       description: "Version management",
       targetDate: "2026-09-30",
+      semver: "1.0.0",
+      isReleaseTarget: true,
+      milestoneRef: "OBS-M1",
+      predecessorVersionId: null,
+      roadmapRef: "docs/product-version-roadmap.md",
+      approvedPlanRef: "plans/revision-3.md",
+      acceptanceSummary: "Release contract accepted.",
+      actualDate: null,
+      dependenciesSummary: "Database contract v1.",
+      dependenciesSatisfied: true,
+      artifactsAccepted: true,
+      verificationComplete: true,
+      roadmapReconciled: true,
+      userGateDecisionRef: "decision:user-gate-1",
     })).resolves.toEqual(version);
     expect(boundary.rpc).toHaveBeenCalledWith("create_observatory_project_version", {
       p_project_key: "plato/dashboard",
-      p_version_label: "v1.0",
+      p_version_label: "1.0.0",
+      p_semver: "1.0.0",
       p_title: "First release",
       p_description: "Version management",
       p_target_date: "2026-09-30",
+      p_is_release_target: true,
+      p_milestone_ref: "OBS-M1",
+      p_predecessor_version_id: null,
+      p_roadmap_ref: "docs/product-version-roadmap.md",
+      p_approved_plan_ref: "plans/revision-3.md",
+      p_acceptance_summary: "Release contract accepted.",
+      p_actual_date: null,
+      p_dependencies_summary: "Database contract v1.",
+      p_dependencies_satisfied: true,
+      p_artifacts_accepted: true,
+      p_verification_complete: true,
+      p_roadmap_reconciled: true,
+      p_user_gate_decision_ref: "decision:user-gate-1",
     });
   });
 
@@ -301,6 +329,58 @@ describe("Project Version repository", () => {
     });
   });
 
+  it("updates every mutable roadmap and release Gate field through one RPC", async () => {
+    const version = { id: "33333333-3333-4333-8333-333333333333", row_version: 3 };
+    const boundary = repositoryClient({ rpcData: version });
+    const repository = createObservatoryRepository(boundary.client);
+    const input = {
+      projectVersionId: version.id,
+      expectedVersion: 2,
+      versionLabel: "1.1.0",
+      semver: "1.1.0",
+      title: "Second release",
+      description: "Roadmap increment",
+      targetDate: "2026-10-31",
+      actualDate: null,
+      isReleaseTarget: true,
+      milestoneRef: "OBS-M2",
+      predecessorVersionId: "22222222-2222-4222-8222-222222222222",
+      roadmapRef: "docs/product-version-roadmap.md",
+      approvedPlanRef: "plans/revision-4.md",
+      acceptanceSummary: "Acceptance is explicit.",
+      dependenciesSummary: "Version 1.0.0.",
+      dependenciesSatisfied: true,
+      artifactsAccepted: true,
+      verificationComplete: true,
+      roadmapReconciled: true,
+      userGateDecisionRef: "decision:user-gate-2",
+    } as const;
+
+    await expect(repository.updateProjectVersion(input)).resolves.toEqual(version);
+    expect(boundary.rpc).toHaveBeenCalledWith("update_observatory_project_version", {
+      p_project_version_id: version.id,
+      p_expected_version: 2,
+      p_version_label: "1.1.0",
+      p_semver: "1.1.0",
+      p_title: "Second release",
+      p_description: "Roadmap increment",
+      p_target_date: "2026-10-31",
+      p_actual_date: null,
+      p_is_release_target: true,
+      p_milestone_ref: "OBS-M2",
+      p_predecessor_version_id: "22222222-2222-4222-8222-222222222222",
+      p_roadmap_ref: "docs/product-version-roadmap.md",
+      p_approved_plan_ref: "plans/revision-4.md",
+      p_acceptance_summary: "Acceptance is explicit.",
+      p_dependencies_summary: "Version 1.0.0.",
+      p_dependencies_satisfied: true,
+      p_artifacts_accepted: true,
+      p_verification_complete: true,
+      p_roadmap_reconciled: true,
+      p_user_gate_decision_ref: "decision:user-gate-2",
+    });
+  });
+
   it.each([
     {
       error: { code: "40001", message: "OBSERVATORY_PROJECT_VERSION_CONFLICT" },
@@ -309,6 +389,50 @@ describe("Project Version repository", () => {
     {
       error: { code: "P0002", message: "OBSERVATORY_PROJECT_VERSION_NOT_FOUND" },
       expectedCode: "PROJECT_VERSION_NOT_FOUND",
+    },
+    {
+      error: { code: "22023", message: "OBSERVATORY_PROJECT_VERSION_SEMVER_INVALID" },
+      expectedCode: "PROJECT_VERSION_SEMVER_INVALID",
+    },
+    {
+      error: { code: "23505", message: "OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE" },
+      expectedCode: "PROJECT_VERSION_DUPLICATE",
+    },
+    {
+      error: { code: "23505", message: "duplicate key violates unique constraint observatory_project_versions_semver_idx" },
+      expectedCode: "PROJECT_VERSION_DUPLICATE",
+    },
+    {
+      error: { code: "23505", message: "duplicate key violates unique constraint observatory_project_versions_one_execution_idx" },
+      expectedCode: "PROJECT_VERSION_EXECUTION_CONFLICT",
+    },
+    {
+      error: { code: "23505", message: "duplicate key violates unique constraint observatory_project_versions_one_release_target_idx" },
+      expectedCode: "PROJECT_VERSION_RELEASE_TARGET_CONFLICT",
+    },
+    {
+      error: { code: "22023", message: "OBSERVATORY_PROJECT_VERSION_IMMUTABLE" },
+      expectedCode: "PROJECT_VERSION_IMMUTABLE",
+    },
+    {
+      error: { code: "23514", message: "OBSERVATORY_PROJECT_VERSION_RELEASE_GATE_INCOMPLETE" },
+      expectedCode: "PROJECT_VERSION_RELEASE_GATE_INCOMPLETE",
+    },
+    {
+      error: { code: "23514", message: "OBSERVATORY_PREDECESSOR_ORDER_INVALID" },
+      expectedCode: "PROJECT_VERSION_PREDECESSOR_INVALID",
+    },
+    {
+      error: { code: "22023", message: "OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED" },
+      expectedCode: "PROJECT_VERSION_BINDING_CLOSED",
+    },
+    {
+      error: { code: "22023", message: "OBSERVATORY_VERSION_BINDING_KIND_INVALID" },
+      expectedCode: "VERSION_BINDING_KIND_INVALID",
+    },
+    {
+      error: { code: "23514", message: "OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE" },
+      expectedCode: "WORK_ITEM_VERSION_SCOPE_IMMUTABLE",
     },
   ])("maps Project Version markers before generic SQLSTATE errors", async ({ error, expectedCode }) => {
     const repository = createObservatoryRepository(repositoryClient({ rpcError: error }).client);
@@ -320,6 +444,20 @@ describe("Project Version repository", () => {
       title: "First release",
       description: "Version management",
       targetDate: null,
+      semver: "1.0.0",
+      isReleaseTarget: false,
+      milestoneRef: null,
+      predecessorVersionId: null,
+      roadmapRef: null,
+      approvedPlanRef: null,
+      acceptanceSummary: "",
+      actualDate: null,
+      dependenciesSummary: "",
+      dependenciesSatisfied: false,
+      artifactsAccepted: false,
+      verificationComplete: false,
+      roadmapReconciled: false,
+      userGateDecisionRef: null,
     })).rejects.toMatchObject({ code: expectedCode });
   });
 });
@@ -402,6 +540,7 @@ describe("Observatory repository", () => {
         description: "",
         projectRef: "plato/dashboard",
         projectVersionId: "33333333-3333-4333-8333-333333333333",
+        versionBindingKind: "required",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-1",
@@ -415,6 +554,7 @@ describe("Observatory repository", () => {
         p_description: "",
         p_project_ref: "plato/dashboard",
         p_project_version_id: "33333333-3333-4333-8333-333333333333",
+        p_version_binding_kind: "required",
         p_assigned_agent_id: "plato",
         p_idempotency_key: "capture-1",
       },
@@ -438,6 +578,7 @@ describe("Observatory repository", () => {
         description: "",
         projectRef: "plato/dashboard",
         projectVersionId: "33333333-3333-4333-8333-333333333333",
+        versionBindingKind: "optional",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-1",
@@ -469,6 +610,7 @@ describe("Observatory repository", () => {
         assignedAgentId: "plato",
         projectRef: "asgard/archaea-gacha-game",
         projectVersionId: "33333333-3333-4333-8333-333333333333",
+        versionBindingKind: "required",
         milestoneRef: "OBS-M3",
         projectKey: "asgard/archaea-gacha-game",
         planRevision: 3,
@@ -492,6 +634,7 @@ describe("Observatory repository", () => {
         p_assigned_agent_id: "plato",
         p_project_ref: "asgard/archaea-gacha-game",
         p_project_version_id: "33333333-3333-4333-8333-333333333333",
+        p_version_binding_kind: "required",
         p_milestone_ref: "OBS-M3",
         p_project_key: "asgard/archaea-gacha-game",
         p_plan_revision: 3,
@@ -524,6 +667,7 @@ describe("Observatory repository", () => {
         assignedAgentId: "plato",
         projectRef: "plato/dashboard",
         projectVersionId: "33333333-3333-4333-8333-333333333333",
+        versionBindingKind: "optional",
         milestoneRef: null,
         projectKey: null,
         planRevision: null,
@@ -550,6 +694,7 @@ describe("Observatory repository", () => {
               description: "",
               projectRef: "plato/dashboard",
               projectVersionId: "33333333-3333-4333-8333-333333333333",
+              versionBindingKind: "optional",
               assignedAgentId: "plato",
               state: "inbox",
               idempotencyKey: "capture-generic-error",
@@ -566,6 +711,7 @@ describe("Observatory repository", () => {
               assignedAgentId: "plato",
               projectRef: "plato/dashboard",
               projectVersionId: "33333333-3333-4333-8333-333333333333",
+              versionBindingKind: "optional",
               milestoneRef: null,
               projectKey: null,
               planRevision: null,
@@ -595,6 +741,7 @@ describe("Observatory repository", () => {
         description: "",
         projectRef: "plato/dashboard",
         projectVersionId: "33333333-3333-4333-8333-333333333333",
+        versionBindingKind: "optional",
         assignedAgentId: "plato",
         state: "inbox",
         idempotencyKey: "capture-2",

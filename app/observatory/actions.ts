@@ -34,6 +34,7 @@ type ObservatoryQuickCaptureField =
   | "description"
   | "projectRef"
   | "projectVersionId"
+  | "versionBindingKind"
   | "assignedAgentId"
   | "idempotencyKey";
 
@@ -58,7 +59,8 @@ export type ObservatoryWorkItemMutationActionState =
   | { status: "success"; version: number };
 
 function formValue(formData: FormData, name: ObservatoryQuickCaptureField) {
-  return formData.get(name);
+  const value = formData.get(name);
+  return typeof value === "string" ? value : undefined;
 }
 
 function formError(error: unknown): string {
@@ -73,6 +75,10 @@ function formError(error: unknown): string {
       return "This capture key was already used for different content. Refresh and try again.";
     case "PROJECT_VERSION_ARCHIVED":
       return "That Project Version was archived. Refresh and choose another version.";
+    case "PROJECT_VERSION_BINDING_CLOSED":
+      return "That Project Version no longer accepts Work Item bindings. Refresh and choose another version.";
+    case "VERSION_BINDING_KIND_INVALID":
+      return "Choose whether the Product Version binding is required or optional.";
     default:
       return "The work item could not be captured. Try again.";
   }
@@ -175,6 +181,24 @@ function mutationFormError(error: unknown): string {
       return "Choose a Project Version that is not archived.";
     case "PROJECT_VERSION_BACKLOG_IMMUTABLE":
       return "The system Backlog version cannot be edited or transitioned.";
+    case "PROJECT_VERSION_SEMVER_INVALID":
+      return "Use a valid MAJOR.MINOR.PATCH version.";
+    case "PROJECT_VERSION_EXECUTION_CONFLICT":
+      return "This Project already has an active or gate-ready version.";
+    case "PROJECT_VERSION_RELEASE_TARGET_CONFLICT":
+      return "This Project already has a release target.";
+    case "PROJECT_VERSION_IMMUTABLE":
+      return "Released and archived Project Versions cannot be edited.";
+    case "PROJECT_VERSION_RELEASE_GATE_INCOMPLETE":
+      return "Complete required Work Items and every release Gate check before release.";
+    case "PROJECT_VERSION_PREDECESSOR_INVALID":
+      return "Choose an earlier version from the same Project as predecessor.";
+    case "PROJECT_VERSION_BINDING_CLOSED":
+      return "Released, archived, and cancelled versions reject new Work Item bindings.";
+    case "VERSION_BINDING_KIND_INVALID":
+      return "Choose whether the Product Version binding is required or optional.";
+    case "WORK_ITEM_VERSION_SCOPE_IMMUTABLE":
+      return "The Product Version binding cannot be changed after work starts.";
     default:
       return "The work item could not be changed. Try again.";
   }
@@ -189,6 +213,10 @@ function nullableText(formData: FormData, name: string) {
   const value = formData.get(name);
   if (typeof value !== "string") return null;
   return value.trim() || null;
+}
+
+function projectVersionRejectsBindings(status: string) {
+  return ["released", "archived", "cancelled"].includes(status);
 }
 
 function fieldErrorState(
@@ -235,6 +263,7 @@ export async function captureObservatoryWorkItemAction(
     description: formValue(formData, "description") ?? undefined,
     projectRef: formValue(formData, "projectRef"),
     projectVersionId: formValue(formData, "projectVersionId"),
+    versionBindingKind: formValue(formData, "versionBindingKind"),
     assignedAgentId: formValue(formData, "assignedAgentId"),
     idempotencyKey: formValue(formData, "idempotencyKey"),
   });
@@ -249,6 +278,7 @@ export async function captureObservatoryWorkItemAction(
         description: fieldErrors.description,
         projectRef: fieldErrors.projectRef,
         projectVersionId: fieldErrors.projectVersionId,
+        versionBindingKind: fieldErrors.versionBindingKind,
         assignedAgentId: fieldErrors.assignedAgentId,
         idempotencyKey: fieldErrors.idempotencyKey,
       },
@@ -299,7 +329,7 @@ export async function captureObservatoryWorkItemAction(
   } catch {
     return operationalError();
   }
-  if (!selectedVersion || selectedVersion.status === "archived") {
+  if (!selectedVersion || projectVersionRejectsBindings(selectedVersion.status)) {
     return {
       status: "error",
       fieldErrors: { projectVersionId: ["Choose an available Project Version."] },
@@ -348,6 +378,7 @@ export async function updateObservatoryWorkItemAction(
     assignedAgentId: nullableText(formData, "assignedAgentId"),
     projectRef: nullableText(formData, "projectRef"),
     projectVersionId: formData.get("projectVersionId"),
+    versionBindingKind: formValue(formData, "versionBindingKind"),
     milestoneRef: nullableText(formData, "milestoneRef"),
     projectKey: nullableText(formData, "projectKey"),
     planRevision: nullableText(formData, "planRevision") === null
@@ -396,8 +427,19 @@ export async function updateObservatoryWorkItemAction(
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
   }
-  if (!selectedVersion || selectedVersion.status === "archived") {
+  if (!selectedVersion) {
     return fieldErrorState({ projectVersionId: ["Choose an available Project Version."] });
+  }
+  if (projectVersionRejectsBindings(selectedVersion.status)) {
+    let currentItem;
+    try {
+      currentItem = await boundary.repository.getWorkItem(validation.data.workItemId);
+    } catch (error) {
+      return { status: "error", formError: mutationFormError(error) };
+    }
+    if (!currentItem || currentItem.project_version_id !== selectedVersion.id) {
+      return fieldErrorState({ projectVersionId: ["Choose an available Project Version."] });
+    }
   }
   if (selectedVersion.project_key !== validation.data.projectRef) {
     return fieldErrorState({ projectVersionId: ["Choose a version from the selected Project."] });
@@ -425,6 +467,20 @@ export async function createObservatoryProjectVersionAction(
     title: formData.get("title"),
     description: formData.get("description") ?? "",
     targetDate: formData.get("targetDate") ?? null,
+    semver: nullableText(formData, "semver") ?? undefined,
+    isReleaseTarget: formData.get("isReleaseTarget") === "on",
+    milestoneRef: nullableText(formData, "milestoneRef"),
+    predecessorVersionId: nullableText(formData, "predecessorVersionId"),
+    roadmapRef: nullableText(formData, "roadmapRef"),
+    approvedPlanRef: nullableText(formData, "approvedPlanRef"),
+    acceptanceSummary: formData.get("acceptanceSummary") ?? "",
+    actualDate: nullableText(formData, "actualDate"),
+    dependenciesSummary: formData.get("dependenciesSummary") ?? "",
+    dependenciesSatisfied: formData.get("dependenciesSatisfied") === "on",
+    artifactsAccepted: formData.get("artifactsAccepted") === "on",
+    verificationComplete: formData.get("verificationComplete") === "on",
+    roadmapReconciled: formData.get("roadmapReconciled") === "on",
+    userGateDecisionRef: nullableText(formData, "userGateDecisionRef"),
   });
   if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
 
@@ -474,6 +530,20 @@ export async function updateObservatoryProjectVersionAction(
     title: formData.get("title"),
     description: formData.get("description") ?? "",
     targetDate: formData.get("targetDate") ?? null,
+    semver: nullableText(formData, "semver"),
+    isReleaseTarget: formData.get("isReleaseTarget") === "on",
+    milestoneRef: nullableText(formData, "milestoneRef"),
+    predecessorVersionId: nullableText(formData, "predecessorVersionId"),
+    roadmapRef: nullableText(formData, "roadmapRef"),
+    approvedPlanRef: nullableText(formData, "approvedPlanRef"),
+    acceptanceSummary: formData.get("acceptanceSummary") ?? "",
+    actualDate: nullableText(formData, "actualDate"),
+    dependenciesSummary: formData.get("dependenciesSummary") ?? "",
+    dependenciesSatisfied: formData.get("dependenciesSatisfied") === "on",
+    artifactsAccepted: formData.get("artifactsAccepted") === "on",
+    verificationComplete: formData.get("verificationComplete") === "on",
+    roadmapReconciled: formData.get("roadmapReconciled") === "on",
+    userGateDecisionRef: nullableText(formData, "userGateDecisionRef"),
   });
   if (!validation.success) return fieldErrorState(validation.error.flatten().fieldErrors);
 
