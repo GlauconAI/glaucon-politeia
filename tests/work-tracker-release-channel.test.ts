@@ -63,6 +63,8 @@ describe("Work Tracker release verification", () => {
 
   it("keeps the networked dependency audit in CI", () => {
     const workflow = readFileSync(".github/workflows/quality.yml", "utf8");
+    expect(workflow).toContain("actions/checkout@v7");
+    expect(workflow).toContain("actions/setup-node@v7");
     expect(workflow).toContain("npm run release:verify");
     expect(workflow).toContain("npm run build");
     expect(workflow).toContain("npm audit --omit=dev --audit-level=high");
