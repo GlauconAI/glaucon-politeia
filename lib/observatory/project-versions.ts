@@ -57,20 +57,14 @@ const ProjectKeySchema = z
   .min(3)
   .max(160)
   .regex(DERIVED_PROJECT_KEY_PATTERN);
-const VersionLabelSchema = z.string().trim().min(1).max(64);
 const VersionTitleSchema = z.string().trim().min(1).max(200);
 const VersionDescriptionSchema = z.string().trim().max(4_000);
 const FormalSemVerSchema = z
   .string()
   .trim()
   .regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u);
-function normalizeLegacySemVer(versionLabel: string): string | null {
-  const match = /^v?(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?$/iu.exec(
-    versionLabel.trim(),
-  );
-  if (!match) return null;
-  return `${match[1]}.${match[2] ?? "0"}.${match[3] ?? "0"}`;
-}
+const ProjectVersionCreateLabelSchema = FormalSemVerSchema;
+const ProjectVersionUpdateLabelSchema = z.string().trim().min(1).max(64);
 const NullableReferenceSchema = z
   .union([z.string().trim().max(160), z.null()])
   .transform((value) => value || null);
@@ -100,30 +94,22 @@ const operationalFieldDefaults = {
 export const ProjectVersionCreateInputSchema = z
   .strictObject({
     projectKey: ProjectKeySchema,
-    versionLabel: VersionLabelSchema,
+    versionLabel: ProjectVersionCreateLabelSchema,
     title: VersionTitleSchema,
     description: VersionDescriptionSchema.default(""),
     targetDate: TargetDateSchema.default(null),
     semver: FormalSemVerSchema.optional(),
     ...operationalFieldDefaults,
   })
-  .superRefine((value, context) => {
-    if (value.semver || normalizeLegacySemVer(value.versionLabel)) return;
-    context.addIssue({
-      code: "custom",
-      message: "A formal MAJOR.MINOR.PATCH SemVer is required.",
-      path: ["semver"],
-    });
-  })
   .transform((value) => ({
     ...value,
-    semver: value.semver ?? normalizeLegacySemVer(value.versionLabel)!,
+    semver: value.semver ?? value.versionLabel,
   }));
 
 export const ProjectVersionUpdateInputSchema = z.strictObject({
   projectVersionId: z.uuid(),
   expectedVersion: z.number().int().positive(),
-  versionLabel: VersionLabelSchema,
+  versionLabel: ProjectVersionUpdateLabelSchema,
   title: VersionTitleSchema,
   description: VersionDescriptionSchema.default(""),
   targetDate: TargetDateSchema.default(null),

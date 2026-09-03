@@ -361,7 +361,7 @@ describe("Project Version actions", () => {
   it("rejects a version for a Project outside the canonical registry", async () => {
     const formData = new FormData();
     formData.set("projectKey", "plato/unknown");
-    formData.set("versionLabel", "v1.0");
+    formData.set("versionLabel", "1.0.0");
     formData.set("title", "Unknown release");
     formData.set("description", "");
     formData.set("targetDate", "");
@@ -381,7 +381,7 @@ describe("Project Version actions", () => {
     mocks.createProjectVersion.mockResolvedValue({ row_version: 1 });
     const formData = new FormData();
     formData.set("projectKey", " plato/dashboard ");
-    formData.set("versionLabel", " v1.0 ");
+    formData.set("versionLabel", " 1.0.0 ");
     formData.set("title", " First release ");
     formData.set("description", " Stable versioning. ");
     formData.set("targetDate", "2026-09-30");
@@ -391,7 +391,7 @@ describe("Project Version actions", () => {
     ).resolves.toEqual({ status: "success", version: 1 });
     expect(mocks.createProjectVersion).toHaveBeenCalledWith({
       projectKey: "plato/dashboard",
-      versionLabel: "v1.0",
+      versionLabel: "1.0.0",
       title: "First release",
       description: "Stable versioning.",
       targetDate: "2026-09-30",
@@ -442,7 +442,7 @@ describe("Project Version actions", () => {
     });
     const formData = new FormData();
     formData.set("projectKey", "plato/dashboard");
-    formData.set("versionLabel", "v1.1");
+    formData.set("versionLabel", "1.1.0");
     formData.set("title", "Second release");
     formData.set("description", "");
     formData.set("targetDate", "");

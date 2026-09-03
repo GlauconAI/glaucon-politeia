@@ -277,14 +277,14 @@ describe("Project Version repository", () => {
     const repository = createObservatoryRepository(boundary.client);
     await expect(repository.createProjectVersion({
       projectKey: "plato/dashboard",
-      versionLabel: "v1.0",
+      versionLabel: "1.0.0",
       title: "First release",
       description: "Version management",
       targetDate: "2026-09-30",
     })).resolves.toEqual(version);
     expect(boundary.rpc).toHaveBeenCalledWith("create_observatory_project_version", {
       p_project_key: "plato/dashboard",
-      p_version_label: "v1.0",
+      p_version_label: "1.0.0",
       p_title: "First release",
       p_description: "Version management",
       p_target_date: "2026-09-30",

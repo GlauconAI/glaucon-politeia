@@ -47,14 +47,14 @@ describe("Project Versions", () => {
   it("normalizes create input with release-target and Gate fields", () => {
     expect(ProjectVersionCreateInputSchema.parse({
       projectKey: " plato/dashboard ",
-      versionLabel: " v0.2 ",
+      versionLabel: " 0.2.0 ",
       title: " Versioned delivery ",
       description: " First release ",
       targetDate: "2026-09-30",
       ...operationalFields,
     })).toEqual({
       projectKey: "plato/dashboard",
-      versionLabel: "v0.2",
+      versionLabel: "0.2.0",
       title: "Versioned delivery",
       description: "First release",
       targetDate: "2026-09-30",
@@ -62,10 +62,10 @@ describe("Project Versions", () => {
     });
   });
 
-  it("defaults operational fields for legacy create and update consumers", () => {
+  it("defaults operational fields for create and legacy update consumers", () => {
     expect(ProjectVersionCreateInputSchema.parse({
       projectKey: "plato/dashboard",
-      versionLabel: "v1.2",
+      versionLabel: "1.2.0",
       title: "Legacy create",
     })).toMatchObject({
       semver: "1.2.0",
@@ -108,27 +108,35 @@ describe("Project Versions", () => {
   });
 
   it("requires strict MAJOR.MINOR.PATCH SemVer without a v prefix", () => {
-    for (const semver of ["v1.2.3", "1.2", "1.2.3-beta.1", "01.2.3"]) {
+    for (const versionLabel of [
+      "v1",
+      "v1.2",
+      "v1.2.3",
+      "1",
+      "1.2",
+      "1.2.3-beta.1",
+      "01.2.3",
+    ]) {
       expect(ProjectVersionCreateInputSchema.safeParse({
         projectKey: "plato/dashboard",
-        versionLabel: semver,
+        versionLabel,
         title: "Invalid formal version",
         description: "",
         targetDate: null,
         ...operationalFields,
-        semver,
+        semver: "1.2.3",
       }).success).toBe(false);
     }
 
-    expect(ProjectVersionCreateInputSchema.safeParse({
+    expect(ProjectVersionCreateInputSchema.parse({
       projectKey: "plato/dashboard",
-      versionLabel: "v0.0.0",
+      versionLabel: "0.0.0",
       title: "Formal version",
       description: "",
       targetDate: null,
       ...operationalFields,
-      semver: "0.0.0",
-    }).success).toBe(true);
+      semver: undefined,
+    }).semver).toBe("0.0.0");
   });
 
   it("allows null SemVer only when updating a legacy version", () => {
@@ -151,7 +159,7 @@ describe("Project Versions", () => {
   it("rejects unsafe Project keys", () => {
     expect(ProjectVersionCreateInputSchema.safeParse({
       projectKey: "/private/project",
-      versionLabel: "v1",
+      versionLabel: "1.0.0",
       title: "Unsafe",
       description: "",
       targetDate: null,
@@ -162,7 +170,7 @@ describe("Project Versions", () => {
   it("accepts canonical Project keys with spaces, underscores, and Unicode names", () => {
     expect(ProjectVersionCreateInputSchema.safeParse({
       projectKey: "aristotle/LLM Wiki_第二版",
-      versionLabel: "v1",
+      versionLabel: "1.0.0",
       title: "Knowledge release",
       description: "",
       targetDate: null,
