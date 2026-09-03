@@ -139,6 +139,34 @@ describe("Project Versions", () => {
     }).semver).toBe("0.0.0");
   });
 
+  it("rejects a create input whose SemVer contradicts its version label", () => {
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "plato/dashboard",
+      versionLabel: "1.2.3",
+      title: "Contradictory version",
+      semver: "2.0.0",
+    }).success).toBe(false);
+  });
+
+  it("enforces the database 64-character limit for formal versions", () => {
+    const boundaryVersion = `${"1".repeat(60)}.0.0`;
+    const oversizedVersion = `${"1".repeat(61)}.0.0`;
+
+    expect(boundaryVersion).toHaveLength(64);
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "plato/dashboard",
+      versionLabel: boundaryVersion,
+      title: "Boundary version",
+    }).success).toBe(true);
+
+    expect(oversizedVersion).toHaveLength(65);
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "plato/dashboard",
+      versionLabel: oversizedVersion,
+      title: "Oversized version",
+    }).success).toBe(false);
+  });
+
   it("allows null SemVer only when updating a legacy version", () => {
     expect(ProjectVersionUpdateInputSchema.safeParse({
       projectVersionId: "11111111-1111-4111-8111-111111111111",
@@ -175,6 +203,7 @@ describe("Project Versions", () => {
       description: "",
       targetDate: null,
       ...operationalFields,
+      semver: "1.0.0",
     }).success).toBe(true);
   });
 

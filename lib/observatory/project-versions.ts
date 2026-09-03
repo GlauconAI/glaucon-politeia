@@ -62,6 +62,7 @@ const VersionDescriptionSchema = z.string().trim().max(4_000);
 const FormalSemVerSchema = z
   .string()
   .trim()
+  .max(64)
   .regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u);
 const ProjectVersionCreateLabelSchema = FormalSemVerSchema;
 const ProjectVersionUpdateLabelSchema = z.string().trim().min(1).max(64);
@@ -100,6 +101,14 @@ export const ProjectVersionCreateInputSchema = z
     targetDate: TargetDateSchema.default(null),
     semver: FormalSemVerSchema.optional(),
     ...operationalFieldDefaults,
+  })
+  .superRefine((value, context) => {
+    if (value.semver === undefined || value.semver === value.versionLabel) return;
+    context.addIssue({
+      code: "custom",
+      message: "SemVer must match the version label.",
+      path: ["semver"],
+    });
   })
   .transform((value) => ({
     ...value,
