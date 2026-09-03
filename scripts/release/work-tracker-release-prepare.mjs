@@ -154,9 +154,9 @@ function execute(command, args, { cwd, allowFailure = false, timeoutMs = 120_000
   };
 }
 
-function absoluteGitCommonDir(cwd, git) {
+function absoluteGitCommonDir(cwd, git, canonicalize) {
   const output = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd }).stdout;
-  return realpathSync(output);
+  return canonicalize(output);
 }
 
 function parseAheadBehind(value) {
@@ -210,12 +210,13 @@ export function runReleasePrepare({
   cwd = process.cwd(),
   argv = process.argv.slice(2),
   runner = execute,
+  canonicalize = realpathSync,
 } = {}) {
-  const canonicalCwd = realpathSync(cwd);
+  const canonicalCwd = canonicalize(cwd);
   const git = (args, options) =>
     runner(GIT_EXECUTABLE, [...GIT_HARDENING_ARGS, ...args], options);
   const gh = (args, options) => runner(GH_EXECUTABLE, args, options);
-  const gitCommonDir = absoluteGitCommonDir(canonicalCwd, git);
+  const gitCommonDir = absoluteGitCommonDir(canonicalCwd, git, canonicalize);
   const remoteUrl = git(["remote", "get-url", "origin"], { cwd: canonicalCwd }).stdout;
   const pushRemoteUrl = git(["remote", "get-url", "--push", "origin"], {
     cwd: canonicalCwd,

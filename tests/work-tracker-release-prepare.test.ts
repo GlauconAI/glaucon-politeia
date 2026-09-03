@@ -169,6 +169,7 @@ describe("Work Tracker host-owned release prepare contract", () => {
         cwd: "/Users/glaucon/.openclaw/workspace/plato/projects/glaucon-politeia/.worktrees/work-tracker-release-approvals-v2",
         argv: [],
         runner,
+        canonicalize: (path) => path,
       }),
     ).toMatchObject({ created: false, branch: validContext.branch, ahead: 2 });
     expect(calls.filter(({ args }) => args.includes("push"))).toHaveLength(1);
@@ -232,7 +233,14 @@ describe("Work Tracker host-owned release prepare contract", () => {
       return { exitCode: 0, stdout: "", stderr: "" };
     };
 
-    expect(runReleasePrepare({ cwd: process.cwd(), argv: [], runner })).toMatchObject({
+    expect(
+      runReleasePrepare({
+        cwd: process.cwd(),
+        argv: [],
+        runner,
+        canonicalize: (path) => path,
+      }),
+    ).toMatchObject({
       created: true,
       pullRequestUrl: "https://github.com/GlauconAI/glaucon-politeia/pull/9",
     });

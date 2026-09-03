@@ -149,6 +149,7 @@ declare module "@/scripts/release/work-tracker-release-prepare.mjs" {
       args: string[],
       options?: { cwd?: string; allowFailure?: boolean; timeoutMs?: number },
     ) => { exitCode: number; stdout: string; stderr: string };
+    canonicalize?: (path: string) => string;
   }): {
     ok: true;
     branch: string;
