@@ -22,7 +22,13 @@ The command only requests the fixed production origin `https://402v.com` and the
 
 ## Release boundary
 
-Routine editing and local verification stay inside the Plato workspace-write sandbox. Pull-request checks run in GitHub Actions. The following remain outside the permanent allowlist and require an explicit production authorization:
+Routine editing and local verification stay inside the Plato workspace-write sandbox. Prepare a clean release branch with the host-owned zero-argument entry:
+
+```text
+/Users/glaucon/.openclaw/agents/plato/agent/bin/work-tracker-release-prepare.sh
+```
+
+It uses a clean fixed environment, validates the exact repository/remote/branch/history, performs a non-force push to the fixed remote, and creates or reuses only a same-repository PR targeting `main`. Pull-request checks run in GitHub Actions. The following remain outside the permanent allowlist and require an explicit production authorization:
 
 - PR merge or production branch update.
 - Supabase schema/data migration.
@@ -39,6 +45,6 @@ Run:
 npm run release:approval-report -- --days 7
 ```
 
-The report scans Plato Codex rollout metadata and emits counts only. It does not emit conversation text, command text, or credentials. `manualApprovalCount` remains `null` because rollout metadata cannot prove which escalations reached a human; the weekly automation reconciles it with the operator-visible prompt count.
+The report emits two deliberately separate scopes. `workTracker` contains project rollout proxy counters and keeps `manualApprovalCount: null` because current runtime data cannot reliably attribute a displayed prompt to this project. `operatorApprovals` contains real user decisions for all Plato activity in the period and is labeled `plato-agent-wide`. The approval database query reads only status/decision/terminal-reason fields; output never contains command, conversation, device, credential, or presentation data.
 
 Review four complete weekly windows before proposing broader adoption. Success means routine development has no human prompts, production work is normally one explicit gate, denied calls do not rise, and no permission scope is widened to compensate.

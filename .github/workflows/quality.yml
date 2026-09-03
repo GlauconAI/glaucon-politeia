@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: quality-${{ github.ref }}
@@ -29,3 +30,21 @@ jobs:
         run: npm run build
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  production-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Wait for the exact Vercel Production deployment
+        run: npm run release:wait-production
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.sha }}
+      - name: Run fixed production smoke checks
+        run: npm run release:smoke

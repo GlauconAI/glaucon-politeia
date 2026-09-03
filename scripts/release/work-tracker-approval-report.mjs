@@ -4,12 +4,14 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DatabaseSync } from "node:sqlite";
 
 const DEFAULT_SESSION_ROOT = join(
   homedir(),
   ".openclaw/agents/plato/agent/codex-home/sessions",
 );
 const DEFAULT_REPO_MARKER = "/glaucon-politeia";
+const DEFAULT_STATE_DATABASE = join(homedir(), ".openclaw/state/openclaw.sqlite");
 const MAX_SESSION_FILES = 5_000;
 
 function payloadText(payload) {
@@ -44,9 +46,6 @@ export function analyzeApprovalSessions(
     escalationRequests: 0,
     gatewayExecCalls: 0,
     deniedCalls: 0,
-    manualApprovalCount: null,
-    manualApprovalNote:
-      "Codex rollout metadata cannot prove whether an escalation reached a human; reconcile this field with the operator prompt count.",
   };
 
   for (const path of sessionPaths) {
@@ -97,6 +96,79 @@ export function analyzeApprovalSessions(
   return report;
 }
 
+export function summarizeOperatorApprovals(rows) {
+  const summary = {
+    status: "available",
+    requests: rows.length,
+    humanDecisions: 0,
+    allowedOnce: 0,
+    allowedAlways: 0,
+    humanDenied: 0,
+    expired: 0,
+    systemCancelled: 0,
+    pending: 0,
+  };
+  for (const row of rows) {
+    if (row.status === "allowed" && row.terminal_reason === "user") {
+      summary.humanDecisions += 1;
+      if (row.decision === "allow-once") summary.allowedOnce += 1;
+      if (row.decision === "allow-always") summary.allowedAlways += 1;
+    } else if (row.status === "denied" && row.terminal_reason === "user") {
+      summary.humanDecisions += 1;
+      summary.humanDenied += 1;
+    } else if (row.status === "expired") {
+      summary.expired += 1;
+    } else if (row.status === "cancelled") {
+      summary.systemCancelled += 1;
+    } else if (row.status === "pending") {
+      summary.pending += 1;
+    }
+  }
+  return summary;
+}
+
+export function buildApprovalReport(workTrackerRollout, operatorApprovalRows) {
+  return {
+    workTracker: {
+      ...workTrackerRollout,
+      manualApprovalCount: null,
+      manualApprovalObservable: false,
+    },
+    operatorApprovals: {
+      ...summarizeOperatorApprovals(operatorApprovalRows),
+      scope: "plato-agent-wide",
+      attributionNote:
+        "OpenClaw operator approvals do not expose a project or stable rollout-session correlation field.",
+    },
+    observability: {
+      autoReviewApprovals: "unavailable",
+      humanPromptsDisplayed: "unavailable",
+      timeoutRetries: "unavailable",
+      note: "Use Work Tracker rollout counters for trend direction and Plato-wide operator decisions only as a separate control metric.",
+    },
+  };
+}
+
+export function queryOperatorApprovals(
+  databasePath,
+  { since, now = new Date() } = {},
+) {
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    return database
+      .prepare(
+        `select status, decision, terminal_reason
+           from operator_approvals
+          where source_agent_id = 'plato'
+            and created_at_ms >= ?
+            and created_at_ms <= ?`,
+      )
+      .all(since.getTime(), now.getTime());
+  } finally {
+    database.close();
+  }
+}
+
 export function formatApprovalReport(report) {
   return JSON.stringify(report, null, 2);
 }
@@ -138,7 +210,32 @@ function main() {
   const now = new Date();
   const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1_000);
   const files = discoverSessionFiles(DEFAULT_SESSION_ROOT, since);
-  const report = analyzeApprovalSessions(files, { since, now });
+  const workTrackerRollout = analyzeApprovalSessions(files, { since, now });
+  let report;
+  try {
+    report = buildApprovalReport(
+      workTrackerRollout,
+      queryOperatorApprovals(DEFAULT_STATE_DATABASE, { since, now }),
+    );
+  } catch {
+    report = {
+      workTracker: {
+        ...workTrackerRollout,
+        manualApprovalCount: null,
+        manualApprovalObservable: false,
+      },
+      operatorApprovals: {
+        status: "unavailable",
+        scope: "plato-agent-wide",
+        reason: "operator approval state could not be read",
+      },
+      observability: {
+        autoReviewApprovals: "unavailable",
+        humanPromptsDisplayed: "unavailable",
+        timeoutRetries: "unavailable",
+      },
+    };
+  }
   process.stdout.write(`${formatApprovalReport(report)}\n`);
 }
 

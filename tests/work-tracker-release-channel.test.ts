@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +17,10 @@ import {
 } from "@/scripts/release/work-tracker-smoke.mjs";
 import {
   analyzeApprovalSessions,
+  buildApprovalReport,
   formatApprovalReport,
+  queryOperatorApprovals,
+  summarizeOperatorApprovals,
 } from "@/scripts/release/work-tracker-approval-report.mjs";
 
 describe("Work Tracker release verification", () => {
@@ -69,6 +73,10 @@ describe("Work Tracker release verification", () => {
     expect(workflow).toContain("npm run build");
     expect(workflow).toContain("npm audit --omit=dev --audit-level=high");
     expect(workflow).toContain("contents: read");
+    expect(workflow).toContain("deployments: read");
+    expect(workflow).toContain("production-smoke");
+    expect(workflow).toContain("npm run release:wait-production");
+    expect(workflow).toContain("npm run release:smoke");
   });
 });
 
@@ -142,10 +150,100 @@ describe("Work Tracker approval observation", () => {
       escalationRequests: 1,
       gatewayExecCalls: 1,
       deniedCalls: 1,
-      manualApprovalCount: null,
     });
     expect(output).not.toContain(sensitive);
     expect(output).not.toContain("git status");
+  });
+
+  it("reports real human decisions separately from timeout and system cancellation", () => {
+    const report = summarizeOperatorApprovals([
+      { status: "allowed", decision: "allow-once", terminal_reason: "user" },
+      { status: "allowed", decision: "allow-always", terminal_reason: "user" },
+      { status: "denied", decision: "deny", terminal_reason: "user" },
+      { status: "expired", decision: "deny", terminal_reason: "timeout" },
+      { status: "cancelled", decision: "deny", terminal_reason: "run-aborted" },
+      { status: "pending", decision: null, terminal_reason: null },
+    ]);
+
+    expect(report).toEqual({
+      status: "available",
+      requests: 6,
+      humanDecisions: 3,
+      allowedOnce: 1,
+      allowedAlways: 1,
+      humanDenied: 1,
+      expired: 1,
+      systemCancelled: 1,
+      pending: 1,
+    });
+    expect(JSON.stringify(report)).not.toContain("presentation_json");
+  });
+
+  it("keeps agent-wide operator decisions outside the Work Tracker KPI", () => {
+    const projectRollout = {
+      periodStart: "2026-09-01T00:00:00.000Z",
+      periodEnd: "2026-09-08T00:00:00.000Z",
+      relevantSessions: 2,
+      escalationRequests: 3,
+      gatewayExecCalls: 4,
+      deniedCalls: 1,
+    };
+    const report = buildApprovalReport(projectRollout, [
+      { status: "allowed", decision: "allow-once", terminal_reason: "user" },
+    ]);
+
+    expect(report.workTracker).toEqual({
+      ...projectRollout,
+      manualApprovalCount: null,
+      manualApprovalObservable: false,
+    });
+    expect(report.operatorApprovals).toMatchObject({
+      scope: "plato-agent-wide",
+      humanDecisions: 1,
+    });
+    expect(report.observability).toMatchObject({
+      autoReviewApprovals: "unavailable",
+      humanPromptsDisplayed: "unavailable",
+      timeoutRetries: "unavailable",
+    });
+  });
+
+  it("reads only non-sensitive approval fields from the state database", () => {
+    const root = mkdtempSync(join(tmpdir(), "work-tracker-operator-approvals-"));
+    const databasePath = join(root, "state.sqlite");
+    const database = new DatabaseSync(databasePath);
+    database.exec(`
+      create table operator_approvals (
+        source_agent_id text,
+        source_run_id text,
+        created_at_ms integer,
+        status text,
+        decision text,
+        terminal_reason text,
+        presentation_json text
+      );
+    `);
+    database
+      .prepare("insert into operator_approvals values (?, ?, ?, ?, ?, ?, ?)")
+      .run(
+        "plato",
+        "run-1",
+        Date.parse("2026-09-02T00:01:00.000Z"),
+        "allowed",
+        "allow-once",
+        "user",
+        "PRIVATE-COMMAND-BODY",
+      );
+    database.close();
+
+    const rows = queryOperatorApprovals(databasePath, {
+      since: new Date("2026-09-01T00:00:00.000Z"),
+      now: new Date("2026-09-08T00:00:00.000Z"),
+    });
+    expect(rows).toEqual([
+      { status: "allowed", decision: "allow-once", terminal_reason: "user" },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain("PRIVATE-COMMAND-BODY");
   });
 
   it("ignores unrelated sessions", () => {
