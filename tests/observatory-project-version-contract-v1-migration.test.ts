@@ -67,6 +67,8 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toContain("observatory_project_versions_one_release_target_idx");
     expect(sql).toMatch(/where status in \('active', 'gate_ready'\)/iu);
     expect(sql).toMatch(/where is_release_target/iu);
+    expect(sql).toMatch(/update public\.observatory_project_versions set is_release_target\s*=\s*false where is_backlog and is_release_target is distinct from false/iu);
+    expect(sql).toMatch(/observatory_project_versions_backlog_release_target_check[\s\S]*not\s*\(is_backlog and is_release_target\)/iu);
     expect(sql).toMatch(/planned[\s\S]*active[\s\S]*gate_ready[\s\S]*released[\s\S]*archived[\s\S]*cancelled/iu);
   });
 
@@ -75,6 +77,10 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toContain("validate_observatory_project_version_predecessor");
     expect(sql).toMatch(/predecessor\.project_key <> new\.project_key/iu);
     expect(sql).toMatch(/predecessor\.semver[\s\S]*new\.semver/iu);
+    expect(sql).toMatch(/successor\.predecessor_version_id\s*=\s*new\.id/iu);
+    expect(sql).toContain("OBSERVATORY_SUCCESSOR_PROJECT_MISMATCH");
+    expect(sql).toContain("OBSERVATORY_SUCCESSOR_SEMVER_REQUIRED");
+    expect(sql).toContain("OBSERVATORY_SUCCESSOR_ORDER_INVALID");
     expect(sql).toMatch(/with recursive predecessor_chain/iu);
     expect(sql).toContain("protect_observatory_project_version_history");
     expect(sql).toMatch(/old\.status = 'released'[\s\S]*new\.status = 'archived'/iu);
@@ -119,6 +125,16 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toMatch(/security definer/iu);
     expect(sql).toMatch(/enable row level security/iu);
     expect(sql).toMatch(/grant execute[\s\S]*to authenticated/iu);
+    for (const signature of [
+      "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "transition_observatory_project_version(uuid,integer,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",
+    ]) {
+      expect(sql).toContain(`revoke all privileges on function public.${signature} from public,anon,authenticated,service_role`);
+      expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
+    }
   });
 
   it("freezes every Work Item scope field while its bound version is released or archived", async () => {

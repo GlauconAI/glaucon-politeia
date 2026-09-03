@@ -68,6 +68,12 @@ set semver = concat_ws('.',
 where not is_backlog
   and version_label ~ '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.(0|[1-9][0-9]*))?$';
 
+-- The new flag defaults false, but normalize explicitly before enforcing the invariant.
+-- This changes no Project scope or identity fields.
+update public.observatory_project_versions
+set is_release_target = false
+where is_backlog and is_release_target is distinct from false;
+
 alter table public.observatory_work_items
   alter column version_binding_kind set default 'optional',
   alter column version_binding_kind set not null,
@@ -95,6 +101,8 @@ alter table public.observatory_project_versions
     check (status in ('planned', 'active', 'gate_ready', 'released', 'archived', 'cancelled')),
   add constraint observatory_project_versions_semver_check
     check ((is_backlog and semver is null) or (not is_backlog and (semver is null or semver ~ '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'))),
+  add constraint observatory_project_versions_backlog_release_target_check
+    check (not (is_backlog and is_release_target)),
   add constraint observatory_project_versions_release_timestamp_check
     check (status not in ('released', 'archived') or released_at is not null);
 
@@ -121,36 +129,59 @@ declare
   predecessor_parts integer[];
   current_parts integer[];
 begin
-  if new.predecessor_version_id is null then return new; end if;
-  if new.predecessor_version_id = new.id then
-    raise exception 'OBSERVATORY_PREDECESSOR_SELF' using errcode = '23514';
+  if new.predecessor_version_id is not null then
+    if new.predecessor_version_id = new.id then
+      raise exception 'OBSERVATORY_PREDECESSOR_SELF' using errcode = '23514';
+    end if;
+    select * into predecessor from public.observatory_project_versions
+    where id = new.predecessor_version_id;
+    if predecessor.id is null then
+      raise exception 'OBSERVATORY_PREDECESSOR_NOT_FOUND' using errcode = '23503';
+    end if;
+    if predecessor.project_key <> new.project_key then
+      raise exception 'OBSERVATORY_PREDECESSOR_PROJECT_MISMATCH' using errcode = '23514';
+    end if;
+    if predecessor.semver is null or new.semver is null then
+      raise exception 'OBSERVATORY_PREDECESSOR_SEMVER_REQUIRED' using errcode = '23514';
+    end if;
+    predecessor_parts := string_to_array(predecessor.semver, '.')::integer[];
+    current_parts := string_to_array(new.semver, '.')::integer[];
+    if predecessor_parts >= current_parts then
+      raise exception 'OBSERVATORY_PREDECESSOR_ORDER_INVALID' using errcode = '23514';
+    end if;
+    with recursive predecessor_chain(id, predecessor_version_id) as (
+      select new.predecessor_version_id, predecessor.predecessor_version_id
+      union all
+      select version.id, version.predecessor_version_id
+      from public.observatory_project_versions version
+      join predecessor_chain chain on version.id = chain.predecessor_version_id
+    )
+    select exists(select 1 from predecessor_chain where id = new.id) into cycle_found;
+    if cycle_found then
+      raise exception 'OBSERVATORY_PREDECESSOR_CYCLE' using errcode = '23514';
+    end if;
   end if;
-  select * into predecessor from public.observatory_project_versions
-  where id = new.predecessor_version_id;
-  if predecessor.id is null then
-    raise exception 'OBSERVATORY_PREDECESSOR_NOT_FOUND' using errcode = '23503';
+  if exists (
+    select 1 from public.observatory_project_versions successor
+    where successor.predecessor_version_id = new.id
+      and successor.project_key <> new.project_key
+  ) then
+    raise exception 'OBSERVATORY_SUCCESSOR_PROJECT_MISMATCH' using errcode = '23514';
   end if;
-  if predecessor.project_key <> new.project_key then
-    raise exception 'OBSERVATORY_PREDECESSOR_PROJECT_MISMATCH' using errcode = '23514';
+  if exists (
+    select 1 from public.observatory_project_versions successor
+    where successor.predecessor_version_id = new.id
+      and (successor.semver is null or new.semver is null)
+  ) then
+    raise exception 'OBSERVATORY_SUCCESSOR_SEMVER_REQUIRED' using errcode = '23514';
   end if;
-  if predecessor.semver is null or new.semver is null then
-    raise exception 'OBSERVATORY_PREDECESSOR_SEMVER_REQUIRED' using errcode = '23514';
-  end if;
-  predecessor_parts := string_to_array(predecessor.semver, '.')::integer[];
-  current_parts := string_to_array(new.semver, '.')::integer[];
-  if predecessor_parts >= current_parts then
-    raise exception 'OBSERVATORY_PREDECESSOR_ORDER_INVALID' using errcode = '23514';
-  end if;
-  with recursive predecessor_chain(id, predecessor_version_id) as (
-    select new.predecessor_version_id, predecessor.predecessor_version_id
-    union all
-    select version.id, version.predecessor_version_id
-    from public.observatory_project_versions version
-    join predecessor_chain chain on version.id = chain.predecessor_version_id
-  )
-  select exists(select 1 from predecessor_chain where id = new.id) into cycle_found;
-  if cycle_found then
-    raise exception 'OBSERVATORY_PREDECESSOR_CYCLE' using errcode = '23514';
+  if exists (
+    select 1 from public.observatory_project_versions successor
+    where successor.predecessor_version_id = new.id
+      and string_to_array(new.semver, '.')::integer[] >=
+        string_to_array(successor.semver, '.')::integer[]
+  ) then
+    raise exception 'OBSERVATORY_SUCCESSOR_ORDER_INVALID' using errcode = '23514';
   end if;
   return new;
 end;

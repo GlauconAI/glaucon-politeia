@@ -55,6 +55,7 @@ describe("Project Version contract v1 verifier", () => {
         predecessorSelfReferences: 0,
         predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0,
+        predecessorNonCanonicalSemverReferences: 0,
         predecessorNonIncreasingReferences: 0,
         predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
@@ -91,6 +92,7 @@ describe("Project Version contract v1 verifier", () => {
         predecessorSelfReferences: 0,
         predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0,
+        predecessorNonCanonicalSemverReferences: 0,
         predecessorNonIncreasingReferences: 0,
         predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
@@ -107,20 +109,22 @@ describe("Project Version contract v1 verifier", () => {
       [{ legacy_non_semver_label_count: 7 }],
       [{ normalized_semver_collision_count: 3 }],
       [{ predecessor_self_count: 4, predecessor_missing_target_count: 2,
-        predecessor_cross_project_count: 5, predecessor_non_increasing_count: 6 }],
+        predecessor_cross_project_count: 5, predecessor_non_canonical_semver_count: 9,
+        predecessor_non_increasing_count: 6 }],
       [{ predecessor_cycle_count: 8 }],
       [{ duplicate_release_target_project_count: 6 }],
     ];
     const client = { unsafe: async () => results.shift() ?? [] };
     await expect(readProjectVersionContractPreflight(client)).resolves.toMatchObject({
       ok: false,
-      blockingIssueCount: 34,
+      blockingIssueCount: 43,
       warningCount: 7,
       blocking: {
         normalizedSemverCollisions: 3,
         predecessorSelfReferences: 4,
         predecessorMissingTargets: 2,
         predecessorCrossProjectReferences: 5,
+        predecessorNonCanonicalSemverReferences: 9,
         predecessorNonIncreasingReferences: 6,
         predecessorCycles: 8,
         duplicateReleaseTargetProjects: 6,
@@ -137,6 +141,7 @@ describe("Project Version contract v1 verifier", () => {
         missingBindings: 0, multipleExecutionProjects: 0, normalizedSemverCollisions: 0,
         predecessorSelfReferences: 0, predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0, predecessorNonIncreasingReferences: 0,
+        predecessorNonCanonicalSemverReferences: 0,
         predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
       },
       warnings: { legacyNonSemverLabels: 2 },
@@ -147,6 +152,7 @@ describe("Project Version contract v1 verifier", () => {
         missingBindings: 0, multipleExecutionProjects: 0, normalizedSemverCollisions: 1,
         predecessorSelfReferences: 0, predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0, predecessorNonIncreasingReferences: 0,
+        predecessorNonCanonicalSemverReferences: 0,
         predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
       },
       warnings: { legacyNonSemverLabels: 0 },
@@ -216,6 +222,7 @@ describe("Project Version contract v1 verifier", () => {
       "utf8",
     );
     expect(source).toContain("observatory_project_versions_status_check");
+    expect(source).toContain("observatory_project_versions_backlog_release_target_check");
     expect(source).toContain("observatory_work_items_version_binding_kind_check");
     for (const rpc of [
       "create_observatory_project_version",
@@ -236,7 +243,9 @@ describe("Project Version contract v1 verifier", () => {
     ]) {
       expect(source).toContain(`public.${signature}`);
     }
-    expect(source).toMatch(/has_function_privilege\('authenticated',[\s\S]*grantee\s*=\s*0[\s\S]*has_function_privilege\('anon'/iu);
+    expect(source).toMatch(/has_function_privilege\('authenticated',[\s\S]*not has_function_privilege\('service_role',[\s\S]*privilege\.grantee not in/iu);
+    expect(source).toMatch(/privilege\.grantee\s*=\s*\(select oid from pg_roles where rolname = 'authenticated'\)/iu);
+    expect(source).toMatch(/not exists\(select 1 from superseded_rpc_signatures where to_regprocedure\(signature\) is not null\)/iu);
     expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
   });

@@ -103,6 +103,7 @@ export type ProjectVersionPreflightCounts = {
   predecessorSelfReferences: number;
   predecessorMissingTargets: number;
   predecessorCrossProjectReferences: number;
+  predecessorNonCanonicalSemverReferences: number;
   predecessorNonIncreasingReferences: number;
   predecessorCycles: number;
   duplicateReleaseTargetProjects: number;
@@ -207,16 +208,20 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
   let predecessorSelfReferences = 0;
   let predecessorMissingTargets = 0;
   let predecessorCrossProjectReferences = 0;
+  let predecessorNonCanonicalSemverReferences = 0;
   let predecessorNonIncreasingReferences = 0;
   let predecessorCycles = 0;
   if (versionsTable && predecessorVersionId) {
+    const canonicalEndpointPredicate = semver
+      ? `version.semver ~ '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'
+            and predecessor.semver ~ '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'`
+      : `version.version_label ~ '^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?$'
+            and predecessor.version_label ~ '^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?$'`;
     const predecessorOrderPredicate = semver
-      ? `version.semver ~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'
-            and predecessor.semver ~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'
+      ? `${canonicalEndpointPredicate}
             and string_to_array(predecessor.semver, '.')::integer[] >=
               string_to_array(version.semver, '.')::integer[]`
-      : `version.version_label ~ '^v?[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$'
-            and predecessor.version_label ~ '^v?[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$'
+      : `${canonicalEndpointPredicate}
             and string_to_array(trim(leading 'v' from predecessor.version_label) ||
               case when predecessor.version_label ~ '^v?[0-9]+\\.[0-9]+$' then '.0' else '' end, '.')::integer[] >=
               string_to_array(trim(leading 'v' from version.version_label) ||
@@ -228,6 +233,9 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
         count(*) filter (where predecessor.id is not null and predecessor.project_key<>version.project_key)::integer
           as predecessor_cross_project_count,
         count(*) filter (
+          where predecessor.id is not null and not coalesce((${canonicalEndpointPredicate}), false)
+        )::integer as predecessor_non_canonical_semver_count,
+        count(*) filter (
           where predecessor.id is not null
             and ${predecessorOrderPredicate}
         )::integer as predecessor_non_increasing_count
@@ -238,6 +246,7 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
     predecessorSelfReferences = Number(row.predecessor_self_count ?? 0);
     predecessorMissingTargets = Number(row.predecessor_missing_target_count ?? 0);
     predecessorCrossProjectReferences = Number(row.predecessor_cross_project_count ?? 0);
+    predecessorNonCanonicalSemverReferences = Number(row.predecessor_non_canonical_semver_count ?? 0);
     predecessorNonIncreasingReferences = Number(row.predecessor_non_increasing_count ?? 0);
     predecessorCycles = await readCount(client, `
       with recursive predecessor_chain(origin, id, predecessor_version_id, path, cycle) as (
@@ -270,6 +279,7 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
     predecessorSelfReferences,
     predecessorMissingTargets,
     predecessorCrossProjectReferences,
+    predecessorNonCanonicalSemverReferences,
     predecessorNonIncreasingReferences,
     predecessorCycles,
     duplicateReleaseTargetProjects,
@@ -302,6 +312,14 @@ async function readDatabaseStatus(sql: Sql) {
       ('public.transition_observatory_project_version(uuid,integer,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text,uuid,text,text)'),
       ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)')
+    ), superseded_rpc_signatures(signature) as (values
+      ('public.create_observatory_project_version(text,text,text,text,date)'),
+      ('public.update_observatory_project_version(uuid,integer,text,text,text,date)'),
+      ('public.transition_observatory_project_version(uuid,integer,text)'),
+      ('public.create_observatory_work_item(text,text,text,text,text,text)'),
+      ('public.create_observatory_work_item(text,text,text,text,text)'),
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)'),
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)')
     ), resolved_bounded_rpcs as (
       select signature, to_regprocedure(signature) as procedure
       from bounded_rpc_signatures
@@ -321,12 +339,17 @@ async function readDatabaseStatus(sql: Sql) {
       to_regclass('public.observatory_project_versions_semver_idx') is not null as semver_index,
       exists(select 1 from pg_constraint where conrelid='public.observatory_project_versions'::regclass
         and conname='observatory_project_versions_status_check' and contype='c') as status_constraint,
+      exists(select 1 from pg_constraint where conrelid='public.observatory_project_versions'::regclass
+        and conname='observatory_project_versions_backlog_release_target_check' and contype='c')
+        as backlog_release_target_constraint,
       exists(select 1 from pg_constraint where conrelid='public.observatory_work_items'::regclass
         and conname='observatory_work_items_version_binding_kind_check' and contype='c') as binding_constraint,
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_validate_predecessor' and not tgisinternal) as predecessor_trigger,
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_protect_history' and not tgisinternal) as history_trigger,
       (select bool_and(procedure is not null) from resolved_bounded_rpcs)
         as bounded_rpcs,
+      not exists(select 1 from superseded_rpc_signatures where to_regprocedure(signature) is not null)
+        as superseded_rpcs_absent,
       exists(select 1 from pg_class where oid='public.observatory_project_versions'::regclass and relrowsecurity)
         and exists(select 1 from pg_class where oid='public.observatory_project_version_events'::regclass and relrowsecurity)
         as versions_and_events_rls,
@@ -340,6 +363,20 @@ async function readDatabaseStatus(sql: Sql) {
       (select bool_and(
         procedure is not null
         and has_function_privilege('authenticated',procedure,'EXECUTE')
+        and not has_function_privilege('service_role',procedure,'EXECUTE')
+        and not has_function_privilege('anon',procedure,'EXECUTE')
+        and exists (
+          select 1
+          from pg_proc function_catalog
+          cross join lateral aclexplode(coalesce(
+            function_catalog.proacl,
+            acldefault('f', function_catalog.proowner)
+          )) privilege
+          where function_catalog.oid = procedure
+            and privilege.privilege_type = 'EXECUTE'
+            and privilege.grantee = (select oid from pg_roles where rolname = 'authenticated')
+            and not privilege.is_grantable
+        )
         and not exists (
           select 1
           from pg_proc function_catalog
@@ -348,10 +385,12 @@ async function readDatabaseStatus(sql: Sql) {
             acldefault('f', function_catalog.proowner)
           )) privilege
           where function_catalog.oid = procedure
-            and privilege.grantee = 0
             and privilege.privilege_type = 'EXECUTE'
+            and privilege.grantee not in (
+              function_catalog.proowner,
+              (select oid from pg_roles where rolname = 'authenticated')
+            )
         )
-        and not has_function_privilege('anon',procedure,'EXECUTE')
       ) from resolved_bounded_rpcs) as rpc_grants,
       exists(select 1 from supabase_migrations.schema_migrations where version=${MIGRATION_VERSION}) as migration_recorded,
       not exists(select 1 from public.observatory_work_items item left join public.observatory_project_versions version
@@ -361,6 +400,8 @@ async function readDatabaseStatus(sql: Sql) {
         group by project_key having count(*)>1) as execution_versions_valid,
       not exists(select 1 from public.observatory_project_versions where is_release_target
         group by project_key having count(*)>1) as release_targets_valid,
+      not exists(select 1 from public.observatory_project_versions where is_backlog and is_release_target)
+        as backlog_release_targets_valid,
       not exists(select 1 from public.observatory_project_versions where semver is not null
         and semver !~ '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') as semver_valid,
       not exists(select 1 from public.observatory_project_versions version
