@@ -24,6 +24,21 @@ export const PROJECT_VERSION_STATUS_LABELS: Record<ProjectVersionStatus, string>
   archived: "已归档",
 };
 
+export function compactProjectVersionLabel(input: {
+  isBacklog: boolean;
+  versionLabel: string;
+}): string {
+  if (input.isBacklog) return "待";
+
+  const label = input.versionLabel.trim();
+  const numericVersion = /^v?(\d+(?:\.\d+)*)$/iu.exec(label);
+  if (!numericVersion) return label;
+
+  const parts = numericVersion[1].split(".");
+  while (parts.length > 1 && parts.at(-1) === "0") parts.pop();
+  return `V${parts.join(".")}`;
+}
+
 export function allowedProjectVersionTransitions(
   status: ProjectVersionStatus,
 ): ProjectVersionStatus[] {

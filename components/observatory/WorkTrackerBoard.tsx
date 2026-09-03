@@ -15,7 +15,10 @@ import type {
   ObservatoryWorkItemRow,
   ObservatoryProjectVersionRow,
 } from "@/lib/observatory/repository";
-import { PROJECT_VERSION_STATUS_LABELS } from "@/lib/observatory/project-versions";
+import {
+  compactProjectVersionLabel,
+  PROJECT_VERSION_STATUS_LABELS,
+} from "@/lib/observatory/project-versions";
 import {
   buildWorkItemDetailHref,
   buildWorkTrackerHref,
@@ -356,8 +359,14 @@ export function WorkTrackerBoard({
             Assigned · {item.assigned_agent_id}
           </span>
           {projectVersion ? (
-            <span className={`work-tracker-version-badge work-tracker-version-${projectVersion.status}`}>
-              {projectVersion.is_backlog ? "待规划" : projectVersion.version_label} · {PROJECT_VERSION_STATUS_LABELS[projectVersion.status]}
+            <span
+              className={`work-tracker-version-badge work-tracker-version-${projectVersion.status}`}
+              title={`${projectVersion.is_backlog ? "待规划" : projectVersion.version_label} · ${PROJECT_VERSION_STATUS_LABELS[projectVersion.status]}`}
+            >
+              {compactProjectVersionLabel({
+                isBacklog: projectVersion.is_backlog,
+                versionLabel: projectVersion.version_label,
+              })}
             </span>
           ) : null}
           <span className="work-tracker-claim-badge">{claimLabel}</span>
@@ -373,37 +382,42 @@ export function WorkTrackerBoard({
         role="group"
         aria-label="Work Tracker controls"
       >
-        {projects && trackedProjects.length > 0 ? (
-          <div className="work-tracker-filter">
-            <CanonicalProjectPicker
-              id="work-tracker-project-filter"
-              name="projectFilter"
-              projects={trackedProjects}
-              value={projectKey}
-              onChange={(nextProjectKey) => {
-                setProjectSelection(nextProjectKey);
-                setProjectVersionId("all");
-              }}
-              allowAll
-              selectLabel="Filter by Project"
-              allLabel="全部有 Item 的 Project"
-              showAvailabilityCount={false}
-            />
-          </div>
-        ) : null}
-        {projectKey !== "all" ? (
-          <div className="work-tracker-filter">
-            <ProjectVersionPicker
-              id="work-tracker-version-filter"
-              name="versionFilter"
-              versions={versions}
-              projectKey={projectKey}
-              value={projectVersionId}
-              onChange={setProjectVersionId}
-              allowAll
-            />
-          </div>
-        ) : null}
+        <div
+          className="work-tracker-filter-group"
+          data-testid="work-tracker-filter-group"
+        >
+          {projects && trackedProjects.length > 0 ? (
+            <div className="work-tracker-filter work-tracker-project-filter">
+              <CanonicalProjectPicker
+                id="work-tracker-project-filter"
+                name="projectFilter"
+                projects={trackedProjects}
+                value={projectKey}
+                onChange={(nextProjectKey) => {
+                  setProjectSelection(nextProjectKey);
+                  setProjectVersionId("all");
+                }}
+                allowAll
+                selectLabel="Filter by Project"
+                allLabel="全部有 Item 的 Project"
+                showAvailabilityCount={false}
+              />
+            </div>
+          ) : null}
+          {projectKey !== "all" ? (
+            <div className="work-tracker-filter work-tracker-version-filter">
+              <ProjectVersionPicker
+                id="work-tracker-version-filter"
+                name="versionFilter"
+                versions={versions}
+                projectKey={projectKey}
+                value={projectVersionId}
+                onChange={setProjectVersionId}
+                allowAll
+              />
+            </div>
+          ) : null}
+        </div>
         <span className="work-tracker-item-count">
           {filteredItems.length} of {state.items.length} items
         </span>
