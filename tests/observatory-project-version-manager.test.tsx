@@ -17,7 +17,7 @@ describe("ProjectVersionManager", () => {
     expect(screen.getByRole("button", { name: "创建计划版本" })).toBeInTheDocument();
     expect(screen.getByText("v1.0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "转为进行中" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "转为已归档" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "转为已取消" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /删除/u })).not.toBeInTheDocument();
   });
 });

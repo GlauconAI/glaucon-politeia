@@ -190,8 +190,32 @@ as $$
 declare
   version_project_key text;
   version_status text;
+  bound_version_status text;
   item_project_key text := coalesce(new.project_key, new.project_ref);
 begin
+  if tg_op = 'UPDATE' then
+    select status into bound_version_status
+    from public.observatory_project_versions where id = old.project_version_id;
+    if bound_version_status in ('released', 'archived') and (
+      new.type is distinct from old.type
+      or new.title is distinct from old.title
+      or new.description is distinct from old.description
+      or new.acceptance_criteria is distinct from old.acceptance_criteria
+      or new.priority is distinct from old.priority
+      or new.owner_id is distinct from old.owner_id
+      or new.assigned_agent_id is distinct from old.assigned_agent_id
+      or new.project_ref is distinct from old.project_ref
+      or new.milestone_ref is distinct from old.milestone_ref
+      or new.project_key is distinct from old.project_key
+      or new.plan_revision is distinct from old.plan_revision
+      or new.stage_id is distinct from old.stage_id
+      or new.work_package_id is distinct from old.work_package_id
+      or new.project_version_id is distinct from old.project_version_id
+      or new.version_binding_kind is distinct from old.version_binding_kind
+    ) then
+      raise exception 'OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE' using errcode = '23514';
+    end if;
+  end if;
   select project_key, status into version_project_key, version_status
   from public.observatory_project_versions where id = new.project_version_id;
   if version_project_key is null then
@@ -211,7 +235,9 @@ $$;
 drop trigger if exists observatory_work_items_validate_project_version
 on public.observatory_work_items;
 create trigger observatory_work_items_validate_project_version
-before insert or update of project_ref, project_key, project_version_id, version_binding_kind
+before insert or update of type, title, description, acceptance_criteria, priority, owner_id,
+  assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id,
+  work_package_id, project_version_id, version_binding_kind
 on public.observatory_work_items
 for each row execute function public.validate_observatory_work_item_project_version();
 
@@ -316,7 +342,7 @@ begin
   if not (
     (current_version.status='planned' and target_status in ('active','cancelled')) or
     (current_version.status='active' and target_status in ('gate_ready','cancelled')) or
-    (current_version.status='gate_ready' and target_status in ('active','released','cancelled')) or
+    (current_version.status='gate_ready' and target_status in ('active','released')) or
     (current_version.status='released' and target_status='archived')
   ) then raise exception 'OBSERVATORY_PROJECT_VERSION_TRANSITION_INVALID' using errcode='22023'; end if;
   if target_status='released' then

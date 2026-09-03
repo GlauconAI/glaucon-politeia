@@ -11,7 +11,7 @@ const DEFAULT_MIGRATION_PATH = resolve(
 export const ROLLBACK_GUIDANCE =
   "Forward-only rollback: roll back the application to the prior RPC contract; no destructive schema drop. Apply a new corrective migration when schema repair is required.";
 
-type Mode = "source" | "status" | "apply";
+type Mode = "source" | "preflight" | "status" | "apply";
 export type VerifierOptions = {
   mode: Mode;
   confirmLocalApply?: true;
@@ -36,8 +36,8 @@ export function parseProjectVersionVerifierArgs(argv: string[]): VerifierOptions
     const argument = argv[index];
     if (argument === "--mode") {
       const value = argv[++index];
-      if (!value || !["source", "status", "apply"].includes(value)) {
-        throw new Error("--mode must be source, status, or apply.");
+      if (!value || !["source", "preflight", "status", "apply"].includes(value)) {
+        throw new Error("--mode must be source, preflight, status, or apply.");
       }
       mode = value as Mode;
     } else if (argument === "--confirm-local-apply") {
@@ -75,11 +75,143 @@ export async function verifyProjectVersionContractSource(
   requirePattern(source, "predecessor integrity", /with recursive predecessor_chain[\s\S]*OBSERVATORY_PREDECESSOR_CYCLE/iu);
   checks.push("predecessor integrity");
   requirePattern(source, "lifecycle and release gates", /gate_ready[\s\S]*version_binding_kind = 'required'[\s\S]*RELEASE_GATE_INCOMPLETE/iu);
+  requirePattern(source, "exact gate-ready transitions", /current_version\.status='gate_ready' and target_status in \('active','released'\)/iu);
+  if (/current_version\.status='gate_ready'[\s\S]{0,120}'cancelled'/iu.test(source)) {
+    throw new Error("Source verification failed: exact gate-ready transitions.");
+  }
   checks.push("lifecycle and release gates");
+  requirePattern(
+    source,
+    "terminal work item scope",
+    /bound_version_status in \('released', 'archived'\)[\s\S]*new\.type is distinct from old\.type[\s\S]*new\.acceptance_criteria is distinct from old\.acceptance_criteria[\s\S]*new\.owner_id is distinct from old\.owner_id[\s\S]*new\.project_version_id is distinct from old\.project_version_id[\s\S]*OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE/iu,
+  );
+  checks.push("terminal work item scope");
   requirePattern(source, "security and audit", /security definer[\s\S]*jsonb_build_object\('before'[\s\S]*grant execute/iu);
   checks.push("security and audit");
   checks.push("rollback guidance");
   return { mode: "source" as const, ok: true, checks, rollbackGuidance: ROLLBACK_GUIDANCE };
+}
+
+type ReadOnlySqlClient = {
+  unsafe: (statement: string) => Promise<readonly Record<string, unknown>[]>;
+};
+
+export type ProjectVersionPreflightCounts = {
+  missingBindings: number;
+  multipleExecutionProjects: number;
+  invalidFormalLabels: number;
+  predecessorSelfReferences: number;
+  predecessorCrossProjectReferences: number;
+  duplicateReleaseTargetProjects: number;
+};
+
+async function readCount(
+  client: ReadOnlySqlClient,
+  statement: string,
+  key: string,
+): Promise<number> {
+  const [row] = await client.unsafe(statement);
+  return Number(row?.[key] ?? 0);
+}
+
+export async function readProjectVersionContractPreflight(client: ReadOnlySqlClient) {
+  const [capabilities = {}] = await client.unsafe(`
+    select
+      to_regclass('public.observatory_project_versions') is not null as versions_table,
+      to_regclass('public.observatory_work_items') is not null as work_items_table,
+      exists(select 1 from information_schema.columns where table_schema='public'
+        and table_name='observatory_work_items' and column_name='project_version_id') as project_version_id,
+      exists(select 1 from information_schema.columns where table_schema='public'
+        and table_name='observatory_project_versions' and column_name='predecessor_version_id') as predecessor_version_id,
+      exists(select 1 from information_schema.columns where table_schema='public'
+        and table_name='observatory_project_versions' and column_name='is_release_target') as is_release_target,
+      exists(select 1 from information_schema.columns where table_schema='public'
+        and table_name='observatory_project_versions' and column_name='is_backlog') as is_backlog
+  `);
+  const versionsTable = capabilities.versions_table === true;
+  const workItemsTable = capabilities.work_items_table === true;
+  const projectVersionId = capabilities.project_version_id === true;
+  const predecessorVersionId = capabilities.predecessor_version_id === true;
+  const releaseTarget = capabilities.is_release_target === true;
+  const backlog = capabilities.is_backlog === true;
+
+  let missingBindings = 0;
+  if (workItemsTable && !projectVersionId) {
+    missingBindings = await readCount(
+      client,
+      "select count(*)::integer as missing_binding_count from public.observatory_work_items",
+      "missing_binding_count",
+    );
+  } else if (workItemsTable && projectVersionId && !versionsTable) {
+    missingBindings = await readCount(
+      client,
+      "select count(*)::integer as missing_binding_count from public.observatory_work_items",
+      "missing_binding_count",
+    );
+  } else if (workItemsTable && projectVersionId && versionsTable) {
+    missingBindings = await readCount(client, `
+      select count(*)::integer as missing_binding_count
+      from public.observatory_work_items item
+      left join public.observatory_project_versions version on version.id=item.project_version_id
+      where item.project_version_id is null or version.id is null
+        or version.project_key<>coalesce(item.project_key,item.project_ref)
+    `, "missing_binding_count");
+  }
+
+  const multipleExecutionProjects = versionsTable
+    ? await readCount(client, `
+        select count(*)::integer as multiple_execution_project_count from (
+          select project_key from public.observatory_project_versions
+          where status in ('active','gate_ready') group by project_key having count(*)>1
+        ) duplicates
+      `, "multiple_execution_project_count")
+    : 0;
+  const invalidFormalLabels = versionsTable
+    ? await readCount(client, `
+        select count(*)::integer as invalid_formal_label_count
+        from public.observatory_project_versions
+        where ${backlog ? "not is_backlog and" : ""}
+          version_label !~ '^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?$'
+      `, "invalid_formal_label_count")
+    : 0;
+
+  let predecessorSelfReferences = 0;
+  let predecessorCrossProjectReferences = 0;
+  if (versionsTable && predecessorVersionId) {
+    const [row = {}] = await client.unsafe(`
+      select
+        count(*) filter (where version.predecessor_version_id=version.id)::integer as predecessor_self_count,
+        count(*) filter (where predecessor.id is not null and predecessor.project_key<>version.project_key)::integer
+          as predecessor_cross_project_count
+      from public.observatory_project_versions version
+      left join public.observatory_project_versions predecessor on predecessor.id=version.predecessor_version_id
+      where version.predecessor_version_id is not null
+    `);
+    predecessorSelfReferences = Number(row.predecessor_self_count ?? 0);
+    predecessorCrossProjectReferences = Number(row.predecessor_cross_project_count ?? 0);
+  }
+  const duplicateReleaseTargetProjects = versionsTable && releaseTarget
+    ? await readCount(client, `
+        select count(*)::integer as duplicate_release_target_project_count from (
+          select project_key from public.observatory_project_versions
+          where is_release_target group by project_key having count(*)>1
+        ) duplicates
+      `, "duplicate_release_target_project_count")
+    : 0;
+
+  const counts: ProjectVersionPreflightCounts = {
+    missingBindings,
+    multipleExecutionProjects,
+    invalidFormalLabels,
+    predecessorSelfReferences,
+    predecessorCrossProjectReferences,
+    duplicateReleaseTargetProjects,
+  };
+  return {
+    mode: "preflight" as const,
+    ok: Object.values(counts).every((count) => count === 0),
+    counts,
+  };
 }
 
 async function readDatabaseStatus(sql: Sql) {
@@ -173,10 +305,15 @@ async function applyMigration(sql: Sql) {
 export async function runProjectVersionContractVerifier(options: VerifierOptions) {
   if (options.mode === "source") return verifyProjectVersionContractSource();
   const databaseUrl = process.env.OBSERVATORY_DATABASE_URL ?? process.env.OBSERVATORY_LOCAL_DB_URL;
-  if (!databaseUrl) throw new Error("Database status mode requires OBSERVATORY_DATABASE_URL or OBSERVATORY_LOCAL_DB_URL.");
+  if (!databaseUrl) throw new Error(`Database ${options.mode} mode requires OBSERVATORY_DATABASE_URL or OBSERVATORY_LOCAL_DB_URL.`);
   if (options.mode === "apply") assertLocalProjectVersionApplyTarget(databaseUrl);
   const sql = postgres(databaseUrl, { connect_timeout: 10, idle_timeout: 5, max: 1, onnotice: () => undefined });
   try {
+    if (options.mode === "preflight") {
+      return await readProjectVersionContractPreflight({
+        unsafe: (statement) => sql.unsafe(statement),
+      });
+    }
     if (options.mode === "apply") await applyMigration(sql);
     return await readDatabaseStatus(sql);
   } finally {

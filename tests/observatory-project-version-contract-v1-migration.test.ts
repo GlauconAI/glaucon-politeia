@@ -78,7 +78,8 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toMatch(/with recursive predecessor_chain/iu);
     expect(sql).toContain("protect_observatory_project_version_history");
     expect(sql).toMatch(/old\.status = 'released'[\s\S]*new\.status = 'archived'/iu);
-    expect(sql).toMatch(/current_version\.status\s*=\s*'gate_ready'[\s\S]*target_status\s+in\s+\('active','released','cancelled'\)/iu);
+    expect(sql).toMatch(/current_version\.status\s*=\s*'gate_ready'[\s\S]*target_status\s+in\s+\('active','released'\)/iu);
+    expect(sql).not.toMatch(/current_version\.status\s*=\s*'gate_ready'[\s\S]{0,120}'cancelled'/iu);
     expect(sql).toMatch(/current_version\.is_backlog[\s\S]*OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE/iu);
     expect(sql).toMatch(/count\(\*\)[\s\S]*version_binding_kind = 'required'[\s\S]*state <> 'done'/iu);
     for (const gate of [
@@ -108,7 +109,7 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toMatch(/version_status in \('released', 'archived', 'cancelled'\)/iu);
     expect(sql).toMatch(/old\.project_version_id is distinct from new\.project_version_id|new\.project_version_id is distinct from old\.project_version_id/iu);
     expect(sql).toMatch(/drop trigger if exists observatory_work_items_validate_project_version/iu);
-    expect(sql).toMatch(/update of project_ref, project_key, project_version_id, version_binding_kind/iu);
+    expect(sql).toMatch(/update of[\s\S]{0,400}project_ref[\s\S]{0,200}project_key[\s\S]{0,200}project_version_id, version_binding_kind/iu);
     expect(sql).toMatch(/drop function if exists public\.create_observatory_work_item\(text,text,text,text,text,text\)/iu);
     expect(sql).toMatch(/drop function if exists public\.create_observatory_work_item\(text,text,text,text,text\)/iu);
     expect(sql).toMatch(/drop function if exists public\.update_observatory_work_item\(uuid,integer,text,text,text,text,text,uuid,text,text\)/iu);
@@ -118,5 +119,33 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toMatch(/security definer/iu);
     expect(sql).toMatch(/enable row level security/iu);
     expect(sql).toMatch(/grant execute[\s\S]*to authenticated/iu);
+  });
+
+  it("freezes every Work Item scope field while its bound version is released or archived", async () => {
+    const sql = await migration();
+    expect(sql).toContain("OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE");
+    expect(sql).toMatch(/bound_version_status\s+in\s+\('released',\s*'archived'\)/iu);
+    for (const column of [
+      "type",
+      "title",
+      "description",
+      "acceptance_criteria",
+      "priority",
+      "owner_id",
+      "assigned_agent_id",
+      "project_ref",
+      "milestone_ref",
+      "project_key",
+      "plan_revision",
+      "stage_id",
+      "work_package_id",
+      "project_version_id",
+      "version_binding_kind",
+    ]) {
+      expect(sql).toMatch(new RegExp(`new\\.${column}\\s+is distinct from\\s+old\\.${column}`, "iu"));
+    }
+    expect(sql).toMatch(
+      /before insert or update of type, title, description, acceptance_criteria, priority, owner_id, assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id, work_package_id, project_version_id, version_binding_kind/iu,
+    );
   });
 });
