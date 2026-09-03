@@ -315,11 +315,13 @@ async function readDatabaseStatus(sql: Sql) {
     ), superseded_rpc_signatures(signature) as (values
       ('public.create_observatory_project_version(text,text,text,text,date)'),
       ('public.update_observatory_project_version(uuid,integer,text,text,text,date)'),
-      ('public.transition_observatory_project_version(uuid,integer,text)'),
+      ('public.create_observatory_work_item(text,text,text,text,text,uuid,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text)'),
       ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)'),
-      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)')
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text)'),
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)'),
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid)')
     ), resolved_bounded_rpcs as (
       select signature, to_regprocedure(signature) as procedure
       from bounded_rpc_signatures

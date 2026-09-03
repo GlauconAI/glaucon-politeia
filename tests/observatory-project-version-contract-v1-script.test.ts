@@ -14,6 +14,13 @@ import {
   verifyProjectVersionContractSource,
 } from "@/scripts/observatory/verify-project-version-contract-v1";
 
+function normalizedSignatures(source: string, start: string, end: string) {
+  const body = source.slice(source.indexOf(start) + start.length, source.indexOf(end));
+  return [...body.matchAll(/'public\.([^']+)'/gu)]
+    .map((match) => match[1].replace(/\s+/gu, ""))
+    .sort();
+}
+
 describe("Project Version contract v1 verifier", () => {
   it("defaults to offline source verification and requires explicit apply intent", () => {
     expect(parseProjectVersionVerifierArgs([])).toEqual({ mode: "source" });
@@ -248,5 +255,47 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toMatch(/not exists\(select 1 from superseded_rpc_signatures where to_regprocedure\(signature\) is not null\)/iu);
     expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
+  });
+
+  it("keeps exact disjoint current and superseded RPC inventories covering every migration drop", async () => {
+    const [verifierSource, migrationSource] = await Promise.all([
+      readFile(join(process.cwd(), "scripts/observatory/verify-project-version-contract-v1.ts"), "utf8"),
+      readFile(join(process.cwd(), "supabase/migrations/20260902000300_work_tracker_project_version_contract_v1.sql"), "utf8"),
+    ]);
+    const current = normalizedSignatures(
+      verifierSource,
+      "bounded_rpc_signatures(signature) as (values",
+      "), superseded_rpc_signatures(signature) as (values",
+    );
+    const superseded = normalizedSignatures(
+      verifierSource,
+      "superseded_rpc_signatures(signature) as (values",
+      "), resolved_bounded_rpcs as (",
+    );
+
+    expect(current).toEqual([
+      "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
+      "transition_observatory_project_version(uuid,integer,text)",
+      "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",
+    ].sort());
+    expect(superseded).toEqual([
+      "create_observatory_project_version(text,text,text,text,date)",
+      "create_observatory_work_item(text,text,text,text,text)",
+      "create_observatory_work_item(text,text,text,text,text,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text)",
+      "update_observatory_project_version(uuid,integer,text,text,text,date)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid)",
+    ].sort());
+    expect(current.filter((signature) => superseded.includes(signature))).toEqual([]);
+
+    const represented = new Set([...current, ...superseded]);
+    const dropped = [...migrationSource.matchAll(/drop function if exists public\.([^;]+);/giu)]
+      .map((match) => match[1].replace(/\s+/gu, ""));
+    expect(dropped.filter((signature) => !represented.has(signature))).toEqual([]);
   });
 });
