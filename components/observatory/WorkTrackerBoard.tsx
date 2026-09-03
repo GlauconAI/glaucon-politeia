@@ -385,9 +385,20 @@ export function WorkTrackerBoard({
         <div
           className="work-tracker-filter-group"
           data-testid="work-tracker-filter-group"
+          style={{
+            display: "flex",
+            minWidth: 0,
+            flex: "1 1 auto",
+            alignItems: "flex-end",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
         >
           {projects && trackedProjects.length > 0 ? (
-            <div className="work-tracker-filter work-tracker-project-filter">
+            <div
+              className="work-tracker-filter work-tracker-project-filter"
+              style={{ width: "min(100%, 562px)" }}
+            >
               <CanonicalProjectPicker
                 id="work-tracker-project-filter"
                 name="projectFilter"
@@ -405,7 +416,10 @@ export function WorkTrackerBoard({
             </div>
           ) : null}
           {projectKey !== "all" ? (
-            <div className="work-tracker-filter work-tracker-version-filter">
+            <div
+              className="work-tracker-filter work-tracker-version-filter"
+              style={{ flex: "0 1 220px" }}
+            >
               <ProjectVersionPicker
                 id="work-tracker-version-filter"
                 name="versionFilter"
