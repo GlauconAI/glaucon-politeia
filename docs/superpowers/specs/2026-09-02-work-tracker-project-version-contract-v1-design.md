@@ -23,6 +23,7 @@ Extend `observatory_project_versions` with:
 - canonical SemVer in `semver` for formal versions;
 - `gate_ready` and `cancelled` lifecycle states;
 - `is_release_target` with one release target per Project;
+- a release transition retires the current release-target marker so the Project can select its next target while the audit snapshot preserves the historical fact;
 - `milestone_ref`, `predecessor_version_id`, `roadmap_ref`, and `approved_plan_ref`;
 - `acceptance_summary`, `actual_date`, and Gate evidence fields;
 - `dependencies_summary` plus explicit dependency, Artifact, Verification, roadmap-reconciliation, and User Gate checks.
@@ -35,7 +36,7 @@ The migration is additive and transaction-wrapped. It normalizes only parseable 
 
 Before enforcing the one-execution-version invariant, the migration checks for Projects with more than one `active` or `gate_ready` version. It fails closed instead of selecting a winner. It also refuses to make the Work Item binding mandatory while unresolved legacy rows remain. Production application therefore stops at the persisted-but-not-applied Gate until an authorized operator reviews the preflight output.
 
-Rollback is forward-only: keep historical rows and audit events, deploy the prior application revision, and disable new v1 mutation entry points. Do not drop the version tables or rewrite released history.
+Recovery is forward-only: keep historical rows, audit events, and the v1 application contract, then deploy a reviewed forward application or migration correction. Compatibility overloads preserve bounded RPC input shapes but do not restore the prior lifecycle graph. Do not roll back to a pre-v1 application, drop the version tables, or rewrite released history.
 
 ## Lifecycle and release Gate
 

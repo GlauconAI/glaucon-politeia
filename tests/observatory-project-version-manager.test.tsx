@@ -59,6 +59,9 @@ describe("ProjectVersionManager", () => {
     expect(screen.getAllByLabelText("Predecessor version").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Canonical roadmap reference").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Approved Plan reference").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("SemVer for 0.4.0")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("SemVer for 0.5.0")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Released and archived roadmap records are immutable.")).toHaveLength(2);
   });
 
   it("shows safe legacy placeholders when contract fields are absent", () => {

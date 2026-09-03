@@ -73,7 +73,7 @@ describe("Project Version contract v1 verifier", () => {
         predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
       },
-      warnings: { legacyNonSemverLabels: 3 },
+      warnings: { legacyNonSemverLabels: 3, legacyMissingReleaseTimestamps: 0 },
     });
     expect(statements).toHaveLength(5);
     expect(statements.join("\n")).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\b/iu);
@@ -110,14 +110,15 @@ describe("Project Version contract v1 verifier", () => {
         predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
       },
-      warnings: { legacyNonSemverLabels: 0 },
+      warnings: { legacyNonSemverLabels: 0, legacyMissingReleaseTimestamps: 0 },
     });
   });
 
   it("reports predecessor and release-target issues when v1 columns are present", async () => {
     const results = [
       [{ versions_table: true, work_items_table: false, project_version_id: false,
-        predecessor_version_id: true, is_release_target: true, is_backlog: true, semver: true }],
+        predecessor_version_id: true, is_release_target: true, is_backlog: true, semver: true,
+        released_at: true }],
       [{ multiple_execution_project_count: 0 }],
       [{ legacy_non_semver_label_count: 7 }],
       [{ normalized_semver_collision_count: 3 }],
@@ -126,12 +127,13 @@ describe("Project Version contract v1 verifier", () => {
         predecessor_non_increasing_count: 6 }],
       [{ predecessor_cycle_count: 8 }],
       [{ duplicate_release_target_project_count: 6 }],
+      [{ legacy_missing_release_timestamp_count: 2 }],
     ];
     const client = { unsafe: async () => results.shift() ?? [] };
     await expect(readProjectVersionContractPreflight(client)).resolves.toMatchObject({
       ok: false,
       blockingIssueCount: 43,
-      warningCount: 7,
+      warningCount: 9,
       blocking: {
         normalizedSemverCollisions: 3,
         predecessorSelfReferences: 4,
@@ -142,7 +144,7 @@ describe("Project Version contract v1 verifier", () => {
         predecessorCycles: 8,
         duplicateReleaseTargetProjects: 6,
       },
-      warnings: { legacyNonSemverLabels: 7 },
+      warnings: { legacyNonSemverLabels: 7, legacyMissingReleaseTimestamps: 2 },
     });
     expect(results).toHaveLength(0);
   });
@@ -157,7 +159,7 @@ describe("Project Version contract v1 verifier", () => {
         predecessorNonCanonicalSemverReferences: 0,
         predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
       },
-      warnings: { legacyNonSemverLabels: 2 },
+      warnings: { legacyNonSemverLabels: 2, legacyMissingReleaseTimestamps: 0 },
     })).not.toThrow();
     expect(() => assertProjectVersionPreflightAllowsApply({
       mode: "preflight", ok: false, blockingIssueCount: 1, warningCount: 0,
@@ -168,24 +170,28 @@ describe("Project Version contract v1 verifier", () => {
         predecessorNonCanonicalSemverReferences: 0,
         predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
       },
-      warnings: { legacyNonSemverLabels: 0 },
+      warnings: { legacyNonSemverLabels: 0, legacyMissingReleaseTimestamps: 0 },
     })).toThrow(/preflight blocked apply[\s\S]*normalizedSemverCollisions/u);
   });
 
   it("fails preflight safely when database configuration is absent", async () => {
     const databaseUrl = process.env.OBSERVATORY_DATABASE_URL;
     const localDatabaseUrl = process.env.OBSERVATORY_LOCAL_DB_URL;
+    const supabaseDatabaseUrl = process.env.SUPABASE_DB_URL;
     delete process.env.OBSERVATORY_DATABASE_URL;
     delete process.env.OBSERVATORY_LOCAL_DB_URL;
+    delete process.env.SUPABASE_DB_URL;
     try {
       await expect(runProjectVersionContractVerifier({ mode: "preflight" })).rejects.toThrow(
-        /^Database preflight mode requires OBSERVATORY_DATABASE_URL or OBSERVATORY_LOCAL_DB_URL\.$/u,
+        /^Database preflight mode requires OBSERVATORY_DATABASE_URL, OBSERVATORY_LOCAL_DB_URL, or SUPABASE_DB_URL\.$/u,
       );
     } finally {
       if (databaseUrl === undefined) delete process.env.OBSERVATORY_DATABASE_URL;
       else process.env.OBSERVATORY_DATABASE_URL = databaseUrl;
       if (localDatabaseUrl === undefined) delete process.env.OBSERVATORY_LOCAL_DB_URL;
       else process.env.OBSERVATORY_LOCAL_DB_URL = localDatabaseUrl;
+      if (supabaseDatabaseUrl === undefined) delete process.env.SUPABASE_DB_URL;
+      else process.env.SUPABASE_DB_URL = supabaseDatabaseUrl;
     }
   });
 
@@ -216,8 +222,8 @@ describe("Project Version contract v1 verifier", () => {
       "security and audit",
       "rollback guidance",
     ]));
-    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*compatibility overloads[\s\S]*prior application revision/iu);
-    expect(result.rollbackGuidance).toMatch(/never drop the schema[\s\S]*rewrite migration history/iu);
+    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*compatibility overloads[\s\S]*not the prior lifecycle semantics/iu);
+    expect(result.rollbackGuidance).toMatch(/never roll back to a pre-v1 application[\s\S]*rewrite migration history/iu);
   });
 
   it("reports a bounded source failure without exposing source contents", async () => {
@@ -244,6 +250,14 @@ describe("Project Version contract v1 verifier", () => {
       source.replace("existing_item.project_version_id is distinct from p_project_version_id", "existing_item.project_version_id is distinct from selected_version.id"),
       source.replace("'version_binding_kind',created_item.version_binding_kind", "'idempotency_key',created_item.idempotency_key"),
       source.replace("conname = 'observatory_project_versions_check'", "conname like '%status%released_at%'"),
+      source.replace(
+        "is_release_target=case when target_status in ('released','cancelled') then false else current_version.is_release_target end,",
+        "is_release_target=current_version.is_release_target,",
+      ),
+      source.replace(
+        "set released_at = coalesce(released_at, updated_at, created_at)",
+        "set released_at = released_at",
+      ),
     ];
     for (const [index, weakened] of weakenedCases.entries()) {
       const path = join(directory, `weakened-${index}.sql`);
@@ -265,6 +279,7 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toMatch(/tgname='observatory_work_items_validate_project_version'[\s\S]*tgenabled in \('O','A'\)[\s\S]*validate_observatory_work_item_project_version/iu);
     expect(source).toMatch(/as graph_lock_trigger[\s\S]*as graph_lock_function[\s\S]*as work_item_validator_lock[\s\S]*as version_update_lock_order[\s\S]*as version_transition_lock_order[\s\S]*as predecessor_validator_lock/iu);
     expect(source).toMatch(/pg_get_triggerdef[\s\S]*observatory_project_versions_lock_graph/iu);
+    expect(source).toMatch(/tgname='observatory_project_versions_lock_graph'[\s\S]*\(tgtype & 1\)=0[\s\S]*\(tgtype & 2\)=2[\s\S]*\(tgtype & 4\)=4[\s\S]*\(tgtype & 16\)=16/iu);
     expect(source).toMatch(/pg_get_functiondef[\s\S]*pg_advisory_xact_lock[\s\S]*for key share/iu);
     for (const rpc of [
       "create_observatory_project_version",

@@ -99,6 +99,18 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).not.toMatch(/update public\.observatory_project_versions[\s\S]{0,300}set status = 'released'/iu);
   });
 
+  it("retires the current release target when that version is released or cancelled", async () => {
+    const sql = await migration();
+    const releaseTransition = sql.slice(
+      sql.indexOf("create function public.transition_observatory_project_version"),
+      sql.indexOf("-- Work Item RPCs"),
+    );
+
+    expect(releaseTransition).toMatch(
+      /is_release_target\s*=\s*case when target_status in \('released','cancelled'\) then false else current_version\.is_release_target end/iu,
+    );
+  });
+
   it("serializes graph validation and binding against concurrent version mutations", async () => {
     const sql = await migration();
     expect(sql).toMatch(/create or replace function public\.lock_observatory_project_version_graph[\s\S]*pg_advisory_xact_lock\(20960902000300\)/iu);
@@ -108,6 +120,8 @@ describe("Project Version contract v1 migration", () => {
       sql.indexOf("create trigger observatory_project_versions_validate_predecessor"),
     );
     expect(predecessorValidator).toMatch(/pg_advisory_xact_lock\(20960902000300\)/iu);
+    expect(predecessorValidator).toMatch(/::numeric\[\]/iu);
+    expect(predecessorValidator).not.toMatch(/::integer\[\]/iu);
     expect(predecessorValidator.indexOf("pg_advisory_xact_lock")).toBeLessThan(
       predecessorValidator.indexOf("new.predecessor_version_id"),
     );
@@ -174,6 +188,10 @@ describe("Project Version contract v1 migration", () => {
 
   it("defines the exact canonical checks including both release dates", async () => {
     const sql = await migration();
+    expect(sql).toMatch(/set released_at = coalesce\(released_at, updated_at, created_at\) where status in \('released', 'archived'\) and released_at is null/iu);
+    expect(sql.indexOf("set released_at = coalesce(released_at, updated_at, created_at)")).toBeLessThan(
+      sql.indexOf("observatory_project_versions_release_timestamp_check"),
+    );
     expect(sql).toMatch(/update public\.observatory_project_versions set actual_date = released_at::date where status in \('released', 'archived'\) and actual_date is null/iu);
     expect(sql.indexOf("set actual_date = released_at::date")).toBeLessThan(
       sql.indexOf("observatory_project_versions_release_timestamp_check"),
@@ -211,7 +229,7 @@ describe("Project Version contract v1 migration", () => {
       "update_observatory_work_item",
     ]) expect(sql).toContain(name);
     expect(sql).toMatch(/create function public\.create_observatory_project_version\( p_project_key text, p_version_label text, p_title text, p_description text, p_target_date date \)[\s\S]*return public\.create_observatory_project_version\([\s\S]*p_semver/iu);
-    expect(sql).toMatch(/create function public\.update_observatory_project_version\( p_project_version_id uuid, p_expected_version integer, p_version_label text, p_title text, p_description text, p_target_date date \)[\s\S]*return public\.update_observatory_project_version\([\s\S]*current_version\.semver/iu);
+    expect(sql).toMatch(/create function public\.update_observatory_project_version\( p_project_version_id uuid, p_expected_version integer, p_version_label text, p_title text, p_description text, p_target_date date \)[\s\S]*normalized_semver[\s\S]*return public\.update_observatory_project_version\([\s\S]*normalized_semver/iu);
     expect(sql).toMatch(/drop function if exists public\.transition_observatory_project_version\(/iu);
     expect(sql).toMatch(/jsonb_build_object\('before',\s*to_jsonb\(current_version\),\s*'after',\s*to_jsonb\(updated_version\)\)/iu);
     expect(sql).toMatch(/version_status in \('released', 'archived', 'cancelled'\)/iu);

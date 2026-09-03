@@ -74,7 +74,13 @@ update public.observatory_project_versions
 set is_release_target = false
 where is_backlog and is_release_target is distinct from false;
 
--- Preserve historical release timing while populating the new canonical actual date.
+-- Preserve legacy release history deterministically. Archived rows were allowed to
+-- omit released_at in v0, so use their last recorded mutation time before falling
+-- back to creation time; never invent a new deployment-time timestamp.
+update public.observatory_project_versions
+set released_at = coalesce(released_at, updated_at, created_at)
+where status in ('released', 'archived') and released_at is null;
+
 update public.observatory_project_versions
 set actual_date = released_at::date
 where status in ('released', 'archived') and actual_date is null;
@@ -166,8 +172,8 @@ as $$
 declare
   predecessor public.observatory_project_versions;
   cycle_found boolean;
-  predecessor_parts integer[];
-  current_parts integer[];
+  predecessor_parts numeric[];
+  current_parts numeric[];
 begin
   -- One transaction-scoped global graph lock serializes all low-volume inserts and
   -- project_key/semver/predecessor mutations before any counterpart validation.
@@ -187,8 +193,8 @@ begin
     if predecessor.semver is null or new.semver is null then
       raise exception 'OBSERVATORY_PREDECESSOR_SEMVER_REQUIRED' using errcode = '23514';
     end if;
-    predecessor_parts := string_to_array(predecessor.semver, '.')::integer[];
-    current_parts := string_to_array(new.semver, '.')::integer[];
+    predecessor_parts := string_to_array(predecessor.semver, '.')::numeric[];
+    current_parts := string_to_array(new.semver, '.')::numeric[];
     if predecessor_parts >= current_parts then
       raise exception 'OBSERVATORY_PREDECESSOR_ORDER_INVALID' using errcode = '23514';
     end if;
@@ -221,8 +227,8 @@ begin
   if exists (
     select 1 from public.observatory_project_versions successor
     where successor.predecessor_version_id = new.id
-      and string_to_array(new.semver, '.')::integer[] >=
-        string_to_array(successor.semver, '.')::integer[]
+      and string_to_array(new.semver, '.')::numeric[] >=
+        string_to_array(successor.semver, '.')::numeric[]
   ) then
     raise exception 'OBSERVATORY_SUCCESSOR_ORDER_INVALID' using errcode = '23514';
   end if;
@@ -458,6 +464,7 @@ begin
   update public.observatory_project_versions set status=target_status,
     released_at=case when target_status='released' then now() else current_version.released_at end,
     actual_date=case when target_status='released' then coalesce(current_version.actual_date,current_date) else current_version.actual_date end,
+    is_release_target=case when target_status in ('released','cancelled') then false else current_version.is_release_target end,
     row_version=current_version.row_version+1, updated_by=calling_user, updated_at=now()
   where id=current_version.id and row_version=p_expected_version returning * into strict updated_version;
   insert into public.observatory_project_version_events(project_version_id,event_type,actor_id,data)
@@ -607,9 +614,9 @@ begin
 end;
 $$;
 
--- Keep prior application revisions usable after this forward-only migration.
--- Every compatibility overload delegates to the v1 mutation boundary so it
--- inherits current validation, locking, terminal-scope, audit, and Gate rules.
+-- Preserve bounded prior RPC input shapes for callers that already conform to
+-- v1 lifecycle semantics. These overloads do not restore the prior transition
+-- graph; recovery after migration is forward-only at both schema and app level.
 create function public.create_observatory_project_version(
   p_project_key text, p_version_label text, p_title text,
   p_description text, p_target_date date
@@ -640,12 +647,15 @@ create function public.update_observatory_project_version(
 returns public.observatory_project_versions
 language plpgsql security definer set search_path = pg_catalog
 as $$
-declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions;
+declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions; semver_parts text[]; normalized_semver text;
 begin
   if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   select * into current_version from public.observatory_project_versions where id=p_project_version_id;
+  semver_parts := regexp_match(btrim(p_version_label), '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.(0|[1-9][0-9]*))?$');
+  if semver_parts is null then raise exception 'OBSERVATORY_PROJECT_VERSION_SEMVER_INVALID' using errcode='22023'; end if;
+  normalized_semver := semver_parts[1] || '.' || semver_parts[2] || '.' || coalesce(semver_parts[3], '0');
   return public.update_observatory_project_version(
-    p_project_version_id, p_expected_version, p_version_label, current_version.semver,
+    p_project_version_id, p_expected_version, p_version_label, normalized_semver,
     p_title, p_description, p_target_date, current_version.is_release_target,
     current_version.milestone_ref, current_version.predecessor_version_id,
     current_version.roadmap_ref, current_version.approved_plan_ref,

@@ -2,14 +2,14 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
-import postgres, { type Sql } from "postgres";
+import postgres, { type Sql, type TransactionSql } from "postgres";
 
 const MIGRATION_VERSION = "20260902000300";
 const DEFAULT_MIGRATION_PATH = resolve(
   "supabase/migrations/20260902000300_work_tracker_project_version_contract_v1.sql",
 );
 export const ROLLBACK_GUIDANCE =
-  "Forward-only rollback: compatibility overloads keep the prior application revision usable while the additive schema remains in place. Roll back application code only; never drop the schema or rewrite migration history.";
+  "Forward-only recovery: keep the additive schema and v1 application contract in place, then ship a reviewed forward application or migration correction. Compatibility overloads preserve bounded RPC input shapes, not the prior lifecycle semantics; never roll back to a pre-v1 application, drop the schema, or rewrite migration history.";
 
 type Mode = "source" | "preflight" | "status" | "apply" | "concurrency";
 export type VerifierOptions = {
@@ -78,6 +78,12 @@ export async function verifyProjectVersionContractSource(
   checks.push("schema contract");
   requirePattern(source, "preflight guards", /OBSERVATORY_MULTIPLE_EXECUTION_VERSIONS[\s\S]*OBSERVATORY_WORK_ITEM_VERSION_REQUIRED/iu);
   checks.push("preflight guards");
+  requirePattern(
+    source,
+    "legacy release timestamp backfill",
+    /set released_at = coalesce\(released_at, updated_at, created_at\)[\s\S]*set actual_date = released_at::date/iu,
+  );
+  checks.push("legacy release timestamp backfill");
   requirePattern(source, "portfolio indexes", /one_execution_idx[\s\S]*one_release_target_idx[\s\S]*semver_idx/iu);
   checks.push("portfolio indexes");
   requirePattern(
@@ -99,6 +105,11 @@ export async function verifyProjectVersionContractSource(
   checks.push("predecessor integrity");
   requirePattern(source, "lifecycle and release gates", /gate_ready[\s\S]*version_binding_kind = 'required'[\s\S]*RELEASE_GATE_INCOMPLETE/iu);
   requirePattern(source, "exact gate-ready transitions", /current_version\.status='gate_ready' and target_status in \('active','released'\)/iu);
+  requirePattern(
+    source,
+    "rolling release target",
+    /is_release_target=case when target_status in \('released','cancelled'\) then false else current_version\.is_release_target end/iu,
+  );
   if (/current_version\.status='gate_ready'[\s\S]{0,120}'cancelled'/iu.test(source)) {
     throw new Error("Source verification failed: exact gate-ready transitions.");
   }
@@ -152,7 +163,7 @@ export async function verifyProjectVersionContractSource(
   requirePattern(
     source,
     "prior application compatibility",
-    /create function public\.create_observatory_project_version\(\s*p_project_key text, p_version_label text, p_title text,[\s\S]*return public\.create_observatory_project_version\([\s\S]*create function public\.update_observatory_project_version\(\s*p_project_version_id uuid, p_expected_version integer,[\s\S]*current_version\.semver[\s\S]*create function public\.create_observatory_work_item\([\s\S]*'optional'[\s\S]*create function public\.update_observatory_work_item\([\s\S]*current_item\.version_binding_kind/iu,
+    /create function public\.create_observatory_project_version\(\s*p_project_key text, p_version_label text, p_title text,[\s\S]*return public\.create_observatory_project_version\([\s\S]*create function public\.update_observatory_project_version\(\s*p_project_version_id uuid, p_expected_version integer,[\s\S]*normalized_semver[\s\S]*create function public\.create_observatory_work_item\([\s\S]*'optional'[\s\S]*create function public\.update_observatory_work_item\([\s\S]*current_item\.version_binding_kind/iu,
   );
   checks.push("security and audit");
   checks.push("rollback guidance");
@@ -182,7 +193,10 @@ export type ProjectVersionPreflightResult = {
   blockingIssueCount: number;
   warningCount: number;
   blocking: ProjectVersionPreflightCounts;
-  warnings: { legacyNonSemverLabels: number };
+  warnings: {
+    legacyNonSemverLabels: number;
+    legacyMissingReleaseTimestamps: number;
+  };
 };
 
 async function readCount(
@@ -209,6 +223,8 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
         and table_name='observatory_project_versions' and column_name='is_backlog') as is_backlog
       , exists(select 1 from information_schema.columns where table_schema='public'
         and table_name='observatory_project_versions' and column_name='semver') as semver
+      , exists(select 1 from information_schema.columns where table_schema='public'
+        and table_name='observatory_project_versions' and column_name='released_at') as released_at
   `);
   const versionsTable = capabilities.versions_table === true;
   const workItemsTable = capabilities.work_items_table === true;
@@ -217,6 +233,7 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
   const releaseTarget = capabilities.is_release_target === true;
   const backlog = capabilities.is_backlog === true;
   const semver = capabilities.semver === true;
+  const releasedAt = capabilities.released_at === true;
 
   let missingBindings = 0;
   if (workItemsTable && !projectVersionId) {
@@ -286,13 +303,13 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
             and predecessor.version_label ~ '^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?$'`;
     const predecessorOrderPredicate = semver
       ? `${canonicalEndpointPredicate}
-            and string_to_array(predecessor.semver, '.')::integer[] >=
-              string_to_array(version.semver, '.')::integer[]`
+            and string_to_array(predecessor.semver, '.')::numeric[] >=
+              string_to_array(version.semver, '.')::numeric[]`
       : `${canonicalEndpointPredicate}
             and string_to_array(trim(leading 'v' from predecessor.version_label) ||
-              case when predecessor.version_label ~ '^v?[0-9]+\\.[0-9]+$' then '.0' else '' end, '.')::integer[] >=
+              case when predecessor.version_label ~ '^v?[0-9]+\\.[0-9]+$' then '.0' else '' end, '.')::numeric[] >=
               string_to_array(trim(leading 'v' from version.version_label) ||
-              case when version.version_label ~ '^v?[0-9]+\\.[0-9]+$' then '.0' else '' end, '.')::integer[]`;
+              case when version.version_label ~ '^v?[0-9]+\\.[0-9]+$' then '.0' else '' end, '.')::numeric[]`;
     const [row = {}] = await client.unsafe(`
       select
         count(*) filter (where version.predecessor_version_id=version.id)::integer as predecessor_self_count,
@@ -338,6 +355,13 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
         ) duplicates
       `, "duplicate_release_target_project_count")
     : 0;
+  const legacyMissingReleaseTimestamps = versionsTable && releasedAt
+    ? await readCount(client, `
+        select count(*)::integer as legacy_missing_release_timestamp_count
+        from public.observatory_project_versions
+        where status in ('released','archived') and released_at is null
+      `, "legacy_missing_release_timestamp_count")
+    : 0;
 
   const blocking: ProjectVersionPreflightCounts = {
     missingBindings,
@@ -356,9 +380,9 @@ export async function readProjectVersionContractPreflight(client: ReadOnlySqlCli
     mode: "preflight" as const,
     ok: blockingIssueCount === 0,
     blockingIssueCount,
-    warningCount: legacyNonSemverLabels,
+    warningCount: legacyNonSemverLabels + legacyMissingReleaseTimestamps,
     blocking,
-    warnings: { legacyNonSemverLabels },
+    warnings: { legacyNonSemverLabels, legacyMissingReleaseTimestamps },
   };
 }
 
@@ -371,7 +395,7 @@ export function assertProjectVersionPreflightAllowsApply(preflight: ProjectVersi
   throw new Error(`Project Version preflight blocked apply: ${issues}.`);
 }
 
-export async function readProjectVersionContractStatus(sql: Sql) {
+export async function readProjectVersionContractStatus(sql: Sql | TransactionSql) {
   const [status] = await sql<Record<string, boolean | number>[]>`
     with bounded_rpc_signatures(signature) as (values
       ('public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
@@ -504,8 +528,12 @@ export async function readProjectVersionContractStatus(sql: Sql) {
           and tgname='observatory_project_versions_lock_graph'
           and tgenabled in ('O','A') and not tgisinternal
           and tgfoid=to_regprocedure('public.lock_observatory_project_version_graph()')
-          and lower(regexp_replace(pg_get_triggerdef(oid), '\\s+', ' ', 'g')) like
-            '%before insert or update of project_key, semver, predecessor_version_id on public.observatory_project_versions for each statement execute function public.lock_observatory_project_version_graph()%')
+          and (tgtype & 1)=0
+          and (tgtype & 2)=2
+          and (tgtype & 4)=4
+          and (tgtype & 16)=16
+          and (tgtype & 8)=0
+          and (tgtype & 32)=0)
         as graph_lock_trigger,
       exists(select 1 from function_definitions
         where signature='public.lock_observatory_project_version_graph()'
@@ -618,7 +646,7 @@ export async function readProjectVersionContractStatus(sql: Sql) {
       not exists(select 1 from public.observatory_project_versions version
         join public.observatory_project_versions predecessor on predecessor.id=version.predecessor_version_id
         where predecessor.project_key<>version.project_key or predecessor.semver is null or version.semver is null
-          or string_to_array(predecessor.semver,'.')::integer[] >= string_to_array(version.semver,'.')::integer[])
+          or string_to_array(predecessor.semver,'.')::numeric[] >= string_to_array(version.semver,'.')::numeric[])
         and not exists(
           with recursive predecessor_chain(origin, id, predecessor_version_id, path, cycle) as (
             select id, id, predecessor_version_id, array[id], false
@@ -711,11 +739,12 @@ export async function exerciseProjectVersionReleaseConcurrency(databaseUrl: stri
     const [version] = await observer<{ id: string }[]>`
       insert into public.observatory_project_versions (
         project_key, version_label, semver, title, description, status,
+        is_release_target,
         acceptance_summary, dependencies_satisfied, artifacts_accepted,
         verification_complete, roadmap_reconciled, user_gate_decision_ref,
         created_by, updated_by
       ) values (
-        ${projectKey}, 'v1.0.0', '1.0.0', 'Local concurrency fixture', '', 'gate_ready',
+        ${projectKey}, 'v1.0.0', '1.0.0', 'Local concurrency fixture', '', 'gate_ready', true,
         'accepted', true, true, true, true, 'local-only',
         ${admin.user_id}::uuid, ${admin.user_id}::uuid
       ) returning id::text as id
@@ -762,15 +791,16 @@ export async function exerciseProjectVersionReleaseConcurrency(databaseUrl: stri
         const [backend] = await releaseConnection<{ pid: number }[]>`select pg_backend_pid()::integer as pid`;
         releasePid = backend?.pid;
         releaseStarted.resolve();
-        const [released] = await releaseConnection<{ status: string }[]>`
-          select status from public.transition_observatory_project_version(${versionId}::uuid, 1, 'released')
+        const [released] = await releaseConnection<{ status: string; is_release_target: boolean }[]>`
+          select status, is_release_target
+          from public.transition_observatory_project_version(${versionId}::uuid, 1, 'released')
         `;
         const [required] = await releaseConnection<{ non_done: number }[]>`
           select count(*)::integer as non_done from public.observatory_work_items
           where project_version_id=${versionId}::uuid and version_binding_kind='required' and state<>'done'
         `;
-        if (released?.status !== "released" || required?.non_done !== 0) {
-          throw new Error("Serialized release observed a required non-done Work Item.");
+        if (released?.status !== "released" || released.is_release_target || required?.non_done !== 0) {
+          throw new Error("Serialized release retained a release target or observed a required non-done Work Item.");
         }
         return released.status;
       } finally {
@@ -819,8 +849,14 @@ export async function runProjectVersionContractVerifier(options: VerifierOptions
     assertLocalProjectVersionApplyTarget(localDatabaseUrl);
     return exerciseProjectVersionReleaseConcurrency(localDatabaseUrl);
   }
-  const databaseUrl = process.env.OBSERVATORY_DATABASE_URL ?? process.env.OBSERVATORY_LOCAL_DB_URL;
-  if (!databaseUrl) throw new Error(`Database ${options.mode} mode requires OBSERVATORY_DATABASE_URL or OBSERVATORY_LOCAL_DB_URL.`);
+  const databaseUrl = process.env.OBSERVATORY_DATABASE_URL
+    ?? process.env.OBSERVATORY_LOCAL_DB_URL
+    ?? process.env.SUPABASE_DB_URL;
+  if (!databaseUrl) {
+    throw new Error(
+      `Database ${options.mode} mode requires OBSERVATORY_DATABASE_URL, OBSERVATORY_LOCAL_DB_URL, or SUPABASE_DB_URL.`,
+    );
+  }
   if (options.mode === "apply") assertLocalProjectVersionApplyTarget(databaseUrl);
   const sql = postgres(databaseUrl, { connect_timeout: 10, idle_timeout: 5, max: 1, onnotice: () => undefined });
   try {
