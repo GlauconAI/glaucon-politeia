@@ -1,39 +1,99 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PROJECT_VERSION_STATUSES,
   ProjectVersionCreateInputSchema,
   ProjectVersionTransitionInputSchema,
+  ProjectVersionUpdateInputSchema,
   allowedProjectVersionTransitions,
+  compactProjectVersionLabel,
 } from "@/lib/observatory/project-versions";
+
+const operationalFields = {
+  semver: "0.2.0",
+  isReleaseTarget: true,
+  milestoneRef: "M2",
+  predecessorVersionId: "22222222-2222-4222-8222-222222222222",
+  roadmapRef: "roadmap/work-tracker",
+  approvedPlanRef: "plan/project-version-contract-v1",
+  acceptanceSummary: "Release Gate requirements are satisfied.",
+  actualDate: "2026-09-29",
+  dependenciesSummary: "Migration and repository updates are complete.",
+  dependenciesSatisfied: true,
+  artifactsAccepted: true,
+  verificationComplete: true,
+  roadmapReconciled: true,
+  userGateDecisionRef: "decision/release-v0.2.0",
+} as const;
 
 describe("Project Versions", () => {
   it("uses the approved lifecycle", () => {
-    expect(allowedProjectVersionTransitions("planned")).toEqual(["active", "archived"]);
-    expect(allowedProjectVersionTransitions("active")).toEqual(["released", "archived"]);
+    expect(PROJECT_VERSION_STATUSES).toEqual([
+      "planned",
+      "active",
+      "gate_ready",
+      "released",
+      "archived",
+      "cancelled",
+    ]);
+    expect(allowedProjectVersionTransitions("planned")).toEqual(["active", "cancelled"]);
+    expect(allowedProjectVersionTransitions("active")).toEqual(["gate_ready", "cancelled"]);
+    expect(allowedProjectVersionTransitions("gate_ready")).toEqual(["active", "released"]);
     expect(allowedProjectVersionTransitions("released")).toEqual(["archived"]);
     expect(allowedProjectVersionTransitions("archived")).toEqual([]);
+    expect(allowedProjectVersionTransitions("cancelled")).toEqual([]);
   });
 
-  it("normalizes create input and rejects unsafe Project keys", () => {
+  it("normalizes create input with release-target and Gate fields", () => {
     expect(ProjectVersionCreateInputSchema.parse({
       projectKey: " plato/dashboard ",
       versionLabel: " v0.2 ",
       title: " Versioned delivery ",
       description: " First release ",
       targetDate: "2026-09-30",
+      ...operationalFields,
     })).toEqual({
       projectKey: "plato/dashboard",
       versionLabel: "v0.2",
       title: "Versioned delivery",
       description: "First release",
       targetDate: "2026-09-30",
+      ...operationalFields,
     });
+  });
+
+  it("requires strict MAJOR.MINOR.PATCH SemVer without a v prefix", () => {
+    for (const semver of ["v1.2.3", "1.2", "1.2.3-beta.1", "01.2.3"]) {
+      expect(ProjectVersionCreateInputSchema.safeParse({
+        projectKey: "plato/dashboard",
+        versionLabel: semver,
+        title: "Invalid formal version",
+        description: "",
+        targetDate: null,
+        ...operationalFields,
+        semver,
+      }).success).toBe(false);
+    }
+
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "plato/dashboard",
+      versionLabel: "v0.0.0",
+      title: "Formal version",
+      description: "",
+      targetDate: null,
+      ...operationalFields,
+      semver: "0.0.0",
+    }).success).toBe(true);
+  });
+
+  it("rejects unsafe Project keys", () => {
     expect(ProjectVersionCreateInputSchema.safeParse({
       projectKey: "/private/project",
       versionLabel: "v1",
       title: "Unsafe",
       description: "",
       targetDate: null,
+      ...operationalFields,
     }).success).toBe(false);
   });
 
@@ -44,7 +104,33 @@ describe("Project Versions", () => {
       title: "Knowledge release",
       description: "",
       targetDate: null,
+      ...operationalFields,
     }).success).toBe(true);
+  });
+
+  it("carries release-target and Gate fields through update input", () => {
+    expect(ProjectVersionUpdateInputSchema.parse({
+      projectVersionId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      versionLabel: " v0.2 ",
+      title: " Versioned delivery ",
+      description: " First release ",
+      targetDate: "2026-09-30",
+      ...operationalFields,
+    })).toEqual({
+      projectVersionId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      versionLabel: "v0.2",
+      title: "Versioned delivery",
+      description: "First release",
+      targetDate: "2026-09-30",
+      ...operationalFields,
+    });
+  });
+
+  it("preserves compact labels for formal versions and Backlog", () => {
+    expect(compactProjectVersionLabel({ isBacklog: false, versionLabel: "v1.2.0" })).toBe("V1.2");
+    expect(compactProjectVersionLabel({ isBacklog: true, versionLabel: "Backlog" })).toBe("待");
   });
 
   it("requires optimistic concurrency for transitions", () => {

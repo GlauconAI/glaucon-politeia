@@ -4,24 +4,30 @@ import { DERIVED_PROJECT_KEY_PATTERN } from "@/lib/observatory/schema";
 export const PROJECT_VERSION_STATUSES = [
   "planned",
   "active",
+  "gate_ready",
   "released",
   "archived",
+  "cancelled",
 ] as const;
 
 export type ProjectVersionStatus = (typeof PROJECT_VERSION_STATUSES)[number];
 
 const transitions = {
-  planned: ["active", "archived"],
-  active: ["released", "archived"],
+  planned: ["active", "cancelled"],
+  active: ["gate_ready", "cancelled"],
+  gate_ready: ["active", "released"],
   released: ["archived"],
   archived: [],
+  cancelled: [],
 } as const satisfies Record<ProjectVersionStatus, readonly ProjectVersionStatus[]>;
 
 export const PROJECT_VERSION_STATUS_LABELS: Record<ProjectVersionStatus, string> = {
   planned: "计划中",
   active: "进行中",
+  gate_ready: "待发布验收",
   released: "已发布",
   archived: "已归档",
+  cancelled: "已取消",
 };
 
 export function compactProjectVersionLabel(input: {
@@ -54,9 +60,36 @@ const ProjectKeySchema = z
 const VersionLabelSchema = z.string().trim().min(1).max(64);
 const VersionTitleSchema = z.string().trim().min(1).max(200);
 const VersionDescriptionSchema = z.string().trim().max(4_000);
+const FormalSemVerSchema = z
+  .string()
+  .trim()
+  .regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u);
+const NullableReferenceSchema = z
+  .union([z.string().trim().max(160), z.null()])
+  .transform((value) => value || null);
+const NullableVersionIdSchema = z
+  .union([z.uuid(), z.literal(""), z.null()])
+  .transform((value) => value || null);
+const SummarySchema = z.string().trim().max(4_000);
 const TargetDateSchema = z
   .union([z.iso.date(), z.literal(""), z.null()])
   .transform((value) => value || null);
+const operationalFields = {
+  semver: FormalSemVerSchema,
+  isReleaseTarget: z.boolean(),
+  milestoneRef: NullableReferenceSchema,
+  predecessorVersionId: NullableVersionIdSchema,
+  roadmapRef: NullableReferenceSchema,
+  approvedPlanRef: NullableReferenceSchema,
+  acceptanceSummary: SummarySchema,
+  actualDate: TargetDateSchema,
+  dependenciesSummary: SummarySchema,
+  dependenciesSatisfied: z.boolean(),
+  artifactsAccepted: z.boolean(),
+  verificationComplete: z.boolean(),
+  roadmapReconciled: z.boolean(),
+  userGateDecisionRef: NullableReferenceSchema,
+};
 
 export const ProjectVersionCreateInputSchema = z.strictObject({
   projectKey: ProjectKeySchema,
@@ -64,6 +97,7 @@ export const ProjectVersionCreateInputSchema = z.strictObject({
   title: VersionTitleSchema,
   description: VersionDescriptionSchema.default(""),
   targetDate: TargetDateSchema.default(null),
+  ...operationalFields,
 });
 
 export const ProjectVersionUpdateInputSchema = z.strictObject({
@@ -73,6 +107,7 @@ export const ProjectVersionUpdateInputSchema = z.strictObject({
   title: VersionTitleSchema,
   description: VersionDescriptionSchema.default(""),
   targetDate: TargetDateSchema.default(null),
+  ...operationalFields,
 });
 
 export const ProjectVersionTransitionInputSchema = z.strictObject({
