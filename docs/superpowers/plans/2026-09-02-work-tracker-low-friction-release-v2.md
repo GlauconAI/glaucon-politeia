@@ -26,8 +26,8 @@
 ## Task 4：升级审批周报
 
 - 修改 `scripts/release/work-tracker-approval-report.mjs`。
-- 读取 trajectory 识别 Work Tracker run IDs。
-- 用 `node:sqlite` 只读查询 `operator_approvals` 的非敏感决策字段。
+- 保留 Work Tracker rollout 的项目级代理指标。
+- 用 `node:sqlite` 只读查询 Plato 范围 `operator_approvals` 的非敏感决策字段，并明确标注 scope。
 - 输出人工批准/拒绝、超时、系统取消、pending 及兼容的 rollout 指标。
 - 在数据库不可用时输出显式 unavailable 状态。
 

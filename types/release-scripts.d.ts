@@ -41,6 +41,24 @@ declare module "@/scripts/release/work-tracker-smoke.mjs" {
 }
 
 declare module "@/scripts/release/work-tracker-approval-report.mjs" {
+  export interface OperatorApprovalRow {
+    status: string;
+    decision: string | null;
+    terminal_reason: string | null;
+  }
+
+  export interface OperatorApprovalSummary {
+    status: "available";
+    requests: number;
+    humanDecisions: number;
+    allowedOnce: number;
+    allowedAlways: number;
+    humanDenied: number;
+    expired: number;
+    systemCancelled: number;
+    pending: number;
+  }
+
   export interface ApprovalReport {
     periodStart: string;
     periodEnd: string;
@@ -48,8 +66,9 @@ declare module "@/scripts/release/work-tracker-approval-report.mjs" {
     escalationRequests: number;
     gatewayExecCalls: number;
     deniedCalls: number;
-    manualApprovalCount: null;
+    manualApprovalCount: number | null;
     manualApprovalNote: string;
+    operatorApprovals?: OperatorApprovalSummary | { status: "unavailable"; reason: string };
   }
 
   export function analyzeApprovalSessions(
@@ -57,4 +76,64 @@ declare module "@/scripts/release/work-tracker-approval-report.mjs" {
     options: { repoMarker?: string; since: Date; now?: Date },
   ): ApprovalReport;
   export function formatApprovalReport(report: ApprovalReport): string;
+  export function summarizeOperatorApprovals(
+    rows: OperatorApprovalRow[],
+  ): OperatorApprovalSummary;
+  export function queryOperatorApprovals(
+    databasePath: string,
+    options: { since: Date; now?: Date },
+  ): OperatorApprovalRow[];
+}
+
+declare module "@/scripts/release/work-tracker-release-prepare.mjs" {
+  export const EXPECTED_GIT_COMMON_DIR: string;
+  export const EXPECTED_REMOTE_URL: string;
+  export const GITHUB_REPOSITORY: "GlauconAI/glaucon-politeia";
+  export const ALLOWED_BRANCH_PATTERN: RegExp;
+
+  export interface ReleaseContext {
+    argv: string[];
+    gitCommonDir: string;
+    remoteUrl: string;
+    pushRemoteUrl: string;
+    branch: string;
+    porcelain: string;
+    originMainIsAncestor: boolean;
+    behind: number;
+    ahead: number;
+  }
+
+  export function validateReleaseContext(
+    context: ReleaseContext,
+  ): { branch: string; ahead: number };
+  export function buildPushArgs(branch: string): string[];
+  export function runReleasePrepare(options?: {
+    cwd?: string;
+    argv?: string[];
+    runner?: (
+      command: string,
+      args: string[],
+      options?: { cwd?: string; allowFailure?: boolean; timeoutMs?: number },
+    ) => { exitCode: number; stdout: string; stderr: string };
+  }): {
+    ok: true;
+    branch: string;
+    ahead: number;
+    created: boolean;
+    pullRequestUrl: string;
+  };
+}
+
+declare module "@/scripts/release/work-tracker-wait-for-production.mjs" {
+  export const GITHUB_REPOSITORY: "GlauconAI/glaucon-politeia";
+  export const DEPLOYMENT_ENVIRONMENT: "Production";
+  export function buildDeploymentsUrl(sha: string): string;
+  export function waitForProductionDeployment(options: {
+    sha: string;
+    token: string;
+    fetchImpl?: typeof fetch;
+    sleep?: (milliseconds: number) => Promise<void>;
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  }): Promise<{ ok: true; deploymentId: number; state: "success"; sha: string }>;
 }

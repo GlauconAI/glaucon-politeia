@@ -53,6 +53,7 @@
     "publish:html": "node scripts/publish-html.mjs",
     "release:verify": "node scripts/release/work-tracker-verify.mjs",
     "release:smoke": "node scripts/release/work-tracker-smoke.mjs",
+    "release:wait-production": "node scripts/release/work-tracker-wait-for-production.mjs",
     "release:approval-report": "node scripts/release/work-tracker-approval-report.mjs",
     "supabase:apply-missing": "node scripts/supabase-ops.mjs apply-missing",
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",

@@ -66,7 +66,7 @@ PR checks 全部通过后，使用一个标准合并命令请求一次人工授�
 - Codex rollout 元数据：相关 sessions、escalation 请求、Gateway exec 调用、拒绝代理指标；
 - OpenClaw `operator_approvals`：人工 `allow-once`、`allow-always`、人工拒绝、超时、系统取消和 pending。
 
-项目归因通过 OpenClaw trajectory 中的 `runId` 与固定 repo/worktree 路径建立，再按 `source_run_id` 查询 approval；不读取或输出 `presentation_json`、命令正文、对话正文、设备 ID 或凭据。
+OpenClaw 当前 approval 表没有 project 字段，新 runtime 的本地 trajectory 文件也不是稳定接口。因此周报明确拆成两层：Work Tracker rollout 指标保持项目级；真实人工决策直接从 `operator_approvals` 统计 Plato 全 Agent 范围，并显式标注 scope。它不读取或输出 `presentation_json`、命令正文、对话正文、设备 ID 或凭据，也不会把无法可靠归因的数据伪装成项目级数字。
 
 ## 失败处理
 
