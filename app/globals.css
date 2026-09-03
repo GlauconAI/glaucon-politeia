@@ -252,6 +252,15 @@
   flex-wrap: wrap;
 }
 
+.work-tracker-filter-group {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .work-tracker-version-picker {
   display: grid;
   gap: 4px;
@@ -271,8 +280,19 @@
 }
 
 .work-tracker-filter {
-  width: min(100%, 562px);
   min-width: 0;
+}
+
+.work-tracker-project-filter {
+  width: min(100%, 562px);
+}
+
+.work-tracker-version-filter {
+  flex: 0 1 220px;
+}
+
+.work-tracker-version-filter .work-tracker-version-picker select {
+  width: 100%;
 }
 
 .work-tracker-filter .work-tracker-project-picker {
@@ -2245,8 +2265,18 @@
     gap: 8px;
   }
 
+  .work-tracker-filter-group {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .work-tracker-filter {
     width: 100%;
+  }
+
+  .work-tracker-version-filter {
+    flex-basis: auto;
   }
 
   .work-tracker-filter .work-tracker-project-picker {

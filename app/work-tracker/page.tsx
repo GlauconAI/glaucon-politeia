@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 
 import { WorkTrackerCaptureDrawer } from "@/components/observatory/WorkTrackerCaptureDrawer";
-import { ProjectVersionManager } from "@/components/observatory/ProjectVersionManager";
 import {
   WorkTrackerBoard,
   type WorkTrackerBoardState,
@@ -144,7 +143,6 @@ export default async function WorkTrackerPage({
             agentIds={agentIds}
             versions={versions}
           />
-          <ProjectVersionManager projects={projects} versions={versions} />
         </div>
       </header>
 

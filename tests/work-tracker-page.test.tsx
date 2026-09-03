@@ -123,6 +123,12 @@ describe("WorkTrackerPage", () => {
     expect(screen.queryByRole("dialog", { name: /quick capture/i })).not.toBeInTheDocument();
   });
 
+  it("does not expose Project Version management in the admin page header", async () => {
+    render(await WorkTrackerPage());
+
+    expect(screen.queryByText(/管理版本/i)).not.toBeInTheDocument();
+  });
+
   it("validates the Project query against the canonical registry", async () => {
     mocks.listWorkItems.mockResolvedValue([
       {

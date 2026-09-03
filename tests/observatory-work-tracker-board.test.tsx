@@ -109,6 +109,22 @@ const versions: ObservatoryProjectVersionRow[] = [
     updated_by: item.created_by,
     updated_at: item.updated_at,
   },
+  {
+    id: "88888888-8888-4888-8888-888888888888",
+    project_key: "amou/wenya-ai",
+    version_label: "v2",
+    title: "问芽第二版",
+    description: "",
+    status: "planned",
+    target_date: null,
+    released_at: null,
+    is_backlog: false,
+    row_version: 1,
+    created_by: item.created_by,
+    created_at: item.created_at,
+    updated_by: item.created_by,
+    updated_at: item.updated_at,
+  },
 ];
 
 describe("WorkTrackerBoard", () => {
@@ -146,7 +162,8 @@ describe("WorkTrackerBoard", () => {
         urlProjectKey="plato/dashboard"
       />,
     );
-    expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("v1.0 · 进行中")).toBeInTheDocument();
+    expect(within(screen.getByTestId(`work-item-${item.id}`)).getByText("V1")).toBeInTheDocument();
+    expect(within(screen.getByTestId(`work-item-${backlogItem.id}`)).getByText("待")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Project Version" }), {
       target: { value: versions[0].id },
     });
@@ -158,6 +175,40 @@ describe("WorkTrackerBoard", () => {
       "href",
       `/work-tracker/items/${item.id}?project=plato%2Fdashboard&version=${versions[0].id}`,
     );
+  });
+
+  it("keeps Project and Version controls together and scopes versions to the selected Project", () => {
+    const otherProjectItem = {
+      ...item,
+      id: "99999999-9999-4999-8999-999999999999",
+      title: "训练问芽模型",
+      project_ref: "amou/wenya-ai",
+      project_version_id: versions[3].id,
+    };
+    render(
+      <WorkTrackerBoard
+        state={{ status: "ready", items: [item, otherProjectItem] }}
+        projects={projects}
+        versions={versions}
+        initialProjectKey="plato/dashboard"
+        urlProjectKey="plato/dashboard"
+      />,
+    );
+
+    const filterGroup = screen.getByTestId("work-tracker-filter-group");
+    const controls = within(filterGroup).getAllByRole("combobox");
+    expect(controls).toHaveLength(2);
+    expect(controls[0]).toHaveAccessibleName("Filter by Project");
+    expect(controls[1]).toHaveAccessibleName("Project Version");
+    expect(within(controls[1]).getByRole("option", { name: "v1.0 · 进行中" })).toBeInTheDocument();
+    expect(within(controls[1]).queryByRole("option", { name: "v2 · 计划中" })).not.toBeInTheDocument();
+
+    fireEvent.change(controls[0], { target: { value: "amou/wenya-ai" } });
+
+    expect(controls[1]).toHaveValue("all");
+    expect(within(controls[1]).getByRole("option", { name: "v2 · 计划中" })).toBeInTheDocument();
+    expect(within(controls[1]).queryByRole("option", { name: "v1.0 · 进行中" })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId(`work-item-${otherProjectItem.id}`)).getByText("V2")).toBeInTheDocument();
   });
 
   it("restores a valid stored Project on a clean URL", async () => {
