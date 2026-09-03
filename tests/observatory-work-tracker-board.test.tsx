@@ -196,6 +196,10 @@ describe("WorkTrackerBoard", () => {
     );
 
     const filterGroup = screen.getByTestId("work-tracker-filter-group");
+    expect(filterGroup).toHaveStyle({ display: "flex", flexWrap: "wrap" });
+    expect(filterGroup.querySelector(".work-tracker-version-filter")).toHaveStyle({
+      flex: "0 1 220px",
+    });
     const controls = within(filterGroup).getAllByRole("combobox");
     expect(controls).toHaveLength(2);
     expect(controls[0]).toHaveAccessibleName("Filter by Project");
