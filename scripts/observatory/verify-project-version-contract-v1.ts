@@ -85,6 +85,14 @@ export async function verifyProjectVersionContractSource(
     "canonical constraints",
     /observatory_project_versions_status_check\s+check \(status in \('planned', 'active', 'gate_ready', 'released', 'archived', 'cancelled'\)\)[\s\S]*observatory_project_versions_semver_check\s+check \(\(is_backlog and semver is null\) or \(not is_backlog and \(semver is null or semver ~ '[^']+'\)\)\)[\s\S]*observatory_project_versions_backlog_release_target_check\s+check \(not \(is_backlog and is_release_target\)\)[\s\S]*observatory_project_versions_release_timestamp_check\s+check \(status not in \('released', 'archived'\) or \(released_at is not null and actual_date is not null\)\)/iu,
   );
+  requirePattern(
+    source,
+    "exact prior constraint replacement",
+    /conname = 'observatory_project_versions_status_check'[\s\S]*conname = 'observatory_project_versions_check'[\s\S]*OBSERVATORY_PROJECT_VERSION_PRIOR_CONSTRAINT_MISMATCH[\s\S]*drop constraint observatory_project_versions_status_check[\s\S]*drop constraint observatory_project_versions_check/iu,
+  );
+  if (/for\s+constraint_name\s+in|pg_get_constraintdef\(oid\)\s+like\s+'%status/iu.test(source)) {
+    throw new Error("Source verification failed: exact prior constraint replacement.");
+  }
   checks.push("canonical constraints");
   requirePattern(source, "predecessor integrity", /with recursive predecessor_chain[\s\S]*OBSERVATORY_PREDECESSOR_CYCLE/iu);
   requirePattern(source, "serialized predecessor graph", /lock_observatory_project_version_graph[\s\S]*pg_advisory_xact_lock\(20960902000300\)[\s\S]*create trigger observatory_project_versions_lock_graph[\s\S]*before insert or update of project_key, semver, predecessor_version_id[\s\S]*for each statement execute function public\.lock_observatory_project_version_graph/iu);
@@ -105,6 +113,40 @@ export async function verifyProjectVersionContractSource(
   requirePattern(source, "state mutation lock trigger", /create trigger observatory_work_items_validate_project_version\s+before insert or update of state,[\s\S]*for each row execute function public\.validate_observatory_work_item_project_version/iu);
   requirePattern(source, "version update lock order", /create function public\.update_observatory_project_version[\s\S]*pg_advisory_xact_lock\(20960902000300\)[\s\S]*for update/iu);
   requirePattern(source, "release gate lock order", /create function public\.transition_observatory_project_version[\s\S]*for update[\s\S]*from public\.observatory_work_items[\s\S]*version_binding_kind = 'required'/iu);
+  for (const [signature, nextMarker, conflict] of [
+    ["update_observatory_project_version", "create function public.transition_observatory_project_version", "OBSERVATORY_PROJECT_VERSION_CONFLICT"],
+    ["transition_observatory_project_version", "-- Work Item RPCs", "OBSERVATORY_PROJECT_VERSION_CONFLICT"],
+    ["update_observatory_work_item", "revoke all privileges on function public.create_observatory_project_version", "OBSERVATORY_VERSION_CONFLICT"],
+  ] as const) {
+    const bodyStart = source.indexOf(`create function public.${signature}`);
+    const body = source.slice(bodyStart, source.indexOf(nextMarker, bodyStart));
+    requirePattern(
+      body,
+      `null expected version guard for ${signature}`,
+      new RegExp(`if p_expected_version is null then raise exception '${conflict}'`, "iu"),
+    );
+  }
+  const createWorkItem = source.slice(
+    source.indexOf("create function public.create_observatory_work_item"),
+    source.indexOf("create function public.update_observatory_work_item"),
+  );
+  const retryLookup = createWorkItem.indexOf("where created_by=calling_user and idempotency_key=btrim(p_idempotency_key)");
+  const terminalRejection = createWorkItem.indexOf("OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED");
+  const workItemInsert = createWorkItem.indexOf("insert into public.observatory_work_items");
+  if (retryLookup < 0 || terminalRejection < 0 || workItemInsert < 0
+    || retryLookup > terminalRejection || retryLookup > workItemInsert
+    || !/existing_item\.project_version_id is distinct from p_project_version_id/iu.test(createWorkItem)
+    || !/on conflict \(created_by, idempotency_key\) do nothing/iu.test(createWorkItem)) {
+    throw new Error("Source verification failed: terminal-safe create idempotency.");
+  }
+  const workItemAudit = source.slice(
+    source.indexOf("insert into public.observatory_work_item_events", source.indexOf("create function public.create_observatory_work_item")),
+    source.indexOf("revoke all privileges on function public.create_observatory_project_version"),
+  );
+  requirePattern(workItemAudit, "Work Item audit whitelist", /'version_binding_kind',[a-z_]+_item\.version_binding_kind/iu);
+  if (/to_jsonb\((?:created|current|updated)_item\)|'idempotency_key'|'agent_claim_enabled'|'authorized_paths'|'allowed_action_classes'|'claim_approved_by'|'claim_approved_at'/iu.test(workItemAudit)) {
+    throw new Error("Source verification failed: Work Item audit whitelist.");
+  }
   checks.push("serialized mutation validation");
   requirePattern(source, "security and audit", /security definer[\s\S]*jsonb_build_object\('before'[\s\S]*grant execute/iu);
   checks.push("security and audit");
@@ -328,6 +370,7 @@ export async function readProjectVersionContractStatus(sql: Sql) {
   const [status] = await sql<Record<string, boolean | number>[]>`
     with bounded_rpc_signatures(signature) as (values
       ('public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
+      ('public.ensure_observatory_project_backlog_versions(text[])'),
       ('public.update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
       ('public.transition_observatory_project_version(uuid,integer,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text,uuid,text,text)'),
@@ -345,6 +388,40 @@ export async function readProjectVersionContractStatus(sql: Sql) {
     ), resolved_bounded_rpcs as (
       select signature, to_regprocedure(signature) as procedure
       from bounded_rpc_signatures
+    ), mutation_function_catalog as (
+      select bounded.signature, bounded.procedure, function_catalog.prosecdef,
+        function_catalog.proconfig,
+        lower(regexp_replace(pg_get_functiondef(bounded.procedure), '\\s+', ' ', 'g')) as definition
+      from resolved_bounded_rpcs bounded
+      left join pg_proc function_catalog on function_catalog.oid=bounded.procedure
+    ), table_acl_expectations(table_name, grantee_name, grantee_oid, privilege_type, expected) as (
+      select table_name, grantee_name, grantee_oid, privilege_type,
+        grantee_name='authenticated' and privilege_type='SELECT'
+      from (values
+        ('observatory_project_versions'),
+        ('observatory_project_version_events')
+      ) tables(table_name)
+      cross join (values
+        ('public', 0::oid),
+        ('anon', (select oid from pg_roles where rolname='anon')),
+        ('authenticated', (select oid from pg_roles where rolname='authenticated')),
+        ('service_role', (select oid from pg_roles where rolname='service_role'))
+      ) grantees(grantee_name, grantee_oid)
+      cross join (values
+        ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')
+      ) privileges(privilege_type)
+    ), rpc_acl_expectations(signature, grantee_name, grantee_oid, expected) as (
+      select signature, grantee_name, grantee_oid, grantee_name='authenticated'
+      from bounded_rpc_signatures
+      cross join (values
+        ('public', 0::oid),
+        ('anon', (select oid from pg_roles where rolname='anon')),
+        ('authenticated', (select oid from pg_roles where rolname='authenticated')),
+        ('service_role', (select oid from pg_roles where rolname='service_role'))
+      ) grantees(grantee_name, grantee_oid)
+    ), policy_expectations(table_name, policy_name) as (values
+      ('observatory_project_versions','observatory_project_versions_select_admin'),
+      ('observatory_project_version_events','observatory_project_version_events_select_admin')
     ), constraint_definitions as (
       select constraint_catalog.conrelid, constraint_catalog.conname,
         lower(regexp_replace(pg_get_constraintdef(constraint_catalog.oid), '\\s+', ' ', 'g')) as definition,
@@ -449,45 +526,61 @@ export async function readProjectVersionContractStatus(sql: Sql) {
       exists(select 1 from pg_class where oid='public.observatory_project_versions'::regclass and relrowsecurity)
         and exists(select 1 from pg_class where oid='public.observatory_project_version_events'::regclass and relrowsecurity)
         as versions_and_events_rls,
-      has_table_privilege('authenticated','public.observatory_project_versions','SELECT')
-        and has_table_privilege('authenticated','public.observatory_project_version_events','SELECT')
-        and not has_table_privilege('authenticated','public.observatory_project_versions','INSERT')
-        and not has_table_privilege('authenticated','public.observatory_project_versions','UPDATE')
-        and not has_table_privilege('authenticated','public.observatory_project_versions','DELETE')
-        and not has_table_privilege('anon','public.observatory_project_versions','SELECT')
-        and not has_table_privilege('anon','public.observatory_project_version_events','SELECT') as table_grants,
-      (select bool_and(
-        procedure is not null
-        and has_function_privilege('authenticated',procedure,'EXECUTE')
-        and not has_function_privilege('service_role',procedure,'EXECUTE')
-        and not has_function_privilege('anon',procedure,'EXECUTE')
-        and exists (
-          select 1
-          from pg_proc function_catalog
-          cross join lateral aclexplode(coalesce(
-            function_catalog.proacl,
-            acldefault('f', function_catalog.proowner)
-          )) privilege
-          where function_catalog.oid = procedure
-            and privilege.privilege_type = 'EXECUTE'
-            and privilege.grantee = (select oid from pg_roles where rolname = 'authenticated')
+      not exists (
+        select 1 from table_acl_expectations expectation
+        join pg_class table_catalog on table_catalog.oid=
+          format('public.%I',expectation.table_name)::regclass
+        where exists (
+          select 1 from aclexplode(coalesce(table_catalog.relacl,acldefault('r',table_catalog.relowner))) privilege
+          where privilege.grantee=expectation.grantee_oid
+            and privilege.privilege_type=expectation.privilege_type
             and not privilege.is_grantable
-        )
-        and not exists (
-          select 1
-          from pg_proc function_catalog
-          cross join lateral aclexplode(coalesce(
-            function_catalog.proacl,
-            acldefault('f', function_catalog.proowner)
-          )) privilege
-          where function_catalog.oid = procedure
-            and privilege.privilege_type = 'EXECUTE'
-            and privilege.grantee not in (
-              function_catalog.proowner,
-              (select oid from pg_roles where rolname = 'authenticated')
-            )
-        )
-      ) from resolved_bounded_rpcs) as rpc_grants,
+        ) is distinct from expectation.expected
+      ) and not exists (
+        select 1 from pg_class table_catalog
+        cross join lateral aclexplode(coalesce(table_catalog.relacl,acldefault('r',table_catalog.relowner))) privilege
+        where table_catalog.oid in (
+          'public.observatory_project_versions'::regclass,
+          'public.observatory_project_version_events'::regclass
+        ) and privilege.grantee<>table_catalog.relowner
+          and not (privilege.grantee=(select oid from pg_roles where rolname='authenticated')
+            and privilege.privilege_type='SELECT' and not privilege.is_grantable)
+      ) as table_acls_exact,
+      (select count(*)=2 from pg_policy policy
+        where policy.polrelid in (
+          'public.observatory_project_versions'::regclass,
+          'public.observatory_project_version_events'::regclass
+        )) and not exists (
+          select 1 from policy_expectations expectation
+          left join pg_policy policy on policy.polrelid=
+              format('public.%I',expectation.table_name)::regclass
+            and policy.polname=expectation.policy_name
+          where policy.oid is null or not policy.polpermissive or policy.polcmd<>'r'
+            or policy.polroles<>array[(select oid from pg_roles where rolname='authenticated')]
+            or lower(regexp_replace(pg_get_expr(policy.polqual,policy.polrelid), '\\s+', ' ', 'g'))<>'is_current_user_admin()'
+            or policy.polwithcheck is not null
+      ) as admin_select_policies_exact,
+      not exists (
+        select 1 from rpc_acl_expectations expectation
+        join pg_proc function_catalog on function_catalog.oid=to_regprocedure(expectation.signature)
+        where exists (
+          select 1 from aclexplode(coalesce(function_catalog.proacl,acldefault('f',function_catalog.proowner))) privilege
+          where privilege.grantee=expectation.grantee_oid
+            and privilege.privilege_type='EXECUTE' and not privilege.is_grantable
+        ) is distinct from expectation.expected
+      ) and not exists (
+        select 1 from mutation_function_catalog mutation
+        join pg_proc function_catalog on function_catalog.oid=mutation.procedure
+        cross join lateral aclexplode(coalesce(function_catalog.proacl,acldefault('f',function_catalog.proowner))) privilege
+        where privilege.grantee<>function_catalog.proowner
+          and not (privilege.grantee=(select oid from pg_roles where rolname='authenticated')
+            and privilege.privilege_type='EXECUTE' and not privilege.is_grantable)
+      ) as rpc_acls_exact,
+      (select bool_and(procedure is not null and prosecdef
+        and proconfig=array['search_path=pg_catalog']
+        and definition like '%if calling_user is null or not public.is_current_user_admin() then%'
+        and definition like '%administrator access required%'
+      ) from mutation_function_catalog) as admin_rpc_definitions_exact,
       exists(select 1 from supabase_migrations.schema_migrations where version=${MIGRATION_VERSION}) as migration_recorded,
       not exists(select 1 from public.observatory_work_items item left join public.observatory_project_versions version
         on version.id=item.project_version_id where item.project_version_id is null

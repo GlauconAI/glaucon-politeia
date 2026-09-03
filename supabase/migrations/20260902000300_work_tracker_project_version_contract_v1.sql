@@ -87,17 +87,35 @@ alter table public.observatory_work_items
     check (version_binding_kind in ('required', 'optional'));
 
 do $constraints$
-declare constraint_name text;
+declare
+  prior_status_definition text;
+  prior_release_definition text;
 begin
-  for constraint_name in
-    select conname from pg_constraint
-    where conrelid = 'public.observatory_project_versions'::regclass
-      and contype = 'c'
-      and (pg_get_constraintdef(oid) like '%status%planned%active%released%archived%'
-        or pg_get_constraintdef(oid) like '%status%released_at%')
-  loop
-    execute format('alter table public.observatory_project_versions drop constraint %I', constraint_name);
-  end loop;
+  select lower(regexp_replace(pg_get_constraintdef(oid), '\s+', ' ', 'g'))
+  into prior_status_definition
+  from pg_constraint
+  where conrelid = 'public.observatory_project_versions'::regclass
+    and contype = 'c'
+    and conname = 'observatory_project_versions_status_check';
+
+  select lower(regexp_replace(pg_get_constraintdef(oid), '\s+', ' ', 'g'))
+  into prior_release_definition
+  from pg_constraint
+  where conrelid = 'public.observatory_project_versions'::regclass
+    and contype = 'c'
+    and conname = 'observatory_project_versions_check';
+
+  if prior_status_definition is distinct from
+      'check ((status = any (array[''planned''::text, ''active''::text, ''released''::text, ''archived''::text])))'
+    or prior_release_definition is distinct from
+      'check (((status <> ''released''::text) or (released_at is not null)))' then
+    raise exception 'OBSERVATORY_PROJECT_VERSION_PRIOR_CONSTRAINT_MISMATCH' using errcode = '55000';
+  end if;
+
+  alter table public.observatory_project_versions
+    drop constraint observatory_project_versions_status_check;
+  alter table public.observatory_project_versions
+    drop constraint observatory_project_versions_check;
 end;
 $constraints$;
 
@@ -367,6 +385,7 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(20960902000300);
   select * into current_version from public.observatory_project_versions where id=p_project_version_id for update;
   if current_version.id is null then raise exception 'OBSERVATORY_PROJECT_VERSION_NOT_FOUND' using errcode='P0002'; end if;
+  if p_expected_version is null then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;
   if current_version.row_version <> p_expected_version then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;
   if current_version.is_backlog or current_version.status in ('released','archived') then raise exception 'OBSERVATORY_PROJECT_VERSION_IMMUTABLE' using errcode='22023'; end if;
   if p_semver is null or btrim(p_semver) !~ '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' then raise exception 'OBSERVATORY_PROJECT_VERSION_SEMVER_INVALID' using errcode='22023'; end if;
@@ -397,6 +416,7 @@ begin
   if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   select * into current_version from public.observatory_project_versions where id=p_project_version_id for update;
   if current_version.id is null then raise exception 'OBSERVATORY_PROJECT_VERSION_NOT_FOUND' using errcode='P0002'; end if;
+  if p_expected_version is null then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;
   if current_version.row_version <> p_expected_version then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;
   if current_version.is_backlog then raise exception 'OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE' using errcode='22023'; end if;
   if not (
@@ -450,7 +470,21 @@ begin
   if btrim(coalesce(p_assigned_agent_id,'')) = 'shared' or btrim(coalesce(p_assigned_agent_id,'')) !~ '^[a-z][a-z0-9-]{0,79}$' then
     raise exception 'OBSERVATORY_ASSIGNED_AGENT_INVALID' using errcode='22023';
   end if;
-  select * into selected_version from public.observatory_project_versions where id=p_project_version_id;
+  select * into existing_item from public.observatory_work_items
+  where created_by=calling_user and idempotency_key=btrim(p_idempotency_key);
+  if existing_item.id is not null then
+    if existing_item.type is distinct from btrim(p_type)
+      or existing_item.title is distinct from btrim(p_title)
+      or existing_item.description is distinct from btrim(coalesce(p_description,''))
+      or existing_item.project_ref is distinct from btrim(p_project_ref)
+      or existing_item.project_version_id is distinct from p_project_version_id
+      or existing_item.version_binding_kind is distinct from p_version_binding_kind
+      or existing_item.assigned_agent_id is distinct from btrim(p_assigned_agent_id) then
+      raise exception 'OBSERVATORY_IDEMPOTENCY_CONFLICT' using errcode='23505';
+    end if;
+    return existing_item;
+  end if;
+  select * into selected_version from public.observatory_project_versions where id=p_project_version_id for key share;
   if selected_version.id is null or selected_version.project_key <> btrim(p_project_ref) then raise exception 'OBSERVATORY_PROJECT_VERSION_MISMATCH' using errcode='22023'; end if;
   if selected_version.status in ('released','archived','cancelled') then raise exception 'OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED' using errcode='22023'; end if;
   insert into public.observatory_work_items(type,title,description,state,project_ref,project_version_id,version_binding_kind,assigned_agent_id,idempotency_key,created_by)
@@ -472,7 +506,18 @@ begin
     return existing_item;
   end if;
   insert into public.observatory_work_item_events(work_item_id,event_type,actor_id,data)
-  values(created_item.id,'created',calling_user,jsonb_build_object('after',to_jsonb(created_item)));
+  values(created_item.id,'created',calling_user,jsonb_build_object('after',jsonb_build_object(
+    'id',created_item.id,'type',created_item.type,'title',created_item.title,
+    'description',created_item.description,'state',created_item.state,'version',created_item.version,
+    'created_by',created_item.created_by,'created_at',created_item.created_at,'updated_at',created_item.updated_at,
+    'priority',created_item.priority,'owner_id',created_item.owner_id,
+    'acceptance_criteria',created_item.acceptance_criteria,'project_ref',created_item.project_ref,
+    'milestone_ref',created_item.milestone_ref,'risk_level',created_item.risk_level,
+    'assigned_agent_id',created_item.assigned_agent_id,'project_key',created_item.project_key,
+    'plan_revision',created_item.plan_revision,'stage_id',created_item.stage_id,
+    'work_package_id',created_item.work_package_id,'project_version_id',created_item.project_version_id,
+    'version_binding_kind',created_item.version_binding_kind
+  )));
   return created_item;
 end;
 $$;
@@ -492,6 +537,7 @@ begin
   if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   select * into current_item from public.observatory_work_items where id=p_work_item_id for update;
   if current_item.id is null then raise exception 'OBSERVATORY_WORK_ITEM_NOT_FOUND' using errcode='P0002'; end if;
+  if p_expected_version is null then raise exception 'OBSERVATORY_VERSION_CONFLICT' using errcode='40001'; end if;
   if current_item.version <> p_expected_version then raise exception 'OBSERVATORY_VERSION_CONFLICT' using errcode='40001'; end if;
   if p_version_binding_kind not in ('required','optional') then raise exception 'OBSERVATORY_VERSION_BINDING_KIND_INVALID' using errcode='22023'; end if;
   if btrim(coalesce(p_assigned_agent_id,'')) = 'shared' or btrim(coalesce(p_assigned_agent_id,'')) !~ '^[a-z][a-z0-9-]{0,79}$' then
@@ -511,7 +557,32 @@ begin
     version_binding_kind=p_version_binding_kind,version=current_item.version+1
   where id=current_item.id and version=p_expected_version returning * into strict updated_item;
   insert into public.observatory_work_item_events(work_item_id,event_type,actor_id,data)
-  values(updated_item.id,'updated',calling_user,jsonb_build_object('before',to_jsonb(current_item),'after',to_jsonb(updated_item)));
+  values(updated_item.id,'updated',calling_user,jsonb_build_object(
+    'before',jsonb_build_object(
+      'id',current_item.id,'type',current_item.type,'title',current_item.title,
+      'description',current_item.description,'state',current_item.state,'version',current_item.version,
+      'created_by',current_item.created_by,'created_at',current_item.created_at,'updated_at',current_item.updated_at,
+      'priority',current_item.priority,'owner_id',current_item.owner_id,
+      'acceptance_criteria',current_item.acceptance_criteria,'project_ref',current_item.project_ref,
+      'milestone_ref',current_item.milestone_ref,'risk_level',current_item.risk_level,
+      'assigned_agent_id',current_item.assigned_agent_id,'project_key',current_item.project_key,
+      'plan_revision',current_item.plan_revision,'stage_id',current_item.stage_id,
+      'work_package_id',current_item.work_package_id,'project_version_id',current_item.project_version_id,
+      'version_binding_kind',current_item.version_binding_kind
+    ),
+    'after',jsonb_build_object(
+      'id',updated_item.id,'type',updated_item.type,'title',updated_item.title,
+      'description',updated_item.description,'state',updated_item.state,'version',updated_item.version,
+      'created_by',updated_item.created_by,'created_at',updated_item.created_at,'updated_at',updated_item.updated_at,
+      'priority',updated_item.priority,'owner_id',updated_item.owner_id,
+      'acceptance_criteria',updated_item.acceptance_criteria,'project_ref',updated_item.project_ref,
+      'milestone_ref',updated_item.milestone_ref,'risk_level',updated_item.risk_level,
+      'assigned_agent_id',updated_item.assigned_agent_id,'project_key',updated_item.project_key,
+      'plan_revision',updated_item.plan_revision,'stage_id',updated_item.stage_id,
+      'work_package_id',updated_item.work_package_id,'project_version_id',updated_item.project_version_id,
+      'version_binding_kind',updated_item.version_binding_kind
+    )
+  ));
   return updated_item;
 end;
 $$;

@@ -240,6 +240,10 @@ describe("Project Version contract v1 verifier", () => {
       source.replace("before insert or update of state,", "before insert or update of"),
       source.replace("perform pg_catalog.pg_advisory_xact_lock(20960902000300);", "perform true;"),
       source.replace("(released_at is not null and actual_date is not null)", "released_at is not null"),
+      source.replace("if p_expected_version is null then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;", ""),
+      source.replace("existing_item.project_version_id is distinct from p_project_version_id", "existing_item.project_version_id is distinct from selected_version.id"),
+      source.replace("'version_binding_kind',created_item.version_binding_kind", "'idempotency_key',created_item.idempotency_key"),
+      source.replace("conname = 'observatory_project_versions_check'", "conname like '%status%released_at%'"),
     ];
     for (const [index, weakened] of weakenedCases.entries()) {
       const path = join(directory, `weakened-${index}.sql`);
@@ -264,6 +268,7 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toMatch(/pg_get_functiondef[\s\S]*pg_advisory_xact_lock[\s\S]*for key share/iu);
     for (const rpc of [
       "create_observatory_project_version",
+      "ensure_observatory_project_backlog_versions",
       "update_observatory_project_version",
       "transition_observatory_project_version",
       "create_observatory_work_item",
@@ -271,9 +276,15 @@ describe("Project Version contract v1 verifier", () => {
     ]) expect(source).toContain(rpc);
     expect(source).toMatch(/observatory_project_version_events[\s\S]*relrowsecurity/iu);
     expect(source).toMatch(/with recursive predecessor_chain/iu);
-    expect(source).toMatch(/not has_table_privilege\('anon'/iu);
+    expect(source).toMatch(/table_acl_expectations[\s\S]*'public'[\s\S]*'anon'[\s\S]*'authenticated'[\s\S]*'service_role'/iu);
+    for (const privilege of ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+      expect(source).toContain(`'${privilege}'`);
+    }
+    expect(source).toMatch(/policy_expectations[\s\S]*observatory_project_versions_select_admin[\s\S]*observatory_project_version_events_select_admin/iu);
+    expect(source).toMatch(/polcmd<>'r'[\s\S]*is_current_user_admin\(\)[\s\S]*polwithcheck is not null/iu);
     for (const signature of [
       "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "ensure_observatory_project_backlog_versions(text[])",
       "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
       "transition_observatory_project_version(uuid,integer,text)",
       "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
@@ -281,8 +292,8 @@ describe("Project Version contract v1 verifier", () => {
     ]) {
       expect(source).toContain(`public.${signature}`);
     }
-    expect(source).toMatch(/has_function_privilege\('authenticated',[\s\S]*not has_function_privilege\('service_role',[\s\S]*privilege\.grantee not in/iu);
-    expect(source).toMatch(/privilege\.grantee\s*=\s*\(select oid from pg_roles where rolname = 'authenticated'\)/iu);
+    expect(source).toMatch(/rpc_acl_expectations[\s\S]*'public'[\s\S]*'anon'[\s\S]*'authenticated'[\s\S]*'service_role'/iu);
+    expect(source).toMatch(/prosecdef[\s\S]*search_path=pg_catalog[\s\S]*administrator access required/iu);
     expect(source).toMatch(/not exists\(select 1 from superseded_rpc_signatures where to_regprocedure\(signature\) is not null\)/iu);
     expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
@@ -296,6 +307,10 @@ describe("Project Version contract v1 verifier", () => {
     "version_update_lock_order",
     "version_transition_lock_order",
     "predecessor_validator_lock",
+    "table_acls_exact",
+    "admin_select_policies_exact",
+    "rpc_acls_exact",
+    "admin_rpc_definitions_exact",
   ])("fails database status when %s is weakened or missing", async (failedCheck) => {
     const sql = (() => Promise.resolve([{ [failedCheck]: false }])) as never;
     await expect(readProjectVersionContractStatus(sql)).rejects.toThrow(
@@ -322,6 +337,7 @@ describe("Project Version contract v1 verifier", () => {
     expect(current).toEqual([
       "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
       "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
+      "ensure_observatory_project_backlog_versions(text[])",
       "transition_observatory_project_version(uuid,integer,text)",
       "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
       "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",

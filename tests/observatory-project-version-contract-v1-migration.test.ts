@@ -184,6 +184,23 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).toMatch(/observatory_project_versions_release_timestamp_check[\s\S]*status not in \('released', 'archived'\)[\s\S]*released_at is not null[\s\S]*actual_date is not null/iu);
   });
 
+  it("replaces only the two known v0 version constraints after verifying their exact definitions", async () => {
+    const sql = await migration();
+    const replacement = sql.slice(
+      sql.indexOf("do $constraints$"),
+      sql.indexOf("alter table public.observatory_project_versions\n  add constraint observatory_project_versions_status_check"),
+    );
+
+    expect(replacement).toContain("conname = 'observatory_project_versions_status_check'");
+    expect(replacement).toContain("conname = 'observatory_project_versions_check'");
+    expect(replacement).toContain("OBSERVATORY_PROJECT_VERSION_PRIOR_CONSTRAINT_MISMATCH");
+    expect(replacement).toContain("alter table public.observatory_project_versions drop constraint observatory_project_versions_status_check");
+    expect(replacement).toContain("alter table public.observatory_project_versions drop constraint observatory_project_versions_check");
+    expect(replacement).not.toMatch(/for\s+constraint_name\s+in/iu);
+    expect(replacement).not.toMatch(/like\s+'%status/iu);
+    expect(replacement).not.toMatch(/execute\s+format/iu);
+  });
+
   it("replaces bounded admin RPCs, audits snapshots, and blocks new bindings to terminal versions", async () => {
     const sql = await migration();
     for (const name of [
@@ -220,6 +237,67 @@ describe("Project Version contract v1 migration", () => {
       expect(sql).toContain(`revoke all privileges on function public.${signature} from public,anon,authenticated,service_role`);
       expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
     }
+  });
+
+  it("rejects null expected versions in every v1 optimistic mutation RPC", async () => {
+    const sql = await migration();
+    const bodies = [
+      sql.slice(sql.indexOf("create function public.update_observatory_project_version"), sql.indexOf("create function public.transition_observatory_project_version")),
+      sql.slice(sql.indexOf("create function public.transition_observatory_project_version"), sql.indexOf("-- Work Item RPCs")),
+      sql.slice(sql.indexOf("create function public.update_observatory_work_item"), sql.indexOf("revoke all privileges on function public.create_observatory_project_version")),
+    ];
+
+    expect(bodies[0]).toMatch(/if p_expected_version is null then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT'/iu);
+    expect(bodies[1]).toMatch(/if p_expected_version is null then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT'/iu);
+    expect(bodies[2]).toMatch(/if p_expected_version is null then raise exception 'OBSERVATORY_VERSION_CONFLICT'/iu);
+  });
+
+  it("preserves exact create idempotency after a version becomes terminal", async () => {
+    const sql = await migration();
+    const body = sql.slice(
+      sql.indexOf("create function public.create_observatory_work_item"),
+      sql.indexOf("create function public.update_observatory_work_item"),
+    );
+    const firstExistingLookup = body.indexOf("where created_by=calling_user and idempotency_key=btrim(p_idempotency_key)");
+    const terminalRejection = body.indexOf("OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED");
+    const insert = body.indexOf("insert into public.observatory_work_items");
+
+    expect(firstExistingLookup).toBeGreaterThan(0);
+    expect(firstExistingLookup).toBeLessThan(terminalRejection);
+    expect(firstExistingLookup).toBeLessThan(insert);
+    expect(body).toMatch(/existing_item\.project_version_id is distinct from p_project_version_id/iu);
+    expect(body).toContain("OBSERVATORY_IDEMPOTENCY_CONFLICT");
+    expect(body).toMatch(/on conflict \(created_by, idempotency_key\) do nothing/iu);
+    expect(body.indexOf("on conflict (created_by, idempotency_key) do nothing")).toBeLessThan(
+      body.lastIndexOf("where created_by=calling_user and idempotency_key=btrim(p_idempotency_key)"),
+    );
+  });
+
+  it("uses an explicit Work Item business-field whitelist for audit snapshots", async () => {
+    const sql = await migration();
+    const createBody = sql.slice(
+      sql.indexOf("create function public.create_observatory_work_item"),
+      sql.indexOf("create function public.update_observatory_work_item"),
+    );
+    const updateBody = sql.slice(
+      sql.indexOf("create function public.update_observatory_work_item"),
+      sql.indexOf("revoke all privileges on function public.create_observatory_project_version"),
+    );
+    const auditSql = `${createBody.slice(createBody.indexOf("insert into public.observatory_work_item_events"))}\n${updateBody.slice(updateBody.indexOf("insert into public.observatory_work_item_events"))}`;
+
+    expect(auditSql).toContain("'version_binding_kind'");
+    expect(auditSql).toContain("created_item.version_binding_kind");
+    expect(auditSql).toContain("current_item.version_binding_kind");
+    expect(auditSql).toContain("updated_item.version_binding_kind");
+    expect(auditSql).not.toMatch(/to_jsonb\((?:created|current|updated)_item\)/iu);
+    for (const forbidden of [
+      "'idempotency_key'",
+      "'agent_claim_enabled'",
+      "'authorized_paths'",
+      "'allowed_action_classes'",
+      "'claim_approved_by'",
+      "'claim_approved_at'",
+    ]) expect(auditSql).not.toContain(forbidden);
   });
 
   it("freezes every Work Item scope field while its bound version is released or archived", async () => {
