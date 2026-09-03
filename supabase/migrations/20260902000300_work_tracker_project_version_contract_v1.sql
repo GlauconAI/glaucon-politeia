@@ -74,6 +74,11 @@ update public.observatory_project_versions
 set is_release_target = false
 where is_backlog and is_release_target is distinct from false;
 
+-- Preserve historical release timing while populating the new canonical actual date.
+update public.observatory_project_versions
+set actual_date = released_at::date
+where status in ('released', 'archived') and actual_date is null;
+
 alter table public.observatory_work_items
   alter column version_binding_kind set default 'optional',
   alter column version_binding_kind set not null,
@@ -104,7 +109,7 @@ alter table public.observatory_project_versions
   add constraint observatory_project_versions_backlog_release_target_check
     check (not (is_backlog and is_release_target)),
   add constraint observatory_project_versions_release_timestamp_check
-    check (status not in ('released', 'archived') or released_at is not null);
+    check (status not in ('released', 'archived') or (released_at is not null and actual_date is not null));
 
 create unique index observatory_project_versions_one_execution_idx
 on public.observatory_project_versions(project_key)
@@ -118,6 +123,23 @@ create unique index observatory_project_versions_semver_idx
 on public.observatory_project_versions(project_key, semver)
 where semver is not null and not is_backlog;
 
+create or replace function public.lock_observatory_project_version_graph()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $$
+begin
+  -- Global graph key for low-volume Project Version topology mutations.
+  perform pg_catalog.pg_advisory_xact_lock(20960902000300);
+  return null;
+end;
+$$;
+
+create trigger observatory_project_versions_lock_graph
+before insert or update of project_key, semver, predecessor_version_id
+on public.observatory_project_versions
+for each statement execute function public.lock_observatory_project_version_graph();
+
 create or replace function public.validate_observatory_project_version_predecessor()
 returns trigger
 language plpgsql
@@ -129,6 +151,9 @@ declare
   predecessor_parts integer[];
   current_parts integer[];
 begin
+  -- One transaction-scoped global graph lock serializes all low-volume inserts and
+  -- project_key/semver/predecessor mutations before any counterpart validation.
+  perform pg_catalog.pg_advisory_xact_lock(20960902000300);
   if new.predecessor_version_id is not null then
     if new.predecessor_version_id = new.id then
       raise exception 'OBSERVATORY_PREDECESSOR_SELF' using errcode = '23514';
@@ -226,7 +251,8 @@ declare
 begin
   if tg_op = 'UPDATE' then
     select status into bound_version_status
-    from public.observatory_project_versions where id = old.project_version_id;
+    from public.observatory_project_versions where id = old.project_version_id
+    for key share;
     if bound_version_status in ('released', 'archived') and (
       new.type is distinct from old.type
       or new.title is distinct from old.title
@@ -248,7 +274,8 @@ begin
     end if;
   end if;
   select project_key, status into version_project_key, version_status
-  from public.observatory_project_versions where id = new.project_version_id;
+  from public.observatory_project_versions where id = new.project_version_id
+  for key share;
   if version_project_key is null then
     raise exception 'OBSERVATORY_PROJECT_VERSION_REQUIRED' using errcode = '22023';
   end if;
@@ -336,6 +363,8 @@ as $$
 declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions; updated_version public.observatory_project_versions;
 begin
   if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  -- Match the statement trigger's global lock order before taking a row lock.
+  perform pg_catalog.pg_advisory_xact_lock(20960902000300);
   select * into current_version from public.observatory_project_versions where id=p_project_version_id for update;
   if current_version.id is null then raise exception 'OBSERVATORY_PROJECT_VERSION_NOT_FOUND' using errcode='P0002'; end if;
   if current_version.row_version <> p_expected_version then raise exception 'OBSERVATORY_PROJECT_VERSION_CONFLICT' using errcode='40001'; end if;

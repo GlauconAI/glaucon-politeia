@@ -223,6 +223,23 @@ describe("Project Version contract v1 verifier", () => {
     );
   });
 
+  it("source verification rejects weakened concurrency and constraint contracts", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "version-contract-weakened-"));
+    const source = await readFile(
+      join(process.cwd(), "supabase/migrations/20260902000300_work_tracker_project_version_contract_v1.sql"),
+      "utf8",
+    );
+    const weakenedCases = [
+      source.replace("for each statement execute function public.lock_observatory_project_version_graph();", "for each statement execute function public.validate_observatory_project_version_predecessor();"),
+      source.replace("(released_at is not null and actual_date is not null)", "released_at is not null"),
+    ];
+    for (const [index, weakened] of weakenedCases.entries()) {
+      const path = join(directory, `weakened-${index}.sql`);
+      await writeFile(path, weakened, "utf8");
+      await expect(verifyProjectVersionContractSource(path)).rejects.toThrow(/Source verification failed/u);
+    }
+  });
+
   it("checks database constraints, all bounded RPCs, exact security, and recursive predecessor integrity", async () => {
     const source = await readFile(
       join(process.cwd(), "scripts/observatory/verify-project-version-contract-v1.ts"),
@@ -231,6 +248,9 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toContain("observatory_project_versions_status_check");
     expect(source).toContain("observatory_project_versions_backlog_release_target_check");
     expect(source).toContain("observatory_work_items_version_binding_kind_check");
+    expect(source).toMatch(/pg_get_constraintdef\(constraint_catalog\.oid\)[\s\S]*observatory_project_versions_semver_check/iu);
+    expect(source).toMatch(/observatory_project_versions_release_timestamp_check[\s\S]*released_at[\s\S]*actual_date/iu);
+    expect(source).toMatch(/tgname='observatory_work_items_validate_project_version'[\s\S]*tgenabled<>'D'[\s\S]*validate_observatory_work_item_project_version/iu);
     for (const rpc of [
       "create_observatory_project_version",
       "update_observatory_project_version",

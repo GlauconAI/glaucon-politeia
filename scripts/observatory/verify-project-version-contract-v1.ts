@@ -72,7 +72,14 @@ export async function verifyProjectVersionContractSource(
   checks.push("preflight guards");
   requirePattern(source, "portfolio indexes", /one_execution_idx[\s\S]*one_release_target_idx[\s\S]*semver_idx/iu);
   checks.push("portfolio indexes");
+  requirePattern(
+    source,
+    "canonical constraints",
+    /observatory_project_versions_status_check\s+check \(status in \('planned', 'active', 'gate_ready', 'released', 'archived', 'cancelled'\)\)[\s\S]*observatory_project_versions_semver_check\s+check \(\(is_backlog and semver is null\) or \(not is_backlog and \(semver is null or semver ~ '[^']+'\)\)\)[\s\S]*observatory_project_versions_backlog_release_target_check\s+check \(not \(is_backlog and is_release_target\)\)[\s\S]*observatory_project_versions_release_timestamp_check\s+check \(status not in \('released', 'archived'\) or \(released_at is not null and actual_date is not null\)\)/iu,
+  );
+  checks.push("canonical constraints");
   requirePattern(source, "predecessor integrity", /with recursive predecessor_chain[\s\S]*OBSERVATORY_PREDECESSOR_CYCLE/iu);
+  requirePattern(source, "serialized predecessor graph", /lock_observatory_project_version_graph[\s\S]*pg_advisory_xact_lock\(20960902000300\)[\s\S]*create trigger observatory_project_versions_lock_graph[\s\S]*before insert or update of project_key, semver, predecessor_version_id[\s\S]*for each statement execute function public\.lock_observatory_project_version_graph/iu);
   checks.push("predecessor integrity");
   requirePattern(source, "lifecycle and release gates", /gate_ready[\s\S]*version_binding_kind = 'required'[\s\S]*RELEASE_GATE_INCOMPLETE/iu);
   requirePattern(source, "exact gate-ready transitions", /current_version\.status='gate_ready' and target_status in \('active','released'\)/iu);
@@ -86,6 +93,8 @@ export async function verifyProjectVersionContractSource(
     /bound_version_status in \('released', 'archived'\)[\s\S]*new\.type is distinct from old\.type[\s\S]*new\.acceptance_criteria is distinct from old\.acceptance_criteria[\s\S]*new\.owner_id is distinct from old\.owner_id[\s\S]*new\.project_version_id is distinct from old\.project_version_id[\s\S]*OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE/iu,
   );
   checks.push("terminal work item scope");
+  requirePattern(source, "serialized work item binding", /where id = new\.project_version_id\s+for key share[\s\S]*OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED/iu);
+  checks.push("serialized mutation validation");
   requirePattern(source, "security and audit", /security definer[\s\S]*jsonb_build_object\('before'[\s\S]*grant execute/iu);
   checks.push("security and audit");
   checks.push("rollback guidance");
@@ -325,6 +334,16 @@ async function readDatabaseStatus(sql: Sql) {
     ), resolved_bounded_rpcs as (
       select signature, to_regprocedure(signature) as procedure
       from bounded_rpc_signatures
+    ), constraint_definitions as (
+      select constraint_catalog.conrelid, constraint_catalog.conname,
+        lower(regexp_replace(pg_get_constraintdef(constraint_catalog.oid), '\\s+', ' ', 'g')) as definition,
+        constraint_catalog.convalidated
+      from pg_constraint constraint_catalog
+      where constraint_catalog.contype='c'
+        and constraint_catalog.conrelid in (
+          'public.observatory_project_versions'::regclass,
+          'public.observatory_work_items'::regclass
+        )
     )
     select
       (select count(*) = 15 from information_schema.columns where table_schema='public'
@@ -339,13 +358,30 @@ async function readDatabaseStatus(sql: Sql) {
       to_regclass('public.observatory_project_versions_one_execution_idx') is not null as execution_index,
       to_regclass('public.observatory_project_versions_one_release_target_idx') is not null as release_target_index,
       to_regclass('public.observatory_project_versions_semver_idx') is not null as semver_index,
-      exists(select 1 from pg_constraint where conrelid='public.observatory_project_versions'::regclass
-        and conname='observatory_project_versions_status_check' and contype='c') as status_constraint,
-      exists(select 1 from pg_constraint where conrelid='public.observatory_project_versions'::regclass
-        and conname='observatory_project_versions_backlog_release_target_check' and contype='c')
+      exists(select 1 from constraint_definitions where conrelid='public.observatory_project_versions'::regclass
+        and conname='observatory_project_versions_status_check' and convalidated
+        and definition='check ((status = any (array[''planned''::text, ''active''::text, ''gate_ready''::text, ''released''::text, ''archived''::text, ''cancelled''::text])))') as status_constraint,
+      exists(select 1 from constraint_definitions where conrelid='public.observatory_project_versions'::regclass
+        and conname='observatory_project_versions_semver_check' and convalidated
+        and definition='check (((is_backlog and (semver is null)) or ((not is_backlog) and ((semver is null) or (semver ~ ''^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$''::text)))))')
+        as semver_constraint,
+      exists(select 1 from constraint_definitions where conrelid='public.observatory_project_versions'::regclass
+        and conname='observatory_project_versions_backlog_release_target_check' and convalidated
+        and definition='check ((not (is_backlog and is_release_target)))')
         as backlog_release_target_constraint,
-      exists(select 1 from pg_constraint where conrelid='public.observatory_work_items'::regclass
-        and conname='observatory_work_items_version_binding_kind_check' and contype='c') as binding_constraint,
+      exists(select 1 from constraint_definitions where conrelid='public.observatory_project_versions'::regclass
+        and conname='observatory_project_versions_release_timestamp_check' and convalidated
+        and definition='check (((status <> all (array[''released''::text, ''archived''::text])) or ((released_at is not null) and (actual_date is not null))))')
+        as release_timestamp_constraint,
+      exists(select 1 from constraint_definitions where conrelid='public.observatory_work_items'::regclass
+        and conname='observatory_work_items_version_binding_kind_check' and convalidated
+        and definition='check ((version_binding_kind = any (array[''required''::text, ''optional''::text])))') as binding_constraint,
+      exists(select 1 from pg_trigger
+        where tgrelid='public.observatory_work_items'::regclass
+          and tgname='observatory_work_items_validate_project_version'
+          and tgenabled<>'D' and not tgisinternal
+          and tgfoid=to_regprocedure('public.validate_observatory_work_item_project_version()'))
+        as work_item_validation_trigger,
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_validate_predecessor' and not tgisinternal) as predecessor_trigger,
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_protect_history' and not tgisinternal) as history_trigger,
       (select bool_and(procedure is not null) from resolved_bounded_rpcs)

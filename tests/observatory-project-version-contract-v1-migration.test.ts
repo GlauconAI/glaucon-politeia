@@ -99,6 +99,62 @@ describe("Project Version contract v1 migration", () => {
     expect(sql).not.toMatch(/update public\.observatory_project_versions[\s\S]{0,300}set status = 'released'/iu);
   });
 
+  it("serializes graph validation and binding against concurrent version mutations", async () => {
+    const sql = await migration();
+    expect(sql).toMatch(/create or replace function public\.lock_observatory_project_version_graph[\s\S]*pg_advisory_xact_lock\(20960902000300\)/iu);
+    expect(sql).toMatch(/create trigger observatory_project_versions_lock_graph[\s\S]*before insert or update of project_key, semver, predecessor_version_id[\s\S]*for each statement[\s\S]*lock_observatory_project_version_graph/iu);
+    const predecessorValidator = sql.slice(
+      sql.indexOf("create or replace function public.validate_observatory_project_version_predecessor"),
+      sql.indexOf("create trigger observatory_project_versions_validate_predecessor"),
+    );
+    expect(predecessorValidator).toMatch(/pg_advisory_xact_lock\(20960902000300\)/iu);
+    expect(predecessorValidator.indexOf("pg_advisory_xact_lock")).toBeLessThan(
+      predecessorValidator.indexOf("new.predecessor_version_id"),
+    );
+    expect(sql).toMatch(
+      /before insert or update of project_key, semver, predecessor_version_id[\s\S]*validate_observatory_project_version_predecessor/iu,
+    );
+    const versionUpdateRpc = sql.slice(
+      sql.indexOf("create function public.update_observatory_project_version"),
+      sql.indexOf("create function public.transition_observatory_project_version"),
+    );
+    expect(versionUpdateRpc).toContain("pg_advisory_xact_lock(20960902000300)");
+    expect(versionUpdateRpc.indexOf("pg_advisory_xact_lock(20960902000300)")).toBeLessThan(
+      versionUpdateRpc.indexOf("for update"),
+    );
+
+    const workItemValidator = sql.slice(
+      sql.indexOf("create or replace function public.validate_observatory_work_item_project_version"),
+      sql.indexOf("drop trigger if exists observatory_work_items_validate_project_version"),
+    );
+    expect(workItemValidator).toMatch(
+      /from public\.observatory_project_versions where id = new\.project_version_id for key share/iu,
+    );
+    expect(workItemValidator.indexOf("for key share")).toBeLessThan(
+      workItemValidator.indexOf("version_status in ('released', 'archived', 'cancelled')"),
+    );
+
+    const releaseTransition = sql.slice(
+      sql.indexOf("create function public.transition_observatory_project_version"),
+      sql.indexOf("-- work item rpcs"),
+    );
+    expect(releaseTransition.indexOf("for update")).toBeLessThan(
+      releaseTransition.indexOf("from public.observatory_work_items"),
+    );
+  });
+
+  it("defines the exact canonical checks including both release dates", async () => {
+    const sql = await migration();
+    expect(sql).toMatch(/update public\.observatory_project_versions set actual_date = released_at::date where status in \('released', 'archived'\) and actual_date is null/iu);
+    expect(sql.indexOf("set actual_date = released_at::date")).toBeLessThan(
+      sql.indexOf("observatory_project_versions_release_timestamp_check"),
+    );
+    expect(sql).toMatch(/observatory_project_versions_status_check[\s\S]*status in \('planned', 'active', 'gate_ready', 'released', 'archived', 'cancelled'\)/iu);
+    expect(sql).toMatch(/observatory_project_versions_semver_check[\s\S]*is_backlog and semver is null[\s\S]*not is_backlog[\s\S]*semver ~ /iu);
+    expect(sql).toMatch(/observatory_project_versions_backlog_release_target_check[\s\S]*not \(is_backlog and is_release_target\)/iu);
+    expect(sql).toMatch(/observatory_project_versions_release_timestamp_check[\s\S]*status not in \('released', 'archived'\)[\s\S]*released_at is not null[\s\S]*actual_date is not null/iu);
+  });
+
   it("replaces bounded admin RPCs, audits snapshots, and blocks new bindings to terminal versions", async () => {
     const sql = await migration();
     for (const name of [
