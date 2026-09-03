@@ -64,6 +64,13 @@ const FormalSemVerSchema = z
   .string()
   .trim()
   .regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u);
+function normalizeLegacySemVer(versionLabel: string): string | null {
+  const match = /^v?(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?$/iu.exec(
+    versionLabel.trim(),
+  );
+  if (!match) return null;
+  return `${match[1]}.${match[2] ?? "0"}.${match[3] ?? "0"}`;
+}
 const NullableReferenceSchema = z
   .union([z.string().trim().max(160), z.null()])
   .transform((value) => value || null);
@@ -74,31 +81,44 @@ const SummarySchema = z.string().trim().max(4_000);
 const TargetDateSchema = z
   .union([z.iso.date(), z.literal(""), z.null()])
   .transform((value) => value || null);
-const operationalFields = {
-  semver: FormalSemVerSchema,
-  isReleaseTarget: z.boolean(),
-  milestoneRef: NullableReferenceSchema,
-  predecessorVersionId: NullableVersionIdSchema,
-  roadmapRef: NullableReferenceSchema,
-  approvedPlanRef: NullableReferenceSchema,
-  acceptanceSummary: SummarySchema,
-  actualDate: TargetDateSchema,
-  dependenciesSummary: SummarySchema,
-  dependenciesSatisfied: z.boolean(),
-  artifactsAccepted: z.boolean(),
-  verificationComplete: z.boolean(),
-  roadmapReconciled: z.boolean(),
-  userGateDecisionRef: NullableReferenceSchema,
+const operationalFieldDefaults = {
+  isReleaseTarget: z.boolean().default(false),
+  milestoneRef: NullableReferenceSchema.default(null),
+  predecessorVersionId: NullableVersionIdSchema.default(null),
+  roadmapRef: NullableReferenceSchema.default(null),
+  approvedPlanRef: NullableReferenceSchema.default(null),
+  acceptanceSummary: SummarySchema.default(""),
+  actualDate: TargetDateSchema.default(null),
+  dependenciesSummary: SummarySchema.default(""),
+  dependenciesSatisfied: z.boolean().default(false),
+  artifactsAccepted: z.boolean().default(false),
+  verificationComplete: z.boolean().default(false),
+  roadmapReconciled: z.boolean().default(false),
+  userGateDecisionRef: NullableReferenceSchema.default(null),
 };
 
-export const ProjectVersionCreateInputSchema = z.strictObject({
-  projectKey: ProjectKeySchema,
-  versionLabel: VersionLabelSchema,
-  title: VersionTitleSchema,
-  description: VersionDescriptionSchema.default(""),
-  targetDate: TargetDateSchema.default(null),
-  ...operationalFields,
-});
+export const ProjectVersionCreateInputSchema = z
+  .strictObject({
+    projectKey: ProjectKeySchema,
+    versionLabel: VersionLabelSchema,
+    title: VersionTitleSchema,
+    description: VersionDescriptionSchema.default(""),
+    targetDate: TargetDateSchema.default(null),
+    semver: FormalSemVerSchema.optional(),
+    ...operationalFieldDefaults,
+  })
+  .superRefine((value, context) => {
+    if (value.semver || normalizeLegacySemVer(value.versionLabel)) return;
+    context.addIssue({
+      code: "custom",
+      message: "A formal MAJOR.MINOR.PATCH SemVer is required.",
+      path: ["semver"],
+    });
+  })
+  .transform((value) => ({
+    ...value,
+    semver: value.semver ?? normalizeLegacySemVer(value.versionLabel)!,
+  }));
 
 export const ProjectVersionUpdateInputSchema = z.strictObject({
   projectVersionId: z.uuid(),
@@ -107,7 +127,8 @@ export const ProjectVersionUpdateInputSchema = z.strictObject({
   title: VersionTitleSchema,
   description: VersionDescriptionSchema.default(""),
   targetDate: TargetDateSchema.default(null),
-  ...operationalFields,
+  semver: FormalSemVerSchema.nullable().default(null),
+  ...operationalFieldDefaults,
 });
 
 export const ProjectVersionTransitionInputSchema = z.strictObject({
@@ -116,6 +137,6 @@ export const ProjectVersionTransitionInputSchema = z.strictObject({
   targetStatus: z.enum(PROJECT_VERSION_STATUSES),
 });
 
-export type ProjectVersionCreateInput = z.infer<typeof ProjectVersionCreateInputSchema>;
-export type ProjectVersionUpdateInput = z.infer<typeof ProjectVersionUpdateInputSchema>;
+export type ProjectVersionCreateInput = z.input<typeof ProjectVersionCreateInputSchema>;
+export type ProjectVersionUpdateInput = z.input<typeof ProjectVersionUpdateInputSchema>;
 export type ProjectVersionTransitionInput = z.infer<typeof ProjectVersionTransitionInputSchema>;

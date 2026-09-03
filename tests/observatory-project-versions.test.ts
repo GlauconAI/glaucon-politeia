@@ -62,6 +62,51 @@ describe("Project Versions", () => {
     });
   });
 
+  it("defaults operational fields for legacy create and update consumers", () => {
+    expect(ProjectVersionCreateInputSchema.parse({
+      projectKey: "plato/dashboard",
+      versionLabel: "v1.2",
+      title: "Legacy create",
+    })).toMatchObject({
+      semver: "1.2.0",
+      isReleaseTarget: false,
+      milestoneRef: null,
+      predecessorVersionId: null,
+      roadmapRef: null,
+      approvedPlanRef: null,
+      acceptanceSummary: "",
+      actualDate: null,
+      dependenciesSummary: "",
+      dependenciesSatisfied: false,
+      artifactsAccepted: false,
+      verificationComplete: false,
+      roadmapReconciled: false,
+      userGateDecisionRef: null,
+    });
+
+    expect(ProjectVersionUpdateInputSchema.parse({
+      projectVersionId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      versionLabel: "internal-preview",
+      title: "Legacy update",
+    })).toMatchObject({
+      semver: null,
+      isReleaseTarget: false,
+      milestoneRef: null,
+      predecessorVersionId: null,
+      roadmapRef: null,
+      approvedPlanRef: null,
+      acceptanceSummary: "",
+      actualDate: null,
+      dependenciesSummary: "",
+      dependenciesSatisfied: false,
+      artifactsAccepted: false,
+      verificationComplete: false,
+      roadmapReconciled: false,
+      userGateDecisionRef: null,
+    });
+  });
+
   it("requires strict MAJOR.MINOR.PATCH SemVer without a v prefix", () => {
     for (const semver of ["v1.2.3", "1.2", "1.2.3-beta.1", "01.2.3"]) {
       expect(ProjectVersionCreateInputSchema.safeParse({
@@ -84,6 +129,23 @@ describe("Project Versions", () => {
       ...operationalFields,
       semver: "0.0.0",
     }).success).toBe(true);
+  });
+
+  it("allows null SemVer only when updating a legacy version", () => {
+    expect(ProjectVersionUpdateInputSchema.safeParse({
+      projectVersionId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      versionLabel: "internal-preview",
+      title: "Legacy version",
+      semver: null,
+    }).success).toBe(true);
+
+    expect(ProjectVersionCreateInputSchema.safeParse({
+      projectKey: "plato/dashboard",
+      versionLabel: "internal-preview",
+      title: "New version",
+      semver: null,
+    }).success).toBe(false);
   });
 
   it("rejects unsafe Project keys", () => {

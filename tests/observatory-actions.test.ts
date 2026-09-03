@@ -395,6 +395,20 @@ describe("Project Version actions", () => {
       title: "First release",
       description: "Stable versioning.",
       targetDate: "2026-09-30",
+      semver: "1.0.0",
+      isReleaseTarget: false,
+      milestoneRef: null,
+      predecessorVersionId: null,
+      roadmapRef: null,
+      approvedPlanRef: null,
+      acceptanceSummary: "",
+      actualDate: null,
+      dependenciesSummary: "",
+      dependenciesSatisfied: false,
+      artifactsAccepted: false,
+      verificationComplete: false,
+      roadmapReconciled: false,
+      userGateDecisionRef: null,
     });
   });
 
