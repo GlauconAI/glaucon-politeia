@@ -133,6 +133,9 @@ describe("Project Version contract v1 migration", () => {
     expect(workItemValidator.indexOf("for key share")).toBeLessThan(
       workItemValidator.indexOf("version_status in ('released', 'archived', 'cancelled')"),
     );
+    expect(sql).toMatch(
+      /create trigger observatory_work_items_validate_project_version before insert or update of state,[\s\S]*for each row execute function public\.validate_observatory_work_item_project_version/iu,
+    );
 
     const releaseTransition = sql.slice(
       sql.indexOf("create function public.transition_observatory_project_version"),
@@ -141,6 +144,32 @@ describe("Project Version contract v1 migration", () => {
     expect(releaseTransition.indexOf("for update")).toBeLessThan(
       releaseTransition.indexOf("from public.observatory_work_items"),
     );
+  });
+
+  it("routes every gate-related transition and claim state mutation through the locked state trigger", async () => {
+    const [core, claims] = await Promise.all([
+      readFile(join(process.cwd(), "supabase/migrations/20260723000100_work_tracker_core.sql"), "utf8"),
+      readFile(join(process.cwd(), "supabase/migrations/20260723000200_observatory_agent_claim_engine.sql"), "utf8"),
+    ]);
+    const stateMutationBody = (source: string, functionName: string) => source.slice(
+      source.indexOf(`function public.${functionName}`),
+      source.indexOf(`revoke all privileges on function public.${functionName}`),
+    ).replace(/\s+/gu, " ");
+
+    expect(stateMutationBody(core, "transition_observatory_work_item")).toMatch(
+      /update public\.observatory_work_items set state = target_state/iu,
+    );
+    for (const claimRpc of [
+      "sweep_observatory_work_item_claims",
+      "claim_observatory_work_item",
+      "release_observatory_work_item_claim",
+      "complete_observatory_work_item_claim",
+      "cancel_observatory_work_item_claim",
+    ]) {
+      expect(stateMutationBody(claims, claimRpc)).toMatch(
+        /update public\.observatory_work_items set state = /iu,
+      );
+    }
   });
 
   it("defines the exact canonical checks including both release dates", async () => {
@@ -217,7 +246,8 @@ describe("Project Version contract v1 migration", () => {
       expect(sql).toMatch(new RegExp(`new\\.${column}\\s+is distinct from\\s+old\\.${column}`, "iu"));
     }
     expect(sql).toMatch(
-      /before insert or update of type, title, description, acceptance_criteria, priority, owner_id, assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id, work_package_id, project_version_id, version_binding_kind/iu,
+      /before insert or update of state, type, title, description, acceptance_criteria, priority, owner_id, assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id, work_package_id, project_version_id, version_binding_kind/iu,
     );
+    expect(sql).not.toMatch(/new\.state is distinct from old\.state/iu);
   });
 });

@@ -10,6 +10,7 @@ import {
   formatProjectVersionVerifierError,
   parseProjectVersionVerifierArgs,
   readProjectVersionContractPreflight,
+  readProjectVersionContractStatus,
   runProjectVersionContractVerifier,
   verifyProjectVersionContractSource,
 } from "@/scripts/observatory/verify-project-version-contract-v1";
@@ -26,6 +27,11 @@ describe("Project Version contract v1 verifier", () => {
     expect(parseProjectVersionVerifierArgs([])).toEqual({ mode: "source" });
     expect(parseProjectVersionVerifierArgs(["--mode", "preflight"])).toEqual({ mode: "preflight" });
     expect(parseProjectVersionVerifierArgs(["--mode", "status"])).toEqual({ mode: "status" });
+    expect(() => parseProjectVersionVerifierArgs(["--mode", "concurrency"])).toThrow(/--confirm-local-concurrency/u);
+    expect(parseProjectVersionVerifierArgs(["--mode", "concurrency", "--confirm-local-concurrency"])).toEqual({
+      mode: "concurrency",
+      confirmLocalConcurrency: true,
+    });
     expect(() => parseProjectVersionVerifierArgs(["--mode", "apply"])).toThrow(/--confirm-local-apply/u);
     expect(parseProjectVersionVerifierArgs(["--mode", "apply", "--confirm-local-apply"])).toEqual({
       mode: "apply",
@@ -231,6 +237,8 @@ describe("Project Version contract v1 verifier", () => {
     );
     const weakenedCases = [
       source.replace("for each statement execute function public.lock_observatory_project_version_graph();", "for each statement execute function public.validate_observatory_project_version_predecessor();"),
+      source.replace("before insert or update of state,", "before insert or update of"),
+      source.replace("perform pg_catalog.pg_advisory_xact_lock(20960902000300);", "perform true;"),
       source.replace("(released_at is not null and actual_date is not null)", "released_at is not null"),
     ];
     for (const [index, weakened] of weakenedCases.entries()) {
@@ -250,7 +258,10 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toContain("observatory_work_items_version_binding_kind_check");
     expect(source).toMatch(/pg_get_constraintdef\(constraint_catalog\.oid\)[\s\S]*observatory_project_versions_semver_check/iu);
     expect(source).toMatch(/observatory_project_versions_release_timestamp_check[\s\S]*released_at[\s\S]*actual_date/iu);
-    expect(source).toMatch(/tgname='observatory_work_items_validate_project_version'[\s\S]*tgenabled<>'D'[\s\S]*validate_observatory_work_item_project_version/iu);
+    expect(source).toMatch(/tgname='observatory_work_items_validate_project_version'[\s\S]*tgenabled in \('O','A'\)[\s\S]*validate_observatory_work_item_project_version/iu);
+    expect(source).toMatch(/as graph_lock_trigger[\s\S]*as graph_lock_function[\s\S]*as work_item_validator_lock[\s\S]*as version_update_lock_order[\s\S]*as version_transition_lock_order[\s\S]*as predecessor_validator_lock/iu);
+    expect(source).toMatch(/pg_get_triggerdef[\s\S]*observatory_project_versions_lock_graph/iu);
+    expect(source).toMatch(/pg_get_functiondef[\s\S]*pg_advisory_xact_lock[\s\S]*for key share/iu);
     for (const rpc of [
       "create_observatory_project_version",
       "update_observatory_project_version",
@@ -275,6 +286,21 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toMatch(/not exists\(select 1 from superseded_rpc_signatures where to_regprocedure\(signature\) is not null\)/iu);
     expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
+    expect(source).toMatch(/options\.mode === "concurrency"[\s\S]*OBSERVATORY_LOCAL_DB_URL[\s\S]*assertLocalProjectVersionApplyTarget[\s\S]*exerciseProjectVersionReleaseConcurrency/iu);
+  });
+
+  it.each([
+    "graph_lock_trigger",
+    "graph_lock_function",
+    "work_item_validator_lock",
+    "version_update_lock_order",
+    "version_transition_lock_order",
+    "predecessor_validator_lock",
+  ])("fails database status when %s is weakened or missing", async (failedCheck) => {
+    const sql = (() => Promise.resolve([{ [failedCheck]: false }])) as never;
+    await expect(readProjectVersionContractStatus(sql)).rejects.toThrow(
+      new RegExp(`Database status verification failed: ${failedCheck}`, "u"),
+    );
   });
 
   it("keeps exact disjoint current and superseded RPC inventories covering every migration drop", async () => {

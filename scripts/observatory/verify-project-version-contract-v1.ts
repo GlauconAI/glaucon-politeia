@@ -11,10 +11,11 @@ const DEFAULT_MIGRATION_PATH = resolve(
 export const ROLLBACK_GUIDANCE =
   "Forward-only rollback: the prior application revision is not directly compatible because this migration drops superseded RPC overloads. Keep the current application, or apply a reviewed corrective compatibility migration before application rollback. Never drop the schema or rewrite migration history.";
 
-type Mode = "source" | "preflight" | "status" | "apply";
+type Mode = "source" | "preflight" | "status" | "apply" | "concurrency";
 export type VerifierOptions = {
   mode: Mode;
   confirmLocalApply?: true;
+  confirmLocalConcurrency?: true;
 };
 
 export function assertLocalProjectVersionApplyTarget(databaseUrl: string) {
@@ -32,16 +33,19 @@ export function assertLocalProjectVersionApplyTarget(databaseUrl: string) {
 export function parseProjectVersionVerifierArgs(argv: string[]): VerifierOptions {
   let mode: Mode = "source";
   let confirmLocalApply = false;
+  let confirmLocalConcurrency = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--mode") {
       const value = argv[++index];
-      if (!value || !["source", "preflight", "status", "apply"].includes(value)) {
-        throw new Error("--mode must be source, preflight, status, or apply.");
+      if (!value || !["source", "preflight", "status", "apply", "concurrency"].includes(value)) {
+        throw new Error("--mode must be source, preflight, status, apply, or concurrency.");
       }
       mode = value as Mode;
     } else if (argument === "--confirm-local-apply") {
       confirmLocalApply = true;
+    } else if (argument === "--confirm-local-concurrency") {
+      confirmLocalConcurrency = true;
     } else {
       throw new Error(`unknown verifier option: ${argument}`);
     }
@@ -49,9 +53,13 @@ export function parseProjectVersionVerifierArgs(argv: string[]): VerifierOptions
   if (mode === "apply") {
     if (!confirmLocalApply) throw new Error("Apply mode requires --confirm-local-apply.");
   }
+  if (mode === "concurrency" && !confirmLocalConcurrency) {
+    throw new Error("Concurrency mode requires --confirm-local-concurrency.");
+  }
   return {
     mode,
     ...(confirmLocalApply ? { confirmLocalApply: true as const } : {}),
+    ...(confirmLocalConcurrency ? { confirmLocalConcurrency: true as const } : {}),
   };
 }
 
@@ -94,6 +102,9 @@ export async function verifyProjectVersionContractSource(
   );
   checks.push("terminal work item scope");
   requirePattern(source, "serialized work item binding", /where id = new\.project_version_id\s+for key share[\s\S]*OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED/iu);
+  requirePattern(source, "state mutation lock trigger", /create trigger observatory_work_items_validate_project_version\s+before insert or update of state,[\s\S]*for each row execute function public\.validate_observatory_work_item_project_version/iu);
+  requirePattern(source, "version update lock order", /create function public\.update_observatory_project_version[\s\S]*pg_advisory_xact_lock\(20960902000300\)[\s\S]*for update/iu);
+  requirePattern(source, "release gate lock order", /create function public\.transition_observatory_project_version[\s\S]*for update[\s\S]*from public\.observatory_work_items[\s\S]*version_binding_kind = 'required'/iu);
   checks.push("serialized mutation validation");
   requirePattern(source, "security and audit", /security definer[\s\S]*jsonb_build_object\('before'[\s\S]*grant execute/iu);
   checks.push("security and audit");
@@ -313,7 +324,7 @@ export function assertProjectVersionPreflightAllowsApply(preflight: ProjectVersi
   throw new Error(`Project Version preflight blocked apply: ${issues}.`);
 }
 
-async function readDatabaseStatus(sql: Sql) {
+export async function readProjectVersionContractStatus(sql: Sql) {
   const [status] = await sql<Record<string, boolean | number>[]>`
     with bounded_rpc_signatures(signature) as (values
       ('public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
@@ -344,6 +355,16 @@ async function readDatabaseStatus(sql: Sql) {
           'public.observatory_project_versions'::regclass,
           'public.observatory_work_items'::regclass
         )
+    ), function_definitions(signature, definition) as (
+      select signature, lower(regexp_replace(pg_get_functiondef(to_regprocedure(signature)), '\\s+', ' ', 'g'))
+      from (values
+        ('public.lock_observatory_project_version_graph()'),
+        ('public.validate_observatory_project_version_predecessor()'),
+        ('public.validate_observatory_work_item_project_version()'),
+        ('public.update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
+        ('public.transition_observatory_project_version(uuid,integer,text)')
+      ) definitions(signature)
+      where to_regprocedure(signature) is not null
     )
     select
       (select count(*) = 15 from information_schema.columns where table_schema='public'
@@ -379,10 +400,47 @@ async function readDatabaseStatus(sql: Sql) {
       exists(select 1 from pg_trigger
         where tgrelid='public.observatory_work_items'::regclass
           and tgname='observatory_work_items_validate_project_version'
-          and tgenabled<>'D' and not tgisinternal
-          and tgfoid=to_regprocedure('public.validate_observatory_work_item_project_version()'))
+          and tgenabled in ('O','A') and not tgisinternal
+          and tgfoid=to_regprocedure('public.validate_observatory_work_item_project_version()')
+          and lower(regexp_replace(pg_get_triggerdef(oid), '\\s+', ' ', 'g')) like
+            '%before insert or update of state, type, title, description, acceptance_criteria, priority, owner_id, assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id, work_package_id, project_version_id, version_binding_kind on public.observatory_work_items%')
         as work_item_validation_trigger,
-      exists(select 1 from pg_trigger where tgname='observatory_project_versions_validate_predecessor' and not tgisinternal) as predecessor_trigger,
+      exists(select 1 from pg_trigger
+        where tgrelid='public.observatory_project_versions'::regclass
+          and tgname='observatory_project_versions_lock_graph'
+          and tgenabled in ('O','A') and not tgisinternal
+          and tgfoid=to_regprocedure('public.lock_observatory_project_version_graph()')
+          and lower(regexp_replace(pg_get_triggerdef(oid), '\\s+', ' ', 'g')) like
+            '%before insert or update of project_key, semver, predecessor_version_id on public.observatory_project_versions for each statement execute function public.lock_observatory_project_version_graph()%')
+        as graph_lock_trigger,
+      exists(select 1 from function_definitions
+        where signature='public.lock_observatory_project_version_graph()'
+          and definition like '%pg_advisory_xact_lock(20960902000300)%') as graph_lock_function,
+      exists(select 1 from function_definitions
+        where signature='public.validate_observatory_work_item_project_version()'
+          and definition like '%where id = old.project_version_id%for key share%bound_version_status in%where id = new.project_version_id%for key share%version_status in%') as work_item_validator_lock,
+      exists(select 1 from function_definitions
+        where signature like 'public.update_observatory_project_version(%'
+          and position('pg_advisory_xact_lock(20960902000300)' in definition)>0
+          and position('pg_advisory_xact_lock(20960902000300)' in definition)<position('for update' in definition))
+        as version_update_lock_order,
+      exists(select 1 from function_definitions
+        where signature='public.transition_observatory_project_version(uuid,integer,text)'
+          and position('for update' in definition)>0
+          and position('for update' in definition)<position('from public.observatory_work_items' in definition)
+          and definition like '%version_binding_kind = ''required''%state <> ''done''%')
+        as version_transition_lock_order,
+      exists(select 1 from function_definitions
+        where signature='public.validate_observatory_project_version_predecessor()'
+          and position('pg_advisory_xact_lock(20960902000300)' in definition)>0
+          and position('pg_advisory_xact_lock(20960902000300)' in definition)<position('if new.predecessor_version_id' in definition)
+          and definition like '%with recursive predecessor_chain%observatory_predecessor_cycle%observatory_successor_order_invalid%')
+        as predecessor_validator_lock,
+      exists(select 1 from pg_trigger
+        where tgrelid='public.observatory_project_versions'::regclass
+          and tgname='observatory_project_versions_validate_predecessor'
+          and tgenabled in ('O','A') and not tgisinternal
+          and tgfoid=to_regprocedure('public.validate_observatory_project_version_predecessor()')) as predecessor_trigger,
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_protect_history' and not tgisinternal) as history_trigger,
       (select bool_and(procedure is not null) from resolved_bounded_rpcs)
         as bounded_rpcs,
@@ -480,8 +538,172 @@ async function applyMigration(sql: Sql) {
   });
 }
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+/**
+ * Local-only, post-apply concurrency exercise. It writes a uniquely named fixture
+ * to the disposable loopback database, commits only the Work Item state change,
+ * rolls back the release RPC, and removes the event-free fixture rows in finally.
+ */
+export async function exerciseProjectVersionReleaseConcurrency(databaseUrl: string) {
+  assertLocalProjectVersionApplyTarget(databaseUrl);
+  const connectionOptions = {
+    connect_timeout: 5,
+    idle_timeout: 5,
+    max: 1,
+    onnotice: () => undefined,
+  } as const;
+  const observer = postgres(databaseUrl, connectionOptions);
+  const stateConnection = postgres(databaseUrl, connectionOptions);
+  const releaseConnection = postgres(databaseUrl, connectionOptions);
+  const fixtureSuffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const projectKey = `local/concurrency-${fixtureSuffix}`;
+  const stateChanged = deferred();
+  const allowStateCommit = deferred();
+  const releaseStarted = deferred();
+  let versionId: string | undefined;
+  let itemId: string | undefined;
+  let releasePid: number | undefined;
+  let releaseFinished = false;
+  let statePromise: Promise<unknown> | undefined;
+  let releasePromise: Promise<unknown> | undefined;
+
+  try {
+    const [admin] = await observer<{ user_id: string }[]>`
+      select user_id::text as user_id from public.profiles
+      where is_admin=true order by created_at limit 1
+    `;
+    if (!admin?.user_id) throw new Error("Local concurrency mode requires one administrator fixture.");
+
+    const [version] = await observer<{ id: string }[]>`
+      insert into public.observatory_project_versions (
+        project_key, version_label, semver, title, description, status,
+        acceptance_summary, dependencies_satisfied, artifacts_accepted,
+        verification_complete, roadmap_reconciled, user_gate_decision_ref,
+        created_by, updated_by
+      ) values (
+        ${projectKey}, 'v1.0.0', '1.0.0', 'Local concurrency fixture', '', 'gate_ready',
+        'accepted', true, true, true, true, 'local-only',
+        ${admin.user_id}::uuid, ${admin.user_id}::uuid
+      ) returning id::text as id
+    `;
+    versionId = version?.id;
+    if (!versionId) throw new Error("Unable to create the local Version concurrency fixture.");
+
+    const [item] = await observer<{ id: string }[]>`
+      insert into public.observatory_work_items (
+        type, title, description, state, idempotency_key, created_by,
+        project_ref, project_version_id, version_binding_kind, assigned_agent_id
+      ) values (
+        'feature', 'Local required item', '', 'review', ${`concurrency-${fixtureSuffix}`},
+        ${admin.user_id}::uuid, ${projectKey}, ${versionId}::uuid, 'required', 'plato'
+      ) returning id::text as id
+    `;
+    itemId = item?.id;
+    if (!itemId) throw new Error("Unable to create the local Work Item concurrency fixture.");
+
+    statePromise = (async () => {
+      await stateConnection.unsafe("begin");
+      try {
+        await stateConnection.unsafe("set local statement_timeout='5s'; set local lock_timeout='5s'");
+        const changed = await stateConnection<{ state: string }[]>`
+          update public.observatory_work_items set state='done', version=version+1
+          where id=${itemId}::uuid returning state
+        `;
+        if (changed[0]?.state !== "done") throw new Error("Required Work Item state change did not execute.");
+        stateChanged.resolve();
+        await withTimeout(allowStateCommit.promise, 5_000, "State transaction release barrier");
+        await stateConnection.unsafe("commit");
+      } catch (error) {
+        await stateConnection.unsafe("rollback").catch(() => undefined);
+        throw error;
+      }
+    })();
+    await withTimeout(stateChanged.promise, 5_000, "Required Work Item state change");
+
+    releasePromise = (async () => {
+      await releaseConnection.unsafe("begin");
+      try {
+        await releaseConnection.unsafe("set local statement_timeout='5s'; set local lock_timeout='5s'");
+        await releaseConnection`select set_config('request.jwt.claim.sub', ${admin.user_id}, true)`;
+        const [backend] = await releaseConnection<{ pid: number }[]>`select pg_backend_pid()::integer as pid`;
+        releasePid = backend?.pid;
+        releaseStarted.resolve();
+        const [released] = await releaseConnection<{ status: string }[]>`
+          select status from public.transition_observatory_project_version(${versionId}::uuid, 1, 'released')
+        `;
+        const [required] = await releaseConnection<{ non_done: number }[]>`
+          select count(*)::integer as non_done from public.observatory_work_items
+          where project_version_id=${versionId}::uuid and version_binding_kind='required' and state<>'done'
+        `;
+        if (released?.status !== "released" || required?.non_done !== 0) {
+          throw new Error("Serialized release observed a required non-done Work Item.");
+        }
+        return released.status;
+      } finally {
+        await releaseConnection.unsafe("rollback").catch(() => undefined);
+      }
+    })().finally(() => { releaseFinished = true; });
+    await withTimeout(releaseStarted.promise, 5_000, "Release transaction start");
+    if (!releasePid) throw new Error("Release transaction backend identity is unavailable.");
+
+    const lockDeadline = Date.now() + 3_000;
+    let lockObserved = false;
+    while (!lockObserved && Date.now() < lockDeadline) {
+      if (releaseFinished) throw new Error("Release did not serialize behind the required Work Item state change.");
+      const [activity] = await observer<{ waiting: boolean }[]>`
+        select exists(select 1 from pg_stat_activity
+          where pid=${releasePid} and wait_event_type='Lock') as waiting
+      `;
+      lockObserved = activity?.waiting === true;
+      if (!lockObserved) await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
+    }
+    if (!lockObserved) throw new Error("Release lock wait was not observed within 3000ms.");
+
+    allowStateCommit.resolve();
+    await withTimeout(Promise.all([statePromise, releasePromise]), 7_000, "Serialized release exercise");
+    return { mode: "concurrency" as const, ok: true, lockObserved: true, finalState: "released+done" };
+  } finally {
+    allowStateCommit.resolve();
+    await Promise.allSettled([statePromise, releasePromise].filter(Boolean) as Promise<unknown>[]);
+    if (itemId) await observer`delete from public.observatory_work_items where id=${itemId}::uuid`;
+    if (versionId) await observer`delete from public.observatory_project_versions where id=${versionId}::uuid`;
+    await Promise.all([
+      observer.end({ timeout: 5 }),
+      stateConnection.end({ timeout: 5 }),
+      releaseConnection.end({ timeout: 5 }),
+    ]);
+  }
+}
+
 export async function runProjectVersionContractVerifier(options: VerifierOptions) {
   if (options.mode === "source") return verifyProjectVersionContractSource();
+  if (options.mode === "concurrency") {
+    const localDatabaseUrl = process.env.OBSERVATORY_LOCAL_DB_URL;
+    if (!localDatabaseUrl) {
+      throw new Error("Database concurrency mode requires OBSERVATORY_LOCAL_DB_URL.");
+    }
+    assertLocalProjectVersionApplyTarget(localDatabaseUrl);
+    return exerciseProjectVersionReleaseConcurrency(localDatabaseUrl);
+  }
   const databaseUrl = process.env.OBSERVATORY_DATABASE_URL ?? process.env.OBSERVATORY_LOCAL_DB_URL;
   if (!databaseUrl) throw new Error(`Database ${options.mode} mode requires OBSERVATORY_DATABASE_URL or OBSERVATORY_LOCAL_DB_URL.`);
   if (options.mode === "apply") assertLocalProjectVersionApplyTarget(databaseUrl);
@@ -494,7 +716,7 @@ export async function runProjectVersionContractVerifier(options: VerifierOptions
       assertProjectVersionPreflightAllowsApply(preflight);
       await applyMigration(sql);
     }
-    return await readDatabaseStatus(sql);
+    return await readProjectVersionContractStatus(sql);
   } finally {
     await sql.end({ timeout: 5 });
   }

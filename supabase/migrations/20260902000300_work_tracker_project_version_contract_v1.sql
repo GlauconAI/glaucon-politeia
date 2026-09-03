@@ -293,7 +293,7 @@ $$;
 drop trigger if exists observatory_work_items_validate_project_version
 on public.observatory_work_items;
 create trigger observatory_work_items_validate_project_version
-before insert or update of type, title, description, acceptance_criteria, priority, owner_id,
+before insert or update of state, type, title, description, acceptance_criteria, priority, owner_id,
   assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision, stage_id,
   work_package_id, project_version_id, version_binding_kind
 on public.observatory_work_items
