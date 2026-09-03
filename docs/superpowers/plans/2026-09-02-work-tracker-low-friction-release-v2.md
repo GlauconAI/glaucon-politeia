@@ -5,14 +5,14 @@
 - 扩展 `tests/work-tracker-release-channel.test.ts`。
 - 为固定 repo、分支、clean、祖先关系、非 force push、PR 创建/复用添加行为测试。
 - 为 exact SHA Production deployment 等待和显式 GET 添加测试。
-- 为 `operator_approvals` 决策聚合、run 归因和敏感字段不泄漏添加测试。
+- 为 `operator_approvals` 决策聚合、项目归因不可观测和敏感字段不泄漏添加测试。
 - 运行聚焦测试，确认新增断言先失败。
 
 ## Task 2：实现安全 prepare 入口
 
-- 新增 `scripts/release/work-tracker-release-prepare.mjs`。
+- 新增固定 `/bin/sh` launcher 与 `scripts/release/work-tracker-release-prepare.mjs` body。
 - 使用 Node 原生 `child_process`，所有命令以 argv 数组执行。
-- 固定 repo、remote、base 和 branch 规则；零参数接口。
+- 固定 repo、remote、base 和 branch 规则；零参数接口；清空调用者环境并拒绝本地 transport 重写配置。
 - 实现 push、现有 PR 查询、固定 PR 创建和结构化输出。
 - 运行聚焦测试直到通过。
 
@@ -40,7 +40,7 @@
 ## Task 6：安装 host-owned wrapper 与配置规则
 
 - 保存 Codex 配置与 OpenClaw approvals 配置回滚副本。
-- 复制已审查 wrapper 到 agent-owned `bin` 目录并记录 SHA-256。
+- 复制已审查 launcher 与 body 到 agent-owned `bin` 目录并记录 SHA-256。
 - 添加精确 Codex prefix rule 和 OpenClaw allowlist 绝对路径。
 - 用新进程验证配置加载；在无危险写入的验证夹具中验证拒绝路径。
 - 更新 Plato `AGENTS.md` 的 Work Tracker 发布纪律。

@@ -17,6 +17,7 @@ import {
 } from "@/scripts/release/work-tracker-smoke.mjs";
 import {
   analyzeApprovalSessions,
+  buildApprovalReport,
   formatApprovalReport,
   queryOperatorApprovals,
   summarizeOperatorApprovals,
@@ -149,7 +150,6 @@ describe("Work Tracker approval observation", () => {
       escalationRequests: 1,
       gatewayExecCalls: 1,
       deniedCalls: 1,
-      manualApprovalCount: null,
     });
     expect(output).not.toContain(sensitive);
     expect(output).not.toContain("git status");
@@ -177,6 +177,35 @@ describe("Work Tracker approval observation", () => {
       pending: 1,
     });
     expect(JSON.stringify(report)).not.toContain("presentation_json");
+  });
+
+  it("keeps agent-wide operator decisions outside the Work Tracker KPI", () => {
+    const projectRollout = {
+      periodStart: "2026-09-01T00:00:00.000Z",
+      periodEnd: "2026-09-08T00:00:00.000Z",
+      relevantSessions: 2,
+      escalationRequests: 3,
+      gatewayExecCalls: 4,
+      deniedCalls: 1,
+    };
+    const report = buildApprovalReport(projectRollout, [
+      { status: "allowed", decision: "allow-once", terminal_reason: "user" },
+    ]);
+
+    expect(report.workTracker).toEqual({
+      ...projectRollout,
+      manualApprovalCount: null,
+      manualApprovalObservable: false,
+    });
+    expect(report.operatorApprovals).toMatchObject({
+      scope: "plato-agent-wide",
+      humanDecisions: 1,
+    });
+    expect(report.observability).toMatchObject({
+      autoReviewApprovals: "unavailable",
+      humanPromptsDisplayed: "unavailable",
+      timeoutRetries: "unavailable",
+    });
   });
 
   it("reads only non-sensitive approval fields from the state database", () => {

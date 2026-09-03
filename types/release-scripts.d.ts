@@ -59,23 +59,43 @@ declare module "@/scripts/release/work-tracker-approval-report.mjs" {
     pending: number;
   }
 
-  export interface ApprovalReport {
+  export interface WorkTrackerRollout {
     periodStart: string;
     periodEnd: string;
     relevantSessions: number;
     escalationRequests: number;
     gatewayExecCalls: number;
     deniedCalls: number;
-    manualApprovalCount: number | null;
-    manualApprovalNote: string;
-    operatorApprovals?: OperatorApprovalSummary | { status: "unavailable"; reason: string };
+  }
+
+  export interface ApprovalReport {
+    workTracker: WorkTrackerRollout & {
+      manualApprovalCount: null;
+      manualApprovalObservable: false;
+    };
+    operatorApprovals:
+      | (OperatorApprovalSummary & {
+          scope: "plato-agent-wide";
+          attributionNote: string;
+        })
+      | { status: "unavailable"; scope: "plato-agent-wide"; reason: string };
+    observability: {
+      autoReviewApprovals: "unavailable";
+      humanPromptsDisplayed: "unavailable";
+      timeoutRetries: "unavailable";
+      note?: string;
+    };
   }
 
   export function analyzeApprovalSessions(
     sessionPaths: string[],
     options: { repoMarker?: string; since: Date; now?: Date },
+  ): WorkTrackerRollout;
+  export function buildApprovalReport(
+    workTrackerRollout: WorkTrackerRollout,
+    rows: OperatorApprovalRow[],
   ): ApprovalReport;
-  export function formatApprovalReport(report: ApprovalReport): string;
+  export function formatApprovalReport(report: WorkTrackerRollout | ApprovalReport): string;
   export function summarizeOperatorApprovals(
     rows: OperatorApprovalRow[],
   ): OperatorApprovalSummary;
@@ -90,6 +110,8 @@ declare module "@/scripts/release/work-tracker-release-prepare.mjs" {
   export const EXPECTED_REMOTE_URL: string;
   export const GITHUB_REPOSITORY: "GlauconAI/glaucon-politeia";
   export const ALLOWED_BRANCH_PATTERN: RegExp;
+  export const RELEASE_BASELINE_REF: string;
+  export const GIT_HARDENING_ARGS: string[];
 
   export interface ReleaseContext {
     argv: string[];
@@ -107,6 +129,18 @@ declare module "@/scripts/release/work-tracker-release-prepare.mjs" {
     context: ReleaseContext,
   ): { branch: string; ahead: number };
   export function buildPushArgs(branch: string): string[];
+  export function safeEnvironmentForRelease(): Record<string, string>;
+  export function validateLocalGitConfig(configNames: string): void;
+  export function validatePullRequest(
+    pullRequest: {
+      url: string;
+      state: string;
+      baseRefName: string;
+      headRefName: string;
+      isCrossRepository: boolean;
+    },
+    branch: string,
+  ): string;
   export function runReleasePrepare(options?: {
     cwd?: string;
     argv?: string[];

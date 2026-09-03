@@ -94,4 +94,96 @@ describe("Work Tracker production deployment wait", () => {
       }),
     ).rejects.toThrow(/failure/i);
   });
+
+  it("times out when no exact Production deployment appears", async () => {
+    const sha = "d".repeat(40);
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(
+      waitForProductionDeployment({
+        sha,
+        token: "test-token",
+        fetchImpl,
+        sleep: async () => {},
+        timeoutMs: -1,
+      }),
+    ).rejects.toThrow(/timed out/i);
+  });
+
+  it("rejects a deployment status URL outside the fixed deployment id", async () => {
+    const sha = "e".repeat(40);
+    const fetchImpl = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 44,
+            sha,
+            environment: "Production",
+            statuses_url:
+              "https://api.github.com/repos/GlauconAI/glaucon-politeia/deployments/999/statuses",
+          },
+        ]),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      waitForProductionDeployment({
+        sha,
+        token: "test-token",
+        fetchImpl,
+        sleep: async () => {},
+        timeoutMs: 1_000,
+      }),
+    ).rejects.toThrow(/status url/i);
+  });
+
+  it("uses the newest matching deployment when GitHub returns duplicates", async () => {
+    const sha = "f".repeat(40);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: 45,
+              sha,
+              environment: "Production",
+              statuses_url:
+                "https://api.github.com/repos/GlauconAI/glaucon-politeia/deployments/45/statuses",
+            },
+            {
+              id: 46,
+              sha,
+              environment: "Production",
+              statuses_url:
+                "https://api.github.com/repos/GlauconAI/glaucon-politeia/deployments/46/statuses",
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ state: "success" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+    await expect(
+      waitForProductionDeployment({
+        sha,
+        token: "test-token",
+        fetchImpl,
+        sleep: async () => {},
+        timeoutMs: 1_000,
+      }),
+    ).resolves.toMatchObject({ deploymentId: 46 });
+    expect(fetchImpl.mock.calls[1]?.[0]).toContain("/deployments/46/statuses");
+  });
 });

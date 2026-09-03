@@ -55,13 +55,24 @@ async function fetchJson(fetchImpl, url, token) {
 
 function selectExactDeployment(deployments, sha) {
   if (!Array.isArray(deployments)) throw new Error("unexpected deployments response");
-  return deployments.find(
-    (deployment) =>
+  return deployments
+    .filter(
+      (deployment) =>
       deployment?.sha === sha &&
       deployment?.environment === DEPLOYMENT_ENVIRONMENT &&
       Number.isInteger(deployment?.id) &&
       typeof deployment?.statuses_url === "string",
-  );
+    )
+    .sort((left, right) => right.id - left.id)[0];
+}
+
+function validateStatusesUrl(deployment) {
+  const parsed = new URL(deployment.statuses_url);
+  const expectedPath = `/repos/${GITHUB_REPOSITORY}/deployments/${deployment.id}/statuses`;
+  if (parsed.origin !== GITHUB_API_ORIGIN || parsed.pathname !== expectedPath) {
+    throw new Error("deployment status URL does not match the fixed deployment id");
+  }
+  return parsed.toString();
 }
 
 export async function waitForProductionDeployment({
@@ -78,7 +89,7 @@ export async function waitForProductionDeployment({
     const deployments = await fetchJson(fetchImpl, buildDeploymentsUrl(sha), token);
     const deployment = selectExactDeployment(deployments, sha);
     if (deployment) {
-      const statuses = await fetchJson(fetchImpl, deployment.statuses_url, token);
+      const statuses = await fetchJson(fetchImpl, validateStatusesUrl(deployment), token);
       if (!Array.isArray(statuses)) throw new Error("unexpected deployment statuses response");
       const state = statuses[0]?.state;
       if (state === "success") {

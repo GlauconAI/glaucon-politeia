@@ -46,9 +46,6 @@ export function analyzeApprovalSessions(
     escalationRequests: 0,
     gatewayExecCalls: 0,
     deniedCalls: 0,
-    manualApprovalCount: null,
-    manualApprovalNote:
-      "Codex rollout metadata cannot prove whether an escalation reached a human; reconcile this field with the operator prompt count.",
   };
 
   for (const path of sessionPaths) {
@@ -130,6 +127,28 @@ export function summarizeOperatorApprovals(rows) {
   return summary;
 }
 
+export function buildApprovalReport(workTrackerRollout, operatorApprovalRows) {
+  return {
+    workTracker: {
+      ...workTrackerRollout,
+      manualApprovalCount: null,
+      manualApprovalObservable: false,
+    },
+    operatorApprovals: {
+      ...summarizeOperatorApprovals(operatorApprovalRows),
+      scope: "plato-agent-wide",
+      attributionNote:
+        "OpenClaw operator approvals do not expose a project or stable rollout-session correlation field.",
+    },
+    observability: {
+      autoReviewApprovals: "unavailable",
+      humanPromptsDisplayed: "unavailable",
+      timeoutRetries: "unavailable",
+      note: "Use Work Tracker rollout counters for trend direction and Plato-wide operator decisions only as a separate control metric.",
+    },
+  };
+}
+
 export function queryOperatorApprovals(
   databasePath,
   { since, now = new Date() } = {},
@@ -191,24 +210,30 @@ function main() {
   const now = new Date();
   const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1_000);
   const files = discoverSessionFiles(DEFAULT_SESSION_ROOT, since);
-  const report = analyzeApprovalSessions(files, { since, now });
+  const workTrackerRollout = analyzeApprovalSessions(files, { since, now });
+  let report;
   try {
-    const operatorApprovals = summarizeOperatorApprovals(
+    report = buildApprovalReport(
+      workTrackerRollout,
       queryOperatorApprovals(DEFAULT_STATE_DATABASE, { since, now }),
     );
-    report.operatorApprovals = {
-      ...operatorApprovals,
-      scope: "plato-agent-wide",
-      attributionNote:
-        "OpenClaw operator approvals do not expose a project field; Work Tracker-specific trend remains in the rollout counters above.",
-    };
-    report.manualApprovalCount = operatorApprovals.humanDecisions;
-    report.manualApprovalNote =
-      "Counted from OpenClaw operator_approvals for all Plato runs in the period; this is a real human-decision count, not a Work Tracker-only count.";
   } catch {
-    report.operatorApprovals = {
-      status: "unavailable",
-      reason: "operator approval state could not be read",
+    report = {
+      workTracker: {
+        ...workTrackerRollout,
+        manualApprovalCount: null,
+        manualApprovalObservable: false,
+      },
+      operatorApprovals: {
+        status: "unavailable",
+        scope: "plato-agent-wide",
+        reason: "operator approval state could not be read",
+      },
+      observability: {
+        autoReviewApprovals: "unavailable",
+        humanPromptsDisplayed: "unavailable",
+        timeoutRetries: "unavailable",
+      },
     };
   }
   process.stdout.write(`${formatApprovalReport(report)}\n`);

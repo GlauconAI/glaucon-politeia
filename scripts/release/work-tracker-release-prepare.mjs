@@ -9,6 +9,7 @@ export const EXPECTED_GIT_COMMON_DIR =
   "/Users/glaucon/.openclaw/workspace/.git/modules/plato/projects/glaucon-politeia";
 export const EXPECTED_REMOTE_URL = "git@github.com:GlauconAI/glaucon-politeia.git";
 export const GITHUB_REPOSITORY = "GlauconAI/glaucon-politeia";
+export const RELEASE_BASELINE_REF = "refs/work-tracker-release/origin-main";
 export const ALLOWED_BRANCH_PATTERN =
   /^(?:feat|fix|chore|ci|docs|refactor|test|perf)\/[a-z0-9][a-z0-9._/-]{0,100}$/u;
 
@@ -23,13 +24,19 @@ const FIXED_PR_BODY = [
 ].join("\n");
 const GIT_EXECUTABLE = "/usr/bin/git";
 const GH_EXECUTABLE = "/usr/local/bin/gh";
-const GIT_HARDENING_ARGS = [
+const SSH_COMMAND =
+  "/usr/bin/ssh -F /dev/null -o BatchMode=yes -o ClearAllForwardings=yes -o PermitLocalCommand=no -o ProxyCommand=none";
+export const GIT_HARDENING_ARGS = [
   "-c",
   "core.hooksPath=/dev/null",
   "-c",
   "core.fsmonitor=false",
   "-c",
-  "core.sshCommand=/usr/bin/ssh",
+  `core.sshCommand=${SSH_COMMAND}`,
+  "-c",
+  "protocol.allow=never",
+  "-c",
+  "protocol.ssh.allow=always",
 ];
 
 function isSafeBranch(branch) {
@@ -64,6 +71,25 @@ function validateReleaseTarget(context) {
   }
 }
 
+export function validateLocalGitConfig(configNames) {
+  const blocked = String(configNames ?? "")
+    .split("\n")
+    .map((name) => name.trim())
+    .filter((name) => {
+      const normalized = name.toLowerCase();
+      return (
+        /^url\..*\.(insteadof|pushinsteadof)$/u.test(normalized) ||
+        /^remote\..*\.(uploadpack|receivepack|proxy)$/u.test(normalized) ||
+        /^core\.(sshcommand|gitproxy)$/u.test(normalized) ||
+        normalized === "ssh.variant" ||
+        /^include(if)?\./u.test(normalized)
+      );
+    });
+  if (blocked.length > 0) {
+    throw new Error(`unsafe local git configuration: ${blocked.join(", ")}`);
+  }
+}
+
 export function validateReleaseContext(context) {
   validateReleaseTarget(context);
   if (!context.originMainIsAncestor) {
@@ -83,30 +109,18 @@ export function buildPushArgs(branch) {
   return [
     ...GIT_HARDENING_ARGS,
     "push",
-    "--set-upstream",
-    "origin",
+    EXPECTED_REMOTE_URL,
     `HEAD:refs/heads/${branch}`,
   ];
 }
 
-function safeEnvironment() {
-  const environment = { ...process.env };
-  for (const name of Object.keys(environment)) {
-    if (
-      name === "GIT_DIR" ||
-      name === "GIT_WORK_TREE" ||
-      name === "GIT_OBJECT_DIRECTORY" ||
-      name === "GIT_ALTERNATE_OBJECT_DIRECTORIES" ||
-      name === "GIT_EXEC_PATH" ||
-      name === "GIT_CONFIG_COUNT" ||
-      name.startsWith("GIT_CONFIG_KEY_") ||
-      name.startsWith("GIT_CONFIG_VALUE_")
-    ) {
-      delete environment[name];
-    }
-  }
+export function safeEnvironmentForRelease() {
   return {
-    ...environment,
+    HOME: "/Users/glaucon",
+    PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    TMPDIR: "/private/tmp",
+    LANG: "C",
+    LC_ALL: "C",
     GH_CONFIG_DIR: "/Users/glaucon/.config/gh",
     GH_HOST: "github.com",
     GH_PAGER: "cat",
@@ -114,7 +128,7 @@ function safeEnvironment() {
     GIT_CONFIG_GLOBAL: "/dev/null",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_PAGER: "cat",
-    GIT_SSH_COMMAND: "/usr/bin/ssh",
+    GIT_SSH_COMMAND: SSH_COMMAND,
     GIT_TERMINAL_PROMPT: "0",
     PAGER: "cat",
     SSH_ASKPASS: "/usr/bin/false",
@@ -125,7 +139,7 @@ function execute(command, args, { cwd, allowFailure = false, timeoutMs = 120_000
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    env: safeEnvironment(),
+    env: safeEnvironmentForRelease(),
     maxBuffer: 2 * 1024 * 1024,
     timeout: timeoutMs,
   });
@@ -155,15 +169,41 @@ function parseAheadBehind(value) {
   return { behind, ahead };
 }
 
-function readOpenPullRequest(branch, cwd, gh) {
+const PR_JSON_FIELDS = "url,state,baseRefName,headRefName,isCrossRepository";
+
+export function validatePullRequest(pullRequest, branch) {
+  if (pullRequest?.state !== "OPEN") throw new Error("pull request is not open");
+  if (pullRequest?.baseRefName !== "main") {
+    throw new Error("pull request base must be main");
+  }
+  if (pullRequest?.headRefName !== branch) {
+    throw new Error("pull request head does not match the release branch");
+  }
+  if (pullRequest?.isCrossRepository !== false) {
+    throw new Error("pull request must originate from the fixed repository");
+  }
+  if (
+    typeof pullRequest?.url !== "string" ||
+    !/^https:\/\/github\.com\/GlauconAI\/glaucon-politeia\/pull\/[1-9][0-9]*$/u.test(
+      pullRequest.url,
+    )
+  ) {
+    throw new Error("pull request URL does not match the fixed repository");
+  }
+  return pullRequest.url;
+}
+
+function readOpenPullRequest(reference, branch, cwd, gh, { allowMissing = true } = {}) {
   const result = gh(
-    ["pr", "view", branch, "--repo", GITHUB_REPOSITORY, "--json", "url,state"],
+    ["pr", "view", reference, "--repo", GITHUB_REPOSITORY, "--json", PR_JSON_FIELDS],
     { cwd, allowFailure: true },
   );
-  if (result.exitCode !== 0) return null;
+  if (result.exitCode !== 0) {
+    if (allowMissing) return null;
+    throw new Error("created pull request could not be verified");
+  }
   const parsed = JSON.parse(result.stdout);
-  if (parsed.state !== "OPEN" || typeof parsed.url !== "string") return null;
-  return parsed.url;
+  return validatePullRequest(parsed, branch);
 }
 
 export function runReleasePrepare({
@@ -185,13 +225,28 @@ export function runReleasePrepare({
 
   validateReleaseTarget({ argv, gitCommonDir, remoteUrl, pushRemoteUrl, branch, porcelain });
 
-  git(["fetch", "--prune", "origin", "main"], { cwd: canonicalCwd });
-  const ancestor = git(["merge-base", "--is-ancestor", "origin/main", "HEAD"], {
+  const blockedLocalConfig = git(
+    ["config", "--local", "--name-only", "--list"],
+    { cwd: canonicalCwd, allowFailure: true },
+  );
+  validateLocalGitConfig(blockedLocalConfig.stdout);
+
+  git(
+    [
+      "fetch",
+      "--no-tags",
+      "--no-recurse-submodules",
+      EXPECTED_REMOTE_URL,
+      `refs/heads/main:${RELEASE_BASELINE_REF}`,
+    ],
+    { cwd: canonicalCwd },
+  );
+  const ancestor = git(["merge-base", "--is-ancestor", RELEASE_BASELINE_REF, "HEAD"], {
     cwd: canonicalCwd,
     allowFailure: true,
   });
   const { behind, ahead } = parseAheadBehind(
-    git(["rev-list", "--left-right", "--count", "origin/main...HEAD"], {
+    git(["rev-list", "--left-right", "--count", `${RELEASE_BASELINE_REF}...HEAD`], {
       cwd: canonicalCwd,
     }).stdout,
   );
@@ -214,10 +269,10 @@ export function runReleasePrepare({
     timeoutMs: 180_000,
   });
 
-  let pullRequestUrl = readOpenPullRequest(branch, canonicalCwd, gh);
+  let pullRequestUrl = readOpenPullRequest(branch, branch, canonicalCwd, gh);
   let created = false;
   if (!pullRequestUrl) {
-    pullRequestUrl = gh(
+    const createdPullRequestUrl = gh(
       [
         "pr",
         "create",
@@ -233,7 +288,21 @@ export function runReleasePrepare({
         FIXED_PR_BODY,
       ],
       { cwd: canonicalCwd, timeoutMs: 180_000 },
-    ).stdout;
+    ).stdout.trim();
+    if (
+      !/^https:\/\/github\.com\/GlauconAI\/glaucon-politeia\/pull\/[1-9][0-9]*$/u.test(
+        createdPullRequestUrl,
+      )
+    ) {
+      throw new Error("created pull request URL does not match the fixed repository");
+    }
+    pullRequestUrl = readOpenPullRequest(
+      createdPullRequestUrl,
+      branch,
+      canonicalCwd,
+      gh,
+      { allowMissing: false },
+    );
     created = true;
   }
 

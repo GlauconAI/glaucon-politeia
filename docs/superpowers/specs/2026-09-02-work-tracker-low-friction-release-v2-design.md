@@ -8,7 +8,7 @@
 2. 安全的非强制推送与 PR 创建由一个固定、不可由项目代码改写的入口完成；
 3. 合并 PR 保留一次人工生产授权；
 4. Vercel Production 等待与固定生产 smoke 由 GitHub Actions 自动完成；
-5. 周报直接统计 OpenClaw 的真实人工审批决策，不再用 escalation 数量代替弹窗数。
+5. 周报把项目级 rollout 代理指标与 Plato 全局真实人工决策分开呈现，不再把 escalation 数量或 Agent 全局数字冒充项目弹窗数。
 
 ## 当前问题
 
@@ -17,7 +17,7 @@ v1 已解决本地 Git 元数据写入和 `npm run release:verify`，但发布�
 ## 安全边界
 
 - 固定仓库：`GlauconAI/glaucon-politeia`。
-- 固定基线：`origin/main`。
+- 固定基线：从固定 SSH URL 显式 fetch 到私有 ref，不依赖仓库可编辑的 fetch mapping。
 - 只允许安全命名的非默认分支，禁止在 `main` / `master` 上运行。
 - 工作区必须干净，分支必须包含且领先 `origin/main`，只执行普通 fast-forward push，不允许 force。
 - PR title 只取当前提交标题，PR body 使用固定模板；入口不接受任意 repo、remote、ref、URL、命令或正文参数。
@@ -28,19 +28,21 @@ v1 已解决本地 Git 元数据写入和 `npm run release:verify`，但发布�
 
 ### 1. Host-owned `release-prepare`
 
-仓库提供 `scripts/release/work-tracker-release-prepare.mjs` 作为受测源码。发布时将其复制到：
+仓库提供一个固定 `/bin/sh` launcher 和 Node body 作为受测源码。发布时将二者复制到 agent-owned `bin`：
 
-`/Users/glaucon/.openclaw/agents/plato/agent/bin/work-tracker-release-prepare`
+`/Users/glaucon/.openclaw/agents/plato/agent/bin/work-tracker-release-prepare.sh`
 
 固定入口零参数运行，依次完成：
 
 1. 校验当前目录属于指定 Git common directory；
 2. 校验 `origin` URL、分支名和 clean 状态；
-3. 只读 fetch `origin/main`；
-4. 校验 `origin/main` 是 `HEAD` 祖先且当前分支至少领先一个提交；
-5. 普通 `git push --set-upstream origin HEAD:refs/heads/<branch>`；
-6. 复用现有 open PR，或用固定 repo/base/head 创建 PR；
-7. 只输出结构化状态和 PR URL。
+3. launcher 用 `env -i`、固定 `HOME/PATH` 和绝对 Node 启动 body，body 的子进程环境也采用字段白名单；
+4. 拒绝会重写 SSH/URL/remote transport 的本地 Git 配置，并用固定 SSH 命令禁用用户 SSH config、ProxyCommand 与转发；
+5. 从固定 remote URL 显式 fetch `main` 到固定私有 ref；
+6. 校验该 ref 是 `HEAD` 祖先且当前分支至少领先一个提交；
+7. 向固定 URL 执行普通 `git push HEAD:refs/heads/<branch>`；
+8. 复用或创建 PR 后，强制验证 URL、repo、base=`main`、head=当前分支且不是跨仓库 PR；
+9. 只输出结构化状态和 PR URL。
 
 OpenClaw 只对白名单中的这个 host-owned 绝对路径免人工审批，不对白名单加入 `git`、`gh`、`node`、`bash` 或仓库内可编辑脚本。
 
@@ -66,7 +68,7 @@ PR checks 全部通过后，使用一个标准合并命令请求一次人工授�
 - Codex rollout 元数据：相关 sessions、escalation 请求、Gateway exec 调用、拒绝代理指标；
 - OpenClaw `operator_approvals`：人工 `allow-once`、`allow-always`、人工拒绝、超时、系统取消和 pending。
 
-OpenClaw 当前 approval 表没有 project 字段，新 runtime 的本地 trajectory 文件也不是稳定接口。因此周报明确拆成两层：Work Tracker rollout 指标保持项目级；真实人工决策直接从 `operator_approvals` 统计 Plato 全 Agent 范围，并显式标注 scope。它不读取或输出 `presentation_json`、命令正文、对话正文、设备 ID 或凭据，也不会把无法可靠归因的数据伪装成项目级数字。
+OpenClaw 当前 approval 表没有 project 字段，也没有可与 Codex rollout 稳定关联的 run/session 字段。因此周报明确拆成两层：Work Tracker rollout 指标保持项目级，但项目人工弹窗数标记为不可观测；真实人工决策从 `operator_approvals` 统计 Plato 全 Agent 范围，并作为独立 control metric 显式标注 scope。数据库查询只选择 `status`、`decision` 与 `terminal_reason`，不读取或输出 `presentation_json`、命令正文、对话正文、设备 ID 或凭据。Codex rollout 扫描会读取工具事件来识别项目相关性与代理计数，但最终输出不包含任何工具输入或正文。
 
 ## 失败处理
 
@@ -77,7 +79,7 @@ OpenClaw 当前 approval 表没有 project 字段，新 runtime 的本地 trajec
 
 ## 验收标准
 
-- 固定入口拒绝错误 repo、默认分支、脏工作区、无领先提交、分叉历史、危险分支名和任何参数。
+- 固定入口拒绝错误 repo、默认分支、脏工作区、无领先提交、分叉历史、危险分支名、transport 重写配置和任何参数；调用者环境不能影响解释器或子进程路径。
 - 固定入口只执行非 force push，并能创建或复用 PR。
 - `main` CI 等待 exact SHA 的 Production deployment 后执行固定 smoke。
 - 周报能从注入样本和真实只读数据库正确区分人工批准、拒绝、超时和取消，且输出不含敏感正文。
