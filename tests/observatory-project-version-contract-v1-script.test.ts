@@ -309,6 +309,7 @@ describe("Project Version contract v1 verifier", () => {
     "predecessor_validator_lock",
     "table_acls_exact",
     "admin_select_policies_exact",
+    "rpc_inventory_exact",
     "rpc_acls_exact",
     "admin_rpc_definitions_exact",
   ])("fails database status when %s is weakened or missing", async (failedCheck) => {
@@ -348,6 +349,9 @@ describe("Project Version contract v1 verifier", () => {
     ].sort());
 
     const represented = new Set(current);
+    expect(verifierSource).toMatch(
+      /actual_bounded_rpcs[\s\S]*pg_proc[\s\S]*not exists[\s\S]*resolved_bounded_rpcs[\s\S]*rpc_inventory_exact/iu,
+    );
     const dropped = [...migrationSource.matchAll(/drop function if exists public\.([^;]+);/giu)]
       .map((match) => match[1].replace(/\s+/gu, ""));
     expect(dropped.filter((signature) => !represented.has(signature))).toEqual([]);

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   removeWorkItemEvidence: vi.fn(),
   configureAgentClaimPolicy: vi.fn(),
   cancelAgentClaim: vi.fn(),
+  getWorkItem: vi.fn(),
   getProjectVersion: vi.fn(),
   createProjectVersion: vi.fn(),
   updateProjectVersion: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("@/lib/observatory/repository", async (importOriginal) => {
       removeWorkItemEvidence: mocks.removeWorkItemEvidence,
       configureAgentClaimPolicy: mocks.configureAgentClaimPolicy,
       cancelAgentClaim: mocks.cancelAgentClaim,
+      getWorkItem: mocks.getWorkItem,
       getProjectVersion: mocks.getProjectVersion,
       createProjectVersion: mocks.createProjectVersion,
       updateProjectVersion: mocks.updateProjectVersion,
@@ -539,6 +541,28 @@ describe("Work Tracker mutation actions", () => {
   const workItemId = "11111111-1111-4111-8111-111111111111";
   const ownerId = "22222222-2222-4222-8222-222222222222";
 
+  function updateFormData(versionId = projectVersionId) {
+    const formData = new FormData();
+    formData.set("workItemId", workItemId);
+    formData.set("expectedVersion", "3");
+    formData.set("type", "feature");
+    formData.set("title", "Manual board");
+    formData.set("description", "Admin only.");
+    formData.set("acceptanceCriteria", "Reaches Done.");
+    formData.set("priority", "high");
+    formData.set("ownerId", ownerId);
+    formData.set("assignedAgentId", "plato");
+    formData.set("projectRef", "plato/dashboard");
+    formData.set("projectVersionId", versionId);
+    formData.set("versionBindingKind", "required");
+    formData.set("milestoneRef", "");
+    formData.set("projectKey", "plato/dashboard");
+    formData.set("planRevision", "3");
+    formData.set("stageId", "stage-05b");
+    formData.set("workPackageId", "wp-05b-coordinate-slice");
+    return formData;
+  }
+
   beforeEach(() => {
     mocks.currentAdmin = { user_id: ownerId };
     mocks.authError = null;
@@ -549,6 +573,11 @@ describe("Work Tracker mutation actions", () => {
     mocks.removeWorkItemEvidence.mockReset();
     mocks.configureAgentClaimPolicy.mockReset();
     mocks.cancelAgentClaim.mockReset();
+    mocks.getWorkItem.mockReset();
+    mocks.getWorkItem.mockResolvedValue({
+      id: workItemId,
+      project_version_id: projectVersionId,
+    });
     mocks.getProjectVersion.mockReset();
     mocks.getProjectVersion.mockResolvedValue({
       id: projectVersionId,
@@ -654,6 +683,43 @@ describe("Work Tracker mutation actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
       `/work-tracker/items/${workItemId}`,
     );
+  });
+
+  it("allows an unrelated edit that preserves a historical terminal binding", async () => {
+    mocks.getProjectVersion.mockResolvedValue({
+      id: projectVersionId,
+      project_key: "plato/dashboard",
+      status: "released",
+    });
+
+    await expect(
+      updateObservatoryWorkItemAction({ status: "idle" }, updateFormData()),
+    ).resolves.toEqual({ status: "success", version: 4 });
+    expect(mocks.getWorkItem).toHaveBeenCalledWith(workItemId);
+    expect(mocks.updateWorkItem).toHaveBeenCalledOnce();
+  });
+
+  it("rejects rebinding a Work Item to a terminal Project Version", async () => {
+    const terminalVersionId = "44444444-4444-4444-8444-444444444444";
+    mocks.getProjectVersion.mockResolvedValue({
+      id: terminalVersionId,
+      project_key: "plato/dashboard",
+      status: "cancelled",
+    });
+
+    await expect(
+      updateObservatoryWorkItemAction(
+        { status: "idle" },
+        updateFormData(terminalVersionId),
+      ),
+    ).resolves.toEqual({
+      status: "error",
+      fieldErrors: {
+        projectVersionId: ["Choose an available Project Version."],
+      },
+    });
+    expect(mocks.getWorkItem).toHaveBeenCalledWith(workItemId);
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
   });
 
   it("rejects a detail edit with a non-canonical Project", async () => {

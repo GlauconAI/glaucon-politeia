@@ -427,8 +427,19 @@ export async function updateObservatoryWorkItemAction(
   } catch (error) {
     return { status: "error", formError: mutationFormError(error) };
   }
-  if (!selectedVersion || projectVersionRejectsBindings(selectedVersion.status)) {
+  if (!selectedVersion) {
     return fieldErrorState({ projectVersionId: ["Choose an available Project Version."] });
+  }
+  if (projectVersionRejectsBindings(selectedVersion.status)) {
+    let currentItem;
+    try {
+      currentItem = await boundary.repository.getWorkItem(validation.data.workItemId);
+    } catch (error) {
+      return { status: "error", formError: mutationFormError(error) };
+    }
+    if (!currentItem || currentItem.project_version_id !== selectedVersion.id) {
+      return fieldErrorState({ projectVersionId: ["Choose an available Project Version."] });
+    }
   }
   if (selectedVersion.project_key !== validation.data.projectRef) {
     return fieldErrorState({ projectVersionId: ["Choose a version from the selected Project."] });

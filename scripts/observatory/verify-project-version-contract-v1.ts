@@ -392,6 +392,19 @@ export async function readProjectVersionContractStatus(sql: Sql) {
     ), resolved_bounded_rpcs as (
       select signature, to_regprocedure(signature) as procedure
       from bounded_rpc_signatures
+    ), actual_bounded_rpcs as (
+      select function_catalog.oid as procedure
+      from pg_proc function_catalog
+      join pg_namespace namespace_catalog on namespace_catalog.oid=function_catalog.pronamespace
+      where namespace_catalog.nspname='public'
+        and function_catalog.proname in (
+          'create_observatory_project_version',
+          'ensure_observatory_project_backlog_versions',
+          'update_observatory_project_version',
+          'transition_observatory_project_version',
+          'create_observatory_work_item',
+          'update_observatory_work_item'
+        )
     ), mutation_function_catalog as (
       select bounded.signature, bounded.procedure, function_catalog.prosecdef,
         function_catalog.proconfig,
@@ -525,6 +538,13 @@ export async function readProjectVersionContractStatus(sql: Sql) {
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_protect_history' and not tgisinternal) as history_trigger,
       (select bool_and(procedure is not null) from resolved_bounded_rpcs)
         as bounded_rpcs,
+      not exists (
+        select 1 from actual_bounded_rpcs actual
+        where not exists (
+          select 1 from resolved_bounded_rpcs expected
+          where expected.procedure=actual.procedure
+        )
+      ) as rpc_inventory_exact,
       exists(select 1 from pg_class where oid='public.observatory_project_versions'::regclass and relrowsecurity)
         and exists(select 1 from pg_class where oid='public.observatory_project_version_events'::regclass and relrowsecurity)
         as versions_and_events_rls,
