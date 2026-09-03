@@ -16,6 +16,7 @@ import type {
   ObservatoryWorkItemTransitionInput,
   ObservatoryWorkItemType,
   ObservatoryWorkItemUpdateInput,
+  ObservatoryVersionBindingKind,
 } from "@/lib/observatory/work-items";
 import type {
   ProjectVersionCreateInput,
@@ -50,6 +51,7 @@ export interface ObservatoryWorkItemRow {
   milestone_ref: string | null;
   project_key: string | null;
   project_version_id: string | null;
+  version_binding_kind?: ObservatoryVersionBindingKind;
   plan_revision: number | null;
   stage_id: string | null;
   work_package_id: string | null;
@@ -70,11 +72,25 @@ export interface ObservatoryProjectVersionRow {
   id: string;
   project_key: string;
   version_label: string;
+  semver?: string | null;
   title: string;
   description: string;
   status: ProjectVersionStatus;
   target_date: string | null;
+  actual_date?: string | null;
   released_at: string | null;
+  is_release_target?: boolean;
+  milestone_ref?: string | null;
+  predecessor_version_id?: string | null;
+  roadmap_ref?: string | null;
+  approved_plan_ref?: string | null;
+  acceptance_summary?: string | null;
+  dependencies_summary?: string | null;
+  dependencies_satisfied?: boolean;
+  artifacts_accepted?: boolean;
+  verification_complete?: boolean;
+  roadmap_reconciled?: boolean;
+  user_gate_decision_ref?: string | null;
   is_backlog: boolean;
   row_version: number;
   created_by: string;
@@ -230,6 +246,15 @@ export type ObservatoryRepositoryErrorCode =
   | "PROJECT_VERSION_REQUIRED"
   | "PROJECT_VERSION_ARCHIVED"
   | "PROJECT_VERSION_BACKLOG_IMMUTABLE"
+  | "PROJECT_VERSION_SEMVER_INVALID"
+  | "PROJECT_VERSION_EXECUTION_CONFLICT"
+  | "PROJECT_VERSION_RELEASE_TARGET_CONFLICT"
+  | "PROJECT_VERSION_IMMUTABLE"
+  | "PROJECT_VERSION_RELEASE_GATE_INCOMPLETE"
+  | "PROJECT_VERSION_PREDECESSOR_INVALID"
+  | "PROJECT_VERSION_BINDING_CLOSED"
+  | "VERSION_BINDING_KIND_INVALID"
+  | "WORK_ITEM_VERSION_SCOPE_IMMUTABLE"
   | "CLAIM_VERSION_CONFLICT";
 
 export class ObservatoryRepositoryError extends Error {
@@ -288,6 +313,42 @@ function mutationError(
   }
   if (marker.includes("OBSERVATORY_PROJECT_VERSION_BACKLOG_IMMUTABLE")) {
     return new ObservatoryRepositoryError("PROJECT_VERSION_BACKLOG_IMMUTABLE", "The system Backlog version cannot be edited or transitioned.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_SEMVER_INVALID")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_SEMVER_INVALID", "Use a valid MAJOR.MINOR.PATCH version.");
+  }
+  if (
+    marker.includes("OBSERVATORY_MULTIPLE_EXECUTION_VERSIONS") ||
+    marker.includes("OBSERVATORY_PROJECT_VERSIONS_ONE_EXECUTION_IDX")
+  ) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_EXECUTION_CONFLICT", "This Project already has an active or gate-ready version.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSIONS_ONE_RELEASE_TARGET_IDX")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_RELEASE_TARGET_CONFLICT", "This Project already has a release target.");
+  }
+  if (
+    marker.includes("OBSERVATORY_PROJECT_VERSION_IMMUTABLE") ||
+    marker.includes("OBSERVATORY_PROJECT_VERSION_HISTORY_IMMUTABLE")
+  ) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_IMMUTABLE", "Released and archived Project Versions cannot be edited.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_RELEASE_GATE_INCOMPLETE")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_RELEASE_GATE_INCOMPLETE", "Complete every required release Gate check before release.");
+  }
+  if (
+    marker.includes("OBSERVATORY_PREDECESSOR_") ||
+    marker.includes("OBSERVATORY_SUCCESSOR_")
+  ) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_PREDECESSOR_INVALID", "Choose an earlier version from the same Project as predecessor.");
+  }
+  if (marker.includes("OBSERVATORY_PROJECT_VERSION_BINDING_CLOSED")) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_BINDING_CLOSED", "Released, archived, and cancelled versions reject new Work Item bindings.");
+  }
+  if (marker.includes("OBSERVATORY_VERSION_BINDING_KIND_INVALID")) {
+    return new ObservatoryRepositoryError("VERSION_BINDING_KIND_INVALID", "Choose a required or optional Product Version binding.");
+  }
+  if (marker.includes("OBSERVATORY_WORK_ITEM_VERSION_SCOPE_IMMUTABLE")) {
+    return new ObservatoryRepositoryError("WORK_ITEM_VERSION_SCOPE_IMMUTABLE", "The Product Version binding cannot be changed after work starts.");
   }
   if (marker.includes("OBSERVATORY_PROJECT_VERSION_INVALID")) {
     return new ObservatoryRepositoryError("PROJECT_VERSION_INVALID", "The Project Version details are invalid.");
@@ -412,7 +473,7 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_items")
           .select(
-            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
           )
           .order("updated_at", { ascending: false }),
       );
@@ -422,7 +483,7 @@ export function createObservatoryRepository(
       const { data, error } = await client
         .from("observatory_work_items")
         .select(
-          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -484,7 +545,7 @@ export function createObservatoryRepository(
       return readRows<ObservatoryProjectVersionRow>(
         client
           .from("observatory_project_versions")
-          .select("id,project_key,version_label,title,description,status,target_date,released_at,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
+          .select("id,project_key,version_label,semver,title,description,status,target_date,actual_date,released_at,is_release_target,milestone_ref,predecessor_version_id,roadmap_ref,approved_plan_ref,acceptance_summary,dependencies_summary,dependencies_satisfied,artifacts_accepted,verification_complete,roadmap_reconciled,user_gate_decision_ref,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
           .order("created_at", { ascending: true }),
       );
     },
@@ -492,7 +553,7 @@ export function createObservatoryRepository(
     async getProjectVersion(id: string): Promise<ObservatoryProjectVersionRow | null> {
       const { data, error } = await client
         .from("observatory_project_versions")
-        .select("id,project_key,version_label,title,description,status,target_date,released_at,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
+        .select("id,project_key,version_label,semver,title,description,status,target_date,actual_date,released_at,is_release_target,milestone_ref,predecessor_version_id,roadmap_ref,approved_plan_ref,acceptance_summary,dependencies_summary,dependencies_satisfied,artifacts_accepted,verification_complete,roadmap_reconciled,user_gate_decision_ref,is_backlog,row_version,created_by,created_at,updated_by,updated_at")
         .eq("id", id)
         .maybeSingle();
       if (error) throw mutationError("update", error);
@@ -523,6 +584,7 @@ export function createObservatoryRepository(
           p_project_ref: input.projectRef,
           p_assigned_agent_id: input.assignedAgentId,
           p_project_version_id: input.projectVersionId,
+          p_version_binding_kind: input.versionBindingKind,
           p_idempotency_key: input.idempotencyKey,
         },
       );
@@ -562,6 +624,7 @@ export function createObservatoryRepository(
           p_stage_id: input.stageId,
           p_work_package_id: input.workPackageId,
           p_project_version_id: input.projectVersionId,
+          p_version_binding_kind: input.versionBindingKind,
         },
       );
 
@@ -691,9 +754,23 @@ export function createObservatoryRepository(
       const { data, error } = await client.rpc("create_observatory_project_version", {
         p_project_key: input.projectKey,
         p_version_label: input.versionLabel,
+        p_semver: input.semver,
         p_title: input.title,
         p_description: input.description,
         p_target_date: input.targetDate,
+        p_is_release_target: input.isReleaseTarget,
+        p_milestone_ref: input.milestoneRef,
+        p_predecessor_version_id: input.predecessorVersionId,
+        p_roadmap_ref: input.roadmapRef,
+        p_approved_plan_ref: input.approvedPlanRef,
+        p_acceptance_summary: input.acceptanceSummary,
+        p_actual_date: input.actualDate,
+        p_dependencies_summary: input.dependenciesSummary,
+        p_dependencies_satisfied: input.dependenciesSatisfied,
+        p_artifacts_accepted: input.artifactsAccepted,
+        p_verification_complete: input.verificationComplete,
+        p_roadmap_reconciled: input.roadmapReconciled,
+        p_user_gate_decision_ref: input.userGateDecisionRef,
       });
       if (error) throw mutationError("create", error);
       if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_CREATE_FAILED", "The Project Version could not be created.");
@@ -713,9 +790,23 @@ export function createObservatoryRepository(
         p_project_version_id: input.projectVersionId,
         p_expected_version: input.expectedVersion,
         p_version_label: input.versionLabel,
+        p_semver: input.semver,
         p_title: input.title,
         p_description: input.description,
         p_target_date: input.targetDate,
+        p_is_release_target: input.isReleaseTarget,
+        p_milestone_ref: input.milestoneRef,
+        p_predecessor_version_id: input.predecessorVersionId,
+        p_roadmap_ref: input.roadmapRef,
+        p_approved_plan_ref: input.approvedPlanRef,
+        p_acceptance_summary: input.acceptanceSummary,
+        p_actual_date: input.actualDate,
+        p_dependencies_summary: input.dependenciesSummary,
+        p_dependencies_satisfied: input.dependenciesSatisfied,
+        p_artifacts_accepted: input.artifactsAccepted,
+        p_verification_complete: input.verificationComplete,
+        p_roadmap_reconciled: input.roadmapReconciled,
+        p_user_gate_decision_ref: input.userGateDecisionRef,
       });
       if (error) throw mutationError("update", error);
       if (!data) throw new ObservatoryRepositoryError("WORK_ITEM_UPDATE_FAILED", "The Project Version could not be updated.");
