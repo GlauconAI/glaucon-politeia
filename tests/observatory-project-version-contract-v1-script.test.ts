@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertLocalProjectVersionApplyTarget,
+  assertProjectVersionPreflightAllowsApply,
   formatProjectVersionVerifierError,
   parseProjectVersionVerifierArgs,
   readProjectVersionContractPreflight,
@@ -25,14 +26,15 @@ describe("Project Version contract v1 verifier", () => {
     });
   });
 
-  it("runs a catalog-aware read-only preflight and reports every issue count", async () => {
+  it("runs a catalog-aware read-only preflight and separates blocking issues from legacy warnings", async () => {
     const statements: string[] = [];
     const results = [
       [{ versions_table: true, work_items_table: true, project_version_id: true,
-        predecessor_version_id: false, is_release_target: false, is_backlog: true }],
+        predecessor_version_id: false, is_release_target: false, is_backlog: true, semver: false }],
       [{ missing_binding_count: 2 }],
       [{ multiple_execution_project_count: 1 }],
-      [{ invalid_formal_label_count: 3 }],
+      [{ legacy_non_semver_label_count: 3 }],
+      [{ normalized_semver_collision_count: 4 }],
     ];
     const client = {
       unsafe: async (statement: string) => {
@@ -44,17 +46,24 @@ describe("Project Version contract v1 verifier", () => {
     await expect(readProjectVersionContractPreflight(client)).resolves.toEqual({
       mode: "preflight",
       ok: false,
-      counts: {
+      blockingIssueCount: 7,
+      warningCount: 3,
+      blocking: {
         missingBindings: 2,
         multipleExecutionProjects: 1,
-        invalidFormalLabels: 3,
+        normalizedSemverCollisions: 4,
         predecessorSelfReferences: 0,
+        predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0,
+        predecessorNonIncreasingReferences: 0,
+        predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
       },
+      warnings: { legacyNonSemverLabels: 3 },
     });
-    expect(statements).toHaveLength(4);
+    expect(statements).toHaveLength(5);
     expect(statements.join("\n")).not.toMatch(/\b(insert|update|delete|alter|create|drop|truncate)\b/iu);
+    expect(statements.join("\n")).toMatch(/normalized_semver_collision_count[\s\S]*having count\(\*\) > 1/iu);
     expect(statements.slice(1).join("\n")).not.toContain("predecessor_version_id = version.id");
     expect(statements.slice(1).join("\n")).not.toContain("is_release_target");
   });
@@ -67,40 +76,81 @@ describe("Project Version contract v1 verifier", () => {
       predecessor_version_id: false,
       is_release_target: false,
       is_backlog: false,
+      semver: false,
     }]];
     const client = { unsafe: async () => results.shift() ?? [] };
     await expect(readProjectVersionContractPreflight(client)).resolves.toMatchObject({
       mode: "preflight",
       ok: true,
-      counts: {
+      blockingIssueCount: 0,
+      warningCount: 0,
+      blocking: {
         missingBindings: 0,
         multipleExecutionProjects: 0,
-        invalidFormalLabels: 0,
+        normalizedSemverCollisions: 0,
         predecessorSelfReferences: 0,
+        predecessorMissingTargets: 0,
         predecessorCrossProjectReferences: 0,
+        predecessorNonIncreasingReferences: 0,
+        predecessorCycles: 0,
         duplicateReleaseTargetProjects: 0,
       },
+      warnings: { legacyNonSemverLabels: 0 },
     });
   });
 
   it("reports predecessor and release-target issues when v1 columns are present", async () => {
     const results = [
       [{ versions_table: true, work_items_table: false, project_version_id: false,
-        predecessor_version_id: true, is_release_target: true, is_backlog: true }],
+        predecessor_version_id: true, is_release_target: true, is_backlog: true, semver: true }],
       [{ multiple_execution_project_count: 0 }],
-      [{ invalid_formal_label_count: 0 }],
-      [{ predecessor_self_count: 4, predecessor_cross_project_count: 5 }],
+      [{ legacy_non_semver_label_count: 7 }],
+      [{ normalized_semver_collision_count: 3 }],
+      [{ predecessor_self_count: 4, predecessor_missing_target_count: 2,
+        predecessor_cross_project_count: 5, predecessor_non_increasing_count: 6 }],
+      [{ predecessor_cycle_count: 8 }],
       [{ duplicate_release_target_project_count: 6 }],
     ];
     const client = { unsafe: async () => results.shift() ?? [] };
     await expect(readProjectVersionContractPreflight(client)).resolves.toMatchObject({
       ok: false,
-      counts: {
+      blockingIssueCount: 34,
+      warningCount: 7,
+      blocking: {
+        normalizedSemverCollisions: 3,
         predecessorSelfReferences: 4,
+        predecessorMissingTargets: 2,
         predecessorCrossProjectReferences: 5,
+        predecessorNonIncreasingReferences: 6,
+        predecessorCycles: 8,
         duplicateReleaseTargetProjects: 6,
       },
+      warnings: { legacyNonSemverLabels: 7 },
     });
+    expect(results).toHaveLength(0);
+  });
+
+  it("allows legacy non-SemVer warnings but refuses apply on every blocking preflight issue", () => {
+    expect(() => assertProjectVersionPreflightAllowsApply({
+      mode: "preflight", ok: true, blockingIssueCount: 0, warningCount: 2,
+      blocking: {
+        missingBindings: 0, multipleExecutionProjects: 0, normalizedSemverCollisions: 0,
+        predecessorSelfReferences: 0, predecessorMissingTargets: 0,
+        predecessorCrossProjectReferences: 0, predecessorNonIncreasingReferences: 0,
+        predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
+      },
+      warnings: { legacyNonSemverLabels: 2 },
+    })).not.toThrow();
+    expect(() => assertProjectVersionPreflightAllowsApply({
+      mode: "preflight", ok: false, blockingIssueCount: 1, warningCount: 0,
+      blocking: {
+        missingBindings: 0, multipleExecutionProjects: 0, normalizedSemverCollisions: 1,
+        predecessorSelfReferences: 0, predecessorMissingTargets: 0,
+        predecessorCrossProjectReferences: 0, predecessorNonIncreasingReferences: 0,
+        predecessorCycles: 0, duplicateReleaseTargetProjects: 0,
+      },
+      warnings: { legacyNonSemverLabels: 0 },
+    })).toThrow(/preflight blocked apply[\s\S]*normalizedSemverCollisions/u);
   });
 
   it("fails preflight safely when database configuration is absent", async () => {
@@ -147,7 +197,8 @@ describe("Project Version contract v1 verifier", () => {
       "security and audit",
       "rollback guidance",
     ]));
-    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*no destructive schema drop/iu);
+    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*keep the current application[\s\S]*corrective compatibility migration[\s\S]*before application rollback/iu);
+    expect(result.rollbackGuidance).toMatch(/never drop the schema[\s\S]*rewrite migration history/iu);
   });
 
   it("reports a bounded source failure without exposing source contents", async () => {
@@ -176,6 +227,17 @@ describe("Project Version contract v1 verifier", () => {
     expect(source).toMatch(/observatory_project_version_events[\s\S]*relrowsecurity/iu);
     expect(source).toMatch(/with recursive predecessor_chain/iu);
     expect(source).toMatch(/not has_table_privilege\('anon'/iu);
+    for (const signature of [
+      "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
+      "transition_observatory_project_version(uuid,integer,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",
+    ]) {
+      expect(source).toContain(`public.${signature}`);
+    }
+    expect(source).toMatch(/has_function_privilege\('authenticated',[\s\S]*grantee\s*=\s*0[\s\S]*has_function_privilege\('anon'/iu);
+    expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
   });
 });
