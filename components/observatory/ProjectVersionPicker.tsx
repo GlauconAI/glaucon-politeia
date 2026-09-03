@@ -22,8 +22,9 @@ export function ProjectVersionPicker({
   required = false,
   allowAll = false,
 }: ProjectVersionPickerProps) {
+  const closedBindingStatuses = new Set(["released", "archived", "cancelled"]);
   const available = versions.filter(
-    (version) => version.project_key === projectKey && (allowAll || version.status !== "archived"),
+    (version) => version.project_key === projectKey && (allowAll || !closedBindingStatuses.has(version.status)),
   );
   const selectedAvailable = available.some((version) => version.id === value);
   return (

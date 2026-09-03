@@ -395,6 +395,14 @@ describe("Project Version repository", () => {
       expectedCode: "PROJECT_VERSION_SEMVER_INVALID",
     },
     {
+      error: { code: "23505", message: "OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE" },
+      expectedCode: "PROJECT_VERSION_DUPLICATE",
+    },
+    {
+      error: { code: "23505", message: "duplicate key violates unique constraint observatory_project_versions_semver_idx" },
+      expectedCode: "PROJECT_VERSION_DUPLICATE",
+    },
+    {
       error: { code: "23505", message: "duplicate key violates unique constraint observatory_project_versions_one_execution_idx" },
       expectedCode: "PROJECT_VERSION_EXECUTION_CONFLICT",
     },

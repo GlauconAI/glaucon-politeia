@@ -334,7 +334,7 @@ create function public.create_observatory_project_version(
 returns public.observatory_project_versions
 language plpgsql security definer set search_path = pg_catalog
 as $$
-declare calling_user uuid := auth.uid(); created_version public.observatory_project_versions;
+declare calling_user uuid := auth.uid(); created_version public.observatory_project_versions; violated_constraint text;
 begin
   if calling_user is null or not public.is_current_user_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
@@ -362,6 +362,16 @@ begin
   insert into public.observatory_project_version_events(project_version_id,event_type,actor_id,data)
   values (created_version.id,'created',calling_user,jsonb_build_object('after',to_jsonb(created_version)));
   return created_version;
+exception
+  when unique_violation then
+    get stacked diagnostics violated_constraint = constraint_name;
+    if violated_constraint = 'observatory_project_versions_project_label_idx' then
+      raise exception 'OBSERVATORY_PROJECT_VERSION_DUPLICATE' using errcode='23505';
+    elsif violated_constraint = 'observatory_project_versions_semver_idx' then
+      raise exception 'OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE' using errcode='23505';
+    else
+      raise;
+    end if;
 end;
 $$;
 
@@ -378,7 +388,7 @@ create function public.update_observatory_project_version(
 returns public.observatory_project_versions
 language plpgsql security definer set search_path = pg_catalog
 as $$
-declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions; updated_version public.observatory_project_versions;
+declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions; updated_version public.observatory_project_versions; violated_constraint text;
 begin
   if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
   -- Match the statement trigger's global lock order before taking a row lock.
@@ -404,6 +414,16 @@ begin
   insert into public.observatory_project_version_events(project_version_id,event_type,actor_id,data)
   values(updated_version.id,'updated',calling_user,jsonb_build_object('before',to_jsonb(current_version),'after',to_jsonb(updated_version)));
   return updated_version;
+exception
+  when unique_violation then
+    get stacked diagnostics violated_constraint = constraint_name;
+    if violated_constraint = 'observatory_project_versions_project_label_idx' then
+      raise exception 'OBSERVATORY_PROJECT_VERSION_DUPLICATE' using errcode='23505';
+    elsif violated_constraint = 'observatory_project_versions_semver_idx' then
+      raise exception 'OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE' using errcode='23505';
+    else
+      raise;
+    end if;
 end;
 $$;
 
@@ -587,6 +607,200 @@ begin
 end;
 $$;
 
+-- Keep prior application revisions usable after this forward-only migration.
+-- Every compatibility overload delegates to the v1 mutation boundary so it
+-- inherits current validation, locking, terminal-scope, audit, and Gate rules.
+create function public.create_observatory_project_version(
+  p_project_key text, p_version_label text, p_title text,
+  p_description text, p_target_date date
+)
+returns public.observatory_project_versions
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare
+  calling_user uuid := auth.uid();
+  semver_parts text[];
+  p_semver text;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  semver_parts := regexp_match(btrim(p_version_label), '^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.(0|[1-9][0-9]*))?$');
+  if semver_parts is null then raise exception 'OBSERVATORY_PROJECT_VERSION_SEMVER_INVALID' using errcode='22023'; end if;
+  p_semver := semver_parts[1] || '.' || semver_parts[2] || '.' || coalesce(semver_parts[3], '0');
+  return public.create_observatory_project_version(
+    p_project_key, p_version_label, p_semver, p_title, p_description, p_target_date,
+    false, null, null, null, null, null, null, null, false, false, false, false, null
+  );
+end;
+$$;
+
+create function public.update_observatory_project_version(
+  p_project_version_id uuid, p_expected_version integer,
+  p_version_label text, p_title text, p_description text, p_target_date date
+)
+returns public.observatory_project_versions
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); current_version public.observatory_project_versions;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  select * into current_version from public.observatory_project_versions where id=p_project_version_id;
+  return public.update_observatory_project_version(
+    p_project_version_id, p_expected_version, p_version_label, current_version.semver,
+    p_title, p_description, p_target_date, current_version.is_release_target,
+    current_version.milestone_ref, current_version.predecessor_version_id,
+    current_version.roadmap_ref, current_version.approved_plan_ref,
+    current_version.acceptance_summary, current_version.actual_date,
+    current_version.dependencies_summary, current_version.dependencies_satisfied,
+    current_version.artifacts_accepted, current_version.verification_complete,
+    current_version.roadmap_reconciled, current_version.user_gate_decision_ref
+  );
+end;
+$$;
+
+create function public.create_observatory_work_item(
+  p_type text, p_title text, p_description text, p_project_ref text,
+  p_assigned_agent_id text, p_project_version_id uuid, p_idempotency_key text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid();
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  return public.create_observatory_work_item(
+    p_type, p_title, p_description, p_project_ref, p_assigned_agent_id,
+    p_project_version_id, 'optional', p_idempotency_key
+  );
+end;
+$$;
+
+create function public.create_observatory_work_item(
+  p_type text, p_title text, p_description text, p_project_ref text,
+  p_assigned_agent_id text, p_idempotency_key text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); selected_version_id uuid;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  perform public.ensure_observatory_project_backlog_versions(array[btrim(p_project_ref)]);
+  select id into selected_version_id from public.observatory_project_versions
+  where project_key=btrim(p_project_ref) and is_backlog;
+  return public.create_observatory_work_item(
+    p_type, p_title, p_description, p_project_ref, p_assigned_agent_id,
+    selected_version_id, 'optional', p_idempotency_key
+  );
+end;
+$$;
+
+create function public.create_observatory_work_item(
+  p_type text, p_title text, p_description text, p_project_ref text,
+  p_idempotency_key text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid();
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  return public.create_observatory_work_item(
+    p_type, p_title, p_description, p_project_ref,
+    split_part(btrim(p_project_ref), '/', 1), p_idempotency_key
+  );
+end;
+$$;
+
+create function public.update_observatory_work_item(
+  p_work_item_id uuid, p_expected_version integer, p_type text, p_title text,
+  p_description text, p_acceptance_criteria text, p_priority text,
+  p_owner_id uuid, p_project_ref text, p_milestone_ref text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); current_item public.observatory_work_items;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  select * into current_item from public.observatory_work_items where id=p_work_item_id;
+  return public.update_observatory_work_item(
+    p_work_item_id, p_expected_version, p_type, p_title, p_description,
+    p_acceptance_criteria, p_priority, p_owner_id, current_item.assigned_agent_id,
+    p_project_ref, p_milestone_ref, current_item.project_key, current_item.plan_revision,
+    current_item.stage_id, current_item.work_package_id, current_item.project_version_id,
+    current_item.version_binding_kind
+  );
+end;
+$$;
+
+create function public.update_observatory_work_item(
+  p_work_item_id uuid, p_expected_version integer, p_type text, p_title text,
+  p_description text, p_acceptance_criteria text, p_priority text,
+  p_owner_id uuid, p_project_ref text, p_milestone_ref text, p_project_key text,
+  p_plan_revision integer, p_stage_id text, p_work_package_id text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); current_item public.observatory_work_items;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  select * into current_item from public.observatory_work_items where id=p_work_item_id;
+  return public.update_observatory_work_item(
+    p_work_item_id, p_expected_version, p_type, p_title, p_description,
+    p_acceptance_criteria, p_priority, p_owner_id, current_item.assigned_agent_id,
+    p_project_ref, p_milestone_ref, p_project_key, p_plan_revision, p_stage_id,
+    p_work_package_id, current_item.project_version_id, current_item.version_binding_kind
+  );
+end;
+$$;
+
+create function public.update_observatory_work_item(
+  p_work_item_id uuid, p_expected_version integer, p_type text, p_title text,
+  p_description text, p_acceptance_criteria text, p_priority text,
+  p_owner_id uuid, p_assigned_agent_id text, p_project_ref text,
+  p_milestone_ref text, p_project_key text, p_plan_revision integer,
+  p_stage_id text, p_work_package_id text
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); current_item public.observatory_work_items;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  select * into current_item from public.observatory_work_items where id=p_work_item_id;
+  return public.update_observatory_work_item(
+    p_work_item_id, p_expected_version, p_type, p_title, p_description,
+    p_acceptance_criteria, p_priority, p_owner_id, p_assigned_agent_id,
+    p_project_ref, p_milestone_ref, p_project_key, p_plan_revision, p_stage_id,
+    p_work_package_id, current_item.project_version_id, current_item.version_binding_kind
+  );
+end;
+$$;
+
+create function public.update_observatory_work_item(
+  p_work_item_id uuid, p_expected_version integer, p_type text, p_title text,
+  p_description text, p_acceptance_criteria text, p_priority text,
+  p_owner_id uuid, p_assigned_agent_id text, p_project_ref text,
+  p_milestone_ref text, p_project_key text, p_plan_revision integer,
+  p_stage_id text, p_work_package_id text, p_project_version_id uuid
+)
+returns public.observatory_work_items
+language plpgsql security definer set search_path = pg_catalog
+as $$
+declare calling_user uuid := auth.uid(); current_item public.observatory_work_items;
+begin
+  if calling_user is null or not public.is_current_user_admin() then raise exception 'Administrator access required' using errcode='42501'; end if;
+  select * into current_item from public.observatory_work_items where id=p_work_item_id;
+  return public.update_observatory_work_item(
+    p_work_item_id, p_expected_version, p_type, p_title, p_description,
+    p_acceptance_criteria, p_priority, p_owner_id, p_assigned_agent_id,
+    p_project_ref, p_milestone_ref, p_project_key, p_plan_revision, p_stage_id,
+    p_work_package_id, p_project_version_id, current_item.version_binding_kind
+  );
+end;
+$$;
+
 revoke all privileges on function public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text) from public,anon,authenticated,service_role;
 grant execute on function public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text) to authenticated;
 revoke all privileges on function public.update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text) from public,anon,authenticated,service_role;
@@ -597,6 +811,24 @@ revoke all privileges on function public.create_observatory_work_item(text,text,
 grant execute on function public.create_observatory_work_item(text,text,text,text,text,uuid,text,text) to authenticated;
 revoke all privileges on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text) from public,anon,authenticated,service_role;
 grant execute on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text) to authenticated;
+revoke all privileges on function public.create_observatory_project_version(text,text,text,text,date) from public,anon,authenticated,service_role;
+grant execute on function public.create_observatory_project_version(text,text,text,text,date) to authenticated;
+revoke all privileges on function public.update_observatory_project_version(uuid,integer,text,text,text,date) from public,anon,authenticated,service_role;
+grant execute on function public.update_observatory_project_version(uuid,integer,text,text,text,date) to authenticated;
+revoke all privileges on function public.create_observatory_work_item(text,text,text,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.create_observatory_work_item(text,text,text,text,text) to authenticated;
+revoke all privileges on function public.create_observatory_work_item(text,text,text,text,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.create_observatory_work_item(text,text,text,text,text,text) to authenticated;
+revoke all privileges on function public.create_observatory_work_item(text,text,text,text,text,uuid,text) from public,anon,authenticated,service_role;
+grant execute on function public.create_observatory_work_item(text,text,text,text,text,uuid,text) to authenticated;
+revoke all privileges on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text) to authenticated;
+revoke all privileges on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text) to authenticated;
+revoke all privileges on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text) to authenticated;
+revoke all privileges on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid) from public,anon,authenticated,service_role;
+grant execute on function public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid) to authenticated;
 
 alter table public.observatory_project_versions enable row level security;
 alter table public.observatory_project_version_events enable row level security;

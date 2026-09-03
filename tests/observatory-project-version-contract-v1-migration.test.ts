@@ -201,7 +201,7 @@ describe("Project Version contract v1 migration", () => {
     expect(replacement).not.toMatch(/execute\s+format/iu);
   });
 
-  it("replaces bounded admin RPCs, audits snapshots, and blocks new bindings to terminal versions", async () => {
+  it("keeps compatibility overloads behind v1 defaults, audits snapshots, and blocks new bindings to terminal versions", async () => {
     const sql = await migration();
     for (const name of [
       "create_observatory_project_version",
@@ -210,18 +210,28 @@ describe("Project Version contract v1 migration", () => {
       "create_observatory_work_item",
       "update_observatory_work_item",
     ]) expect(sql).toContain(name);
-    expect(sql).toMatch(/drop function if exists public\.create_observatory_project_version\(/iu);
-    expect(sql).toMatch(/drop function if exists public\.update_observatory_project_version\(/iu);
+    expect(sql).toMatch(/create function public\.create_observatory_project_version\( p_project_key text, p_version_label text, p_title text, p_description text, p_target_date date \)[\s\S]*return public\.create_observatory_project_version\([\s\S]*p_semver/iu);
+    expect(sql).toMatch(/create function public\.update_observatory_project_version\( p_project_version_id uuid, p_expected_version integer, p_version_label text, p_title text, p_description text, p_target_date date \)[\s\S]*return public\.update_observatory_project_version\([\s\S]*current_version\.semver/iu);
     expect(sql).toMatch(/drop function if exists public\.transition_observatory_project_version\(/iu);
     expect(sql).toMatch(/jsonb_build_object\('before',\s*to_jsonb\(current_version\),\s*'after',\s*to_jsonb\(updated_version\)\)/iu);
     expect(sql).toMatch(/version_status in \('released', 'archived', 'cancelled'\)/iu);
     expect(sql).toMatch(/old\.project_version_id is distinct from new\.project_version_id|new\.project_version_id is distinct from old\.project_version_id/iu);
     expect(sql).toMatch(/drop trigger if exists observatory_work_items_validate_project_version/iu);
     expect(sql).toMatch(/update of[\s\S]{0,400}project_ref[\s\S]{0,200}project_key[\s\S]{0,200}project_version_id, version_binding_kind/iu);
-    expect(sql).toMatch(/drop function if exists public\.create_observatory_work_item\(text,text,text,text,text,text\)/iu);
-    expect(sql).toMatch(/drop function if exists public\.create_observatory_work_item\(text,text,text,text,text\)/iu);
-    expect(sql).toMatch(/drop function if exists public\.update_observatory_work_item\(uuid,integer,text,text,text,text,text,uuid,text,text\)/iu);
-    expect(sql).toMatch(/drop function if exists public\.update_observatory_work_item\(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text\)/iu);
+    for (const signature of [
+      "create_observatory_project_version(text,text,text,text,date)",
+      "update_observatory_project_version(uuid,integer,text,text,text,date)",
+      "create_observatory_work_item(text,text,text,text,text)",
+      "create_observatory_work_item(text,text,text,text,text,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid)",
+    ]) {
+      expect(sql).toContain(`revoke all privileges on function public.${signature} from public,anon,authenticated,service_role`);
+      expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
+    }
     expect(sql).toMatch(/on conflict \(created_by, idempotency_key\) do nothing/iu);
     expect(sql).toContain("OBSERVATORY_PROJECT_CONTROL_BINDING_INVALID");
     expect(sql).toMatch(/security definer/iu);
@@ -236,6 +246,21 @@ describe("Project Version contract v1 migration", () => {
     ]) {
       expect(sql).toContain(`revoke all privileges on function public.${signature} from public,anon,authenticated,service_role`);
       expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
+    }
+  });
+
+  it("translates duplicate labels and SemVer without hiding portfolio conflicts", async () => {
+    const sql = await migration();
+    for (const body of [
+      sql.slice(sql.indexOf("create function public.create_observatory_project_version"), sql.indexOf("create function public.update_observatory_project_version")),
+      sql.slice(sql.indexOf("create function public.update_observatory_project_version"), sql.indexOf("create function public.transition_observatory_project_version")),
+    ]) {
+      expect(body).toMatch(/get stacked diagnostics[\s\S]*constraint_name/iu);
+      expect(body).toContain("observatory_project_versions_project_label_idx");
+      expect(body).toContain("observatory_project_versions_semver_idx");
+      expect(body).toContain("OBSERVATORY_PROJECT_VERSION_DUPLICATE");
+      expect(body).toContain("OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE");
+      expect(body).toMatch(/else raise;/iu);
     }
   });
 

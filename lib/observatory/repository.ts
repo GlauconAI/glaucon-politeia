@@ -293,6 +293,12 @@ function mutationError(
   if (marker.includes("OBSERVATORY_PROJECT_VERSION_DUPLICATE")) {
     return new ObservatoryRepositoryError("PROJECT_VERSION_DUPLICATE", "That version label already exists for this Project.");
   }
+  if (
+    marker.includes("OBSERVATORY_PROJECT_VERSION_SEMVER_DUPLICATE") ||
+    marker.includes("OBSERVATORY_PROJECT_VERSIONS_SEMVER_IDX")
+  ) {
+    return new ObservatoryRepositoryError("PROJECT_VERSION_DUPLICATE", "That SemVer already exists for this Project.");
+  }
   if (marker.includes("OBSERVATORY_PROJECT_VERSION_CONFLICT")) {
     return new ObservatoryRepositoryError("PROJECT_VERSION_CONFLICT", "The Project Version changed after it was loaded.");
   }

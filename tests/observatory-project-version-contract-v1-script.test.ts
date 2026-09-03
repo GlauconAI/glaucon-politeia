@@ -216,7 +216,7 @@ describe("Project Version contract v1 verifier", () => {
       "security and audit",
       "rollback guidance",
     ]));
-    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*keep the current application[\s\S]*corrective compatibility migration[\s\S]*before application rollback/iu);
+    expect(result.rollbackGuidance).toMatch(/forward-only[\s\S]*compatibility overloads[\s\S]*prior application revision/iu);
     expect(result.rollbackGuidance).toMatch(/never drop the schema[\s\S]*rewrite migration history/iu);
   });
 
@@ -294,7 +294,7 @@ describe("Project Version contract v1 verifier", () => {
     }
     expect(source).toMatch(/rpc_acl_expectations[\s\S]*'public'[\s\S]*'anon'[\s\S]*'authenticated'[\s\S]*'service_role'/iu);
     expect(source).toMatch(/prosecdef[\s\S]*search_path=pg_catalog[\s\S]*administrator access required/iu);
-    expect(source).toMatch(/not exists\(select 1 from superseded_rpc_signatures where to_regprocedure\(signature\) is not null\)/iu);
+    expect(source).not.toContain("superseded_rpc_signatures");
     expect(source).toMatch(/options\.mode === "apply"[\s\S]*readProjectVersionContractPreflight\(preflightClient\)[\s\S]*assertProjectVersionPreflightAllowsApply\(preflight\)[\s\S]*applyMigration\(sql\)/u);
     expect(source).not.toContain('argument === "--database-url"');
     expect(source).toMatch(/options\.mode === "concurrency"[\s\S]*OBSERVATORY_LOCAL_DB_URL[\s\S]*assertLocalProjectVersionApplyTarget[\s\S]*exerciseProjectVersionReleaseConcurrency/iu);
@@ -318,7 +318,7 @@ describe("Project Version contract v1 verifier", () => {
     );
   });
 
-  it("keeps exact disjoint current and superseded RPC inventories covering every migration drop", async () => {
+  it("keeps one exact current RPC inventory covering v1 and every recreated compatibility overload", async () => {
     const [verifierSource, migrationSource] = await Promise.all([
       readFile(join(process.cwd(), "scripts/observatory/verify-project-version-contract-v1.ts"), "utf8"),
       readFile(join(process.cwd(), "supabase/migrations/20260902000300_work_tracker_project_version_contract_v1.sql"), "utf8"),
@@ -326,38 +326,35 @@ describe("Project Version contract v1 verifier", () => {
     const current = normalizedSignatures(
       verifierSource,
       "bounded_rpc_signatures(signature) as (values",
-      "), superseded_rpc_signatures(signature) as (values",
-    );
-    const superseded = normalizedSignatures(
-      verifierSource,
-      "superseded_rpc_signatures(signature) as (values",
       "), resolved_bounded_rpcs as (",
     );
 
     expect(current).toEqual([
       "create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
-      "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
-      "ensure_observatory_project_backlog_versions(text[])",
-      "transition_observatory_project_version(uuid,integer,text)",
-      "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
-      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",
-    ].sort());
-    expect(superseded).toEqual([
       "create_observatory_project_version(text,text,text,text,date)",
       "create_observatory_work_item(text,text,text,text,text)",
       "create_observatory_work_item(text,text,text,text,text,text)",
       "create_observatory_work_item(text,text,text,text,text,uuid,text)",
+      "create_observatory_work_item(text,text,text,text,text,uuid,text,text)",
+      "ensure_observatory_project_backlog_versions(text[])",
+      "transition_observatory_project_version(uuid,integer,text)",
       "update_observatory_project_version(uuid,integer,text,text,text,date)",
+      "update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)",
       "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)",
       "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text)",
       "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)",
       "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid)",
+      "update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)",
     ].sort());
-    expect(current.filter((signature) => superseded.includes(signature))).toEqual([]);
 
-    const represented = new Set([...current, ...superseded]);
+    const represented = new Set(current);
     const dropped = [...migrationSource.matchAll(/drop function if exists public\.([^;]+);/giu)]
       .map((match) => match[1].replace(/\s+/gu, ""));
     expect(dropped.filter((signature) => !represented.has(signature))).toEqual([]);
+    for (const signature of dropped) {
+      expect(migrationSource.lastIndexOf(`create function public.${signature.split("(")[0]}(`)).toBeGreaterThan(
+        migrationSource.indexOf(`drop function if exists public.${signature}`),
+      );
+    }
   });
 });

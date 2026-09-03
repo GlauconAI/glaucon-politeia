@@ -9,7 +9,7 @@ const DEFAULT_MIGRATION_PATH = resolve(
   "supabase/migrations/20260902000300_work_tracker_project_version_contract_v1.sql",
 );
 export const ROLLBACK_GUIDANCE =
-  "Forward-only rollback: the prior application revision is not directly compatible because this migration drops superseded RPC overloads. Keep the current application, or apply a reviewed corrective compatibility migration before application rollback. Never drop the schema or rewrite migration history.";
+  "Forward-only rollback: compatibility overloads keep the prior application revision usable while the additive schema remains in place. Roll back application code only; never drop the schema or rewrite migration history.";
 
 type Mode = "source" | "preflight" | "status" | "apply" | "concurrency";
 export type VerifierOptions = {
@@ -149,6 +149,11 @@ export async function verifyProjectVersionContractSource(
   }
   checks.push("serialized mutation validation");
   requirePattern(source, "security and audit", /security definer[\s\S]*jsonb_build_object\('before'[\s\S]*grant execute/iu);
+  requirePattern(
+    source,
+    "prior application compatibility",
+    /create function public\.create_observatory_project_version\(\s*p_project_key text, p_version_label text, p_title text,[\s\S]*return public\.create_observatory_project_version\([\s\S]*create function public\.update_observatory_project_version\(\s*p_project_version_id uuid, p_expected_version integer,[\s\S]*current_version\.semver[\s\S]*create function public\.create_observatory_work_item\([\s\S]*'optional'[\s\S]*create function public\.update_observatory_work_item\([\s\S]*current_item\.version_binding_kind/iu,
+  );
   checks.push("security and audit");
   checks.push("rollback guidance");
   return { mode: "source" as const, ok: true, checks, rollbackGuidance: ROLLBACK_GUIDANCE };
@@ -370,17 +375,16 @@ export async function readProjectVersionContractStatus(sql: Sql) {
   const [status] = await sql<Record<string, boolean | number>[]>`
     with bounded_rpc_signatures(signature) as (values
       ('public.create_observatory_project_version(text,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
+      ('public.create_observatory_project_version(text,text,text,text,date)'),
       ('public.ensure_observatory_project_backlog_versions(text[])'),
       ('public.update_observatory_project_version(uuid,integer,text,text,text,text,date,boolean,text,uuid,text,text,text,date,text,boolean,boolean,boolean,boolean,text)'),
+      ('public.update_observatory_project_version(uuid,integer,text,text,text,date)'),
       ('public.transition_observatory_project_version(uuid,integer,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text,uuid,text,text)'),
-      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)')
-    ), superseded_rpc_signatures(signature) as (values
-      ('public.create_observatory_project_version(text,text,text,text,date)'),
-      ('public.update_observatory_project_version(uuid,integer,text,text,text,date)'),
       ('public.create_observatory_work_item(text,text,text,text,text,uuid,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text,text)'),
       ('public.create_observatory_work_item(text,text,text,text,text)'),
+      ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text)'),
       ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)'),
       ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,integer,text,text)'),
       ('public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text)'),
@@ -521,8 +525,6 @@ export async function readProjectVersionContractStatus(sql: Sql) {
       exists(select 1 from pg_trigger where tgname='observatory_project_versions_protect_history' and not tgisinternal) as history_trigger,
       (select bool_and(procedure is not null) from resolved_bounded_rpcs)
         as bounded_rpcs,
-      not exists(select 1 from superseded_rpc_signatures where to_regprocedure(signature) is not null)
-        as superseded_rpcs_absent,
       exists(select 1 from pg_class where oid='public.observatory_project_versions'::regclass and relrowsecurity)
         and exists(select 1 from pg_class where oid='public.observatory_project_version_events'::regclass and relrowsecurity)
         as versions_and_events_rls,
