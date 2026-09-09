@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 export const OBSERVATORY_SNAPSHOT_SCHEMA_VERSION = "1.0.0" as const;
-export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION = "2.0.0" as const;
+export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V2 = "2.0.0" as const;
+export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION = "3.0.0" as const;
+export const ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS = [
+  ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V2,
+  ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
+] as const;
 export const ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE =
   "shared/projects/openclaw-orchestration-control/orchestration-system-design.html#orchestration-registry" as const;
 export const DERIVED_PROJECT_KEY_PATTERN =
@@ -96,7 +101,7 @@ export const ObservatoryRegistrySummarySchema = z.strictObject({
 export const ObservatoryRegistrySnapshotSchema = z
   .strictObject({
     schema_version: z.literal(OBSERVATORY_SNAPSHOT_SCHEMA_VERSION),
-    registry_schema_version: z.literal(ORCHESTRATION_REGISTRY_SCHEMA_VERSION),
+    registry_schema_version: z.enum(ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS),
     registry_version: RequiredRegistryTextSchema,
     source: ObservatorySourceSchema,
     summary: ObservatoryRegistrySummarySchema,
