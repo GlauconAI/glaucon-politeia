@@ -274,6 +274,21 @@ describe("extractOrchestrationRegistryPayload", () => {
 });
 
 describe("parseOrchestrationRegistryHtml", () => {
+  it("accepts the v3 canonical registry while keeping the public projection narrow", () => {
+    const registry = JSON.parse(expectedFixturePayload) as Record<string, unknown>;
+    registry.schema_version = "3.0.0";
+    registry.project_version_control_contract = {
+      private_runtime_field: "must-not-escape",
+    };
+    const html = `<script id="orchestration-registry" type="application/json">${JSON.stringify(registry)}</script>`;
+
+    const snapshot = parseOrchestrationRegistryHtml(html, provenance);
+
+    expect(snapshot.registry_schema_version).toBe("3.0.0");
+    expect(snapshot.summary.project_count).toBe(3);
+    expect(JSON.stringify(snapshot)).not.toContain("private_runtime_field");
+  });
+
   it("returns correct project, primary/secondary scene, and flow summaries", () => {
     const snapshot = parseOrchestrationRegistryHtml(fixtureHtml, provenance);
 
@@ -402,7 +417,7 @@ describe("parseOrchestrationRegistryHtml", () => {
   it("reports unsupported canonical registry schema versions explicitly", () => {
     const html = fixtureHtml.replace(
       '"schema_version": "2.0.0"',
-      '"schema_version": "3.0.0"',
+      '"schema_version": "4.0.0"',
     );
 
     const error = captureRegistryError(() =>
@@ -411,7 +426,7 @@ describe("parseOrchestrationRegistryHtml", () => {
 
     expect(error.code).toBe("REGISTRY_SCHEMA_UNSUPPORTED");
     expect(error.message).toBe(
-      'Unsupported orchestration registry schema version "3.0.0"; expected "2.0.0".',
+      'Unsupported orchestration registry schema version "4.0.0"; expected one of "2.0.0", "3.0.0".',
     );
   });
 

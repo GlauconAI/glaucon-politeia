@@ -4,7 +4,7 @@ import {
   OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   DERIVED_PROJECT_KEY_PATTERN,
   ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
-  ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
+  ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS,
   ObservatoryRegistrySnapshotSchema,
   ObservatorySourceSchema,
   type ObservatoryRegistrySnapshot,
@@ -91,7 +91,7 @@ const CanonicalExecutionFlowSchema = z
 
 const CanonicalRegistrySchema = z
   .object({
-    schema_version: z.literal(ORCHESTRATION_REGISTRY_SCHEMA_VERSION),
+    schema_version: z.enum(ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS),
     registry_version: z.string().min(1),
     execution_flows: z.array(CanonicalExecutionFlowSchema),
     scene_groups: z.array(CanonicalSceneGroupSchema),
@@ -254,11 +254,16 @@ export function parseOrchestrationRegistryHtml(
     );
   }
   if (
-    versionResult.data.schema_version !== ORCHESTRATION_REGISTRY_SCHEMA_VERSION
+    !ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS.some(
+      (version) => version === versionResult.data.schema_version,
+    )
   ) {
+    const expectedVersions = ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS.map(
+      (version) => `"${version}"`,
+    ).join(", ");
     throw new OrchestrationRegistryError(
       "REGISTRY_SCHEMA_UNSUPPORTED",
-      `Unsupported orchestration registry schema version "${versionResult.data.schema_version}"; expected "${ORCHESTRATION_REGISTRY_SCHEMA_VERSION}".`,
+      `Unsupported orchestration registry schema version "${versionResult.data.schema_version}"; expected one of ${expectedVersions}.`,
     );
   }
 
