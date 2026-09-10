@@ -215,6 +215,30 @@ describe("collectAgentActivity", () => {
     });
   });
 
+  it("accepts the canonical object-keyed Agent config", async () => {
+    const objectConfig = JSON.stringify({
+      defaults: { thinkingDefault: "medium" },
+      entries: {
+        plato: {
+          model: { primary: "openai/gpt-5.6-sol" },
+          thinkingDefault: "high",
+        },
+      },
+    });
+    const runCommand = vi.fn(async (invocation: CommandInvocation) => ({
+      exitCode: 0,
+      stdout: invocation.args[0] === "config" ? objectConfig : activityOutput,
+    }));
+
+    const snapshot = await collectAgentActivity(
+      { agents },
+      { runCommand, now: () => new Date("2026-09-10T22:00:00.000Z") },
+    );
+
+    expect(snapshot.status).toBe("ready");
+    expect(snapshot.agents[0]?.default_thinking_level).toBe("high");
+  });
+
   it("degrades independently when config or activity is unavailable", async () => {
     const configUnavailable = await collectAgentActivity(
       { agents },

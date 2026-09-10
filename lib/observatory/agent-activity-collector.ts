@@ -76,13 +76,18 @@ async function runOptional(
 function configuredThinking(candidate: unknown): Map<string, string | null> | undefined {
   const root = asRecord(candidate);
   const defaults = asRecord(root?.defaults);
-  const entries = root?.entries;
-  if (!root || !Array.isArray(entries)) return undefined;
+  const rawEntries = root?.entries;
+  const entries: Array<[string | undefined, unknown]> = Array.isArray(rawEntries)
+    ? rawEntries.map((entry) => [undefined, entry])
+    : asRecord(rawEntries)
+      ? Object.entries(rawEntries)
+      : [];
+  if (!root || entries.length === 0) return undefined;
   const fallback = firstString(defaults?.thinkingDefault) ?? null;
   const result = new Map<string, string | null>();
-  for (const value of entries) {
+  for (const [entryId, value] of entries) {
     const entry = asRecord(value);
-    const id = firstString(entry?.id);
+    const id = firstString(entry?.id, entryId);
     if (!entry || !id) continue;
     result.set(id, firstString(entry.thinkingDefault) ?? fallback);
   }
