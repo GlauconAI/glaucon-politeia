@@ -20,13 +20,15 @@ import {
   upgradeObservatorySnapshotToV4,
   upgradeObservatorySnapshotToV5,
   upgradeObservatorySnapshotToV6,
+  upgradeObservatorySnapshotToV7,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
 } from "#observatory-collector";
 import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
-import { ObservatoryCollectionEnvelopeV6Schema } from "#observatory-collection-schema";
+import { ObservatoryCollectionEnvelopeSchema } from "#observatory-collection-schema";
+import { collectAgentActivity } from "#observatory-agent-activity-collector";
 import { computeProjectControlDigest } from "#observatory-project-control-schema";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
@@ -137,8 +139,12 @@ async function readPreviousProjectControl(
   } catch {
     return undefined;
   }
-  const previous = ObservatoryCollectionEnvelopeV6Schema.safeParse(candidate);
-  if (!previous.success || !previous.data.project_controls) return undefined;
+  const previous = ObservatoryCollectionEnvelopeSchema.safeParse(candidate);
+  if (
+    !previous.success ||
+    !("project_controls" in previous.data) ||
+    !previous.data.project_controls
+  ) return undefined;
   if (
     computeObservatorySnapshotDigest(previous.data) !==
       previous.data.source_digest ||
@@ -267,11 +273,18 @@ async function main(): Promise<void> {
               now: () => new Date(),
             },
           );
-      snapshot = upgradeObservatorySnapshotToV6(
+      const controlSnapshot = upgradeObservatorySnapshotToV6(
         executionSnapshot,
         retainProjectControlLastKnownGood(
           candidateProjectControl,
           previousProjectControl,
+        ),
+      );
+      snapshot = upgradeObservatorySnapshotToV7(
+        controlSnapshot,
+        await collectAgentActivity(
+          { agents: controlSnapshot.agents },
+          { runCommand, now: () => new Date() },
         ),
       );
     } else {

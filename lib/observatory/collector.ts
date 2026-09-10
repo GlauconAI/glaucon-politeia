@@ -9,11 +9,13 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V6,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
   OBSERVATORY_COLLECTOR_VERSION_V2,
   OBSERVATORY_COLLECTOR_VERSION_V3,
   OBSERVATORY_COLLECTOR_VERSION_V4,
   OBSERVATORY_COLLECTOR_VERSION_V5,
   OBSERVATORY_COLLECTOR_VERSION_V6,
+  OBSERVATORY_COLLECTOR_VERSION_V7,
   ObservatoryAgentSchema,
   ObservatoryCollectionEnvelopeSchema,
   ObservatoryCollectionEnvelopeV1Schema,
@@ -22,6 +24,7 @@ import {
   ObservatoryCollectionEnvelopeV4Schema,
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
+  ObservatoryCollectionEnvelopeV7Schema,
   ObservatoryRuntimeSchema,
   type ObservatoryAgent,
   type ObservatoryCollectionEnvelope,
@@ -30,8 +33,13 @@ import {
   type ObservatoryCollectionEnvelopeV4,
   type ObservatoryCollectionEnvelopeV5,
   type ObservatoryCollectionEnvelopeV6,
+  type ObservatoryCollectionEnvelopeV7,
   type ObservatoryRuntime,
 } from "#observatory-collection-schema";
+import {
+  ObservatoryAgentActivitySnapshotSchema,
+  type ObservatoryAgentActivitySnapshot,
+} from "#observatory-agent-activity-schema";
 import {
   ObservatoryAssetInventorySchema,
   ObservatoryAssetSchema,
@@ -714,6 +722,42 @@ export function upgradeObservatorySnapshotToV6(
   });
   const digest = computeObservatorySnapshotDigest(draft);
   return ObservatoryCollectionEnvelopeV6Schema.parse({
+    ...draft,
+    source_digest: digest,
+    registry: {
+      ...draft.registry,
+      source: { ...draft.registry.source, digest },
+    },
+  });
+}
+
+export function upgradeObservatorySnapshotToV7(
+  controlSnapshotInput: unknown,
+  agentActivityInput: ObservatoryAgentActivitySnapshot,
+): ObservatoryCollectionEnvelopeV7 {
+  const controlSnapshot = ObservatoryCollectionEnvelopeV6Schema.parse(
+    controlSnapshotInput,
+  );
+  const agentActivity = ObservatoryAgentActivitySnapshotSchema.parse(
+    agentActivityInput,
+  );
+  const placeholderDigest = "0".repeat(64);
+  const draft = ObservatoryCollectionEnvelopeV7Schema.parse({
+    ...controlSnapshot,
+    schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
+    collector_version: OBSERVATORY_COLLECTOR_VERSION_V7,
+    source_digest: placeholderDigest,
+    registry: {
+      ...controlSnapshot.registry,
+      source: {
+        ...controlSnapshot.registry.source,
+        digest: placeholderDigest,
+      },
+    },
+    agent_activity: agentActivity,
+  });
+  const digest = computeObservatorySnapshotDigest(draft);
+  return ObservatoryCollectionEnvelopeV7Schema.parse({
     ...draft,
     source_digest: digest,
     registry: {
