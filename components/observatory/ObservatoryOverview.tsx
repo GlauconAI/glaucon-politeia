@@ -12,6 +12,7 @@ import { ProjectCockpit } from "@/components/observatory/ProjectCockpit";
 import { DeliveryRoadmap } from "@/components/observatory/DeliveryRoadmap";
 import { FlowAnalytics } from "@/components/observatory/FlowAnalytics";
 import { GovernanceReview } from "@/components/observatory/GovernanceReview";
+import { AgentStatusDirectory } from "@/components/observatory/AgentStatusDirectory";
 import {
   buildCronDirectory,
   buildSkillDirectory,
@@ -140,37 +141,6 @@ export function ObservatoryOverview({
       ),
     }));
 
-    const agents: SearchItem[] = state.snapshot.agents.map((agent) => ({
-      id: agent.id,
-      searchText: [
-        agent.id,
-        agent.display_name,
-        agent.model_label,
-        agent.workspace_label,
-        agent.default ? "default" : "",
-      ].join(" "),
-      content: (
-        <>
-          <div className="observatory-object-title">
-            <h4 className="observatory-wrap">
-              {agent.emoji ? `${agent.emoji} ` : ""}
-              {agent.display_name || agent.id}
-            </h4>
-            <span className="observatory-object-badge observatory-wrap">
-              {agent.binding_count} bindings
-            </span>
-          </div>
-          <p className="observatory-wrap">
-            {agent.model_label || "Model not reported"}
-          </p>
-          <small className="observatory-wrap">
-            {agent.workspace_label}
-            {agent.default ? " · default" : ""}
-          </small>
-        </>
-      ),
-    }));
-
     const flows: SearchItem[] = state.snapshot.registry.execution_flows.map(
       (flow) => ({
         id: flow.id,
@@ -202,7 +172,7 @@ export function ObservatoryOverview({
       }),
     );
 
-    return { projects, scenes, agents, flows };
+    return { projects, scenes, flows };
   }, [state]);
 
   if (state.status !== "ready" || !lists) {
@@ -263,7 +233,7 @@ export function ObservatoryOverview({
     {
       label: "Agents",
       value: summary.agent_count,
-      href: "#dashboard-objects",
+      href: "#dashboard-agents",
     },
     {
       label: "Bindings",
@@ -383,6 +353,15 @@ export function ObservatoryOverview({
         </section>
       )}
 
+      <AgentStatusDirectory
+        agents={state.snapshot.agents}
+        activity={
+          "agent_activity" in state.snapshot
+            ? state.snapshot.agent_activity
+            : undefined
+        }
+      />
+
       <section
         id="dashboard-objects"
         className="observatory-catalog dashboard-section-anchor"
@@ -396,7 +375,7 @@ export function ObservatoryOverview({
           </div>
         </div>
         <label className="observatory-search" htmlFor="observatory-object-search">
-          <span>Search projects, scenes, agents, and flows</span>
+          <span>Search projects, scenes, and flows</span>
           <input
             id="observatory-object-search"
             type="search"
@@ -416,12 +395,6 @@ export function ObservatoryOverview({
             id="observatory-scenes"
             title="Scenes"
             items={filter(lists.scenes)}
-            searching={Boolean(normalizedQuery)}
-          />
-          <ObjectList
-            id="observatory-agents"
-            title="Agents"
-            items={filter(lists.agents)}
             searching={Boolean(normalizedQuery)}
           />
           <ObjectList

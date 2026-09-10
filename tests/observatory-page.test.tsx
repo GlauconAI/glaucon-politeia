@@ -162,6 +162,10 @@ describe("DashboardPage", () => {
       "href",
       "#dashboard-objects",
     );
+    expect(screen.getByRole("link", { name: "Agents" })).toHaveAttribute(
+      "href",
+      "#dashboard-agents",
+    );
     expect(screen.queryByRole("link", { name: "Capture" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Work" })).not.toBeInTheDocument();
   });

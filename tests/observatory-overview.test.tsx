@@ -304,7 +304,7 @@ describe("ObservatoryOverview", () => {
     ).toHaveAttribute("href", "/dashboard/projects");
     expect(
       within(summary).getByRole("link", { name: /view Agents/i }),
-    ).toHaveAttribute("href", "#dashboard-objects");
+    ).toHaveAttribute("href", "#dashboard-agents");
     expect(
       within(summary).getByRole("link", { name: /view Active tasks/i }),
     ).toHaveAttribute("href", "#dashboard-snapshot");
@@ -411,6 +411,7 @@ describe("ObservatoryOverview", () => {
 
     expect(document.getElementById("dashboard-snapshot")).toBeInTheDocument();
     expect(document.getElementById("dashboard-index")).toBeInTheDocument();
+    expect(document.getElementById("dashboard-agents")).toBeInTheDocument();
     expect(document.getElementById("dashboard-objects")).toBeInTheDocument();
   });
 
@@ -502,11 +503,11 @@ describe("ObservatoryOverview", () => {
     ).toBeInTheDocument();
   });
 
-  it("searches projects, scenes, agents, and execution flows with a labelled native input", () => {
+  it("searches projects, scenes, and execution flows with a labelled native input", () => {
     render(<ObservatoryOverview state={readyState()} />);
 
     const search = screen.getByRole("searchbox", {
-      name: /search projects, scenes, agents, and flows/i,
+      name: /search projects, scenes, and flows/i,
     });
     fireEvent.change(search, { target: { value: "Observatory" } });
 
@@ -515,7 +516,7 @@ describe("ObservatoryOverview", () => {
     expect(screen.queryByText("Product strategy")).not.toBeInTheDocument();
     expect(screen.queryByText("Fast Flow")).not.toBeInTheDocument();
     expect(screen.queryByText("Socrates", { selector: "h4" })).not.toBeInTheDocument();
-    expect(screen.getAllByText(/no matching/i)).toHaveLength(3);
+    expect(screen.getAllByText(/no matching/i)).toHaveLength(2);
   });
 
   it("includes flow core output in object search", () => {
@@ -523,7 +524,7 @@ describe("ObservatoryOverview", () => {
 
     fireEvent.change(
       screen.getByRole("searchbox", {
-        name: /search projects, scenes, agents, and flows/i,
+        name: /search projects, scenes, and flows/i,
       }),
       { target: { value: "One artifact" } },
     );
