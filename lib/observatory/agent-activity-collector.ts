@@ -77,10 +77,11 @@ function configuredThinking(candidate: unknown): Map<string, string | null> | un
   const root = asRecord(candidate);
   const defaults = asRecord(root?.defaults);
   const rawEntries = root?.entries;
+  const rawEntriesRecord = asRecord(rawEntries);
   const entries: Array<[string | undefined, unknown]> = Array.isArray(rawEntries)
     ? rawEntries.map((entry) => [undefined, entry])
-    : asRecord(rawEntries)
-      ? Object.entries(rawEntries)
+    : rawEntriesRecord
+      ? Object.entries(rawEntriesRecord)
       : [];
   if (!root || entries.length === 0) return undefined;
   const fallback = firstString(defaults?.thinkingDefault) ?? null;
