@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
+  ObservatoryCollectionEnvelopeV7Schema,
 } from "#observatory-collection-schema";
 import { computeObservatorySnapshotDigest } from "#observatory-collector";
 import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
@@ -15,10 +16,12 @@ async function main(): Promise<void> {
   const metadata = await stat(snapshotPath);
   const snapshot = ObservatoryCollectionEnvelopeV5Schema.or(
     ObservatoryCollectionEnvelopeV6Schema,
+  ).or(
+    ObservatoryCollectionEnvelopeV7Schema,
   ).parse(
     JSON.parse(await readFile(snapshotPath, "utf8")),
   );
-  const expectedSourceDomains = snapshot.schema_version === "6.0.0" ? 9 : 8;
+  const expectedSourceDomains = "project_controls" in snapshot ? 9 : 8;
   const privacyCategoryCounts = scanObservatoryPrivacy(snapshot);
   const checks = {
     mode_0600: (metadata.mode & 0o777) === 0o600,
@@ -53,8 +56,12 @@ async function main(): Promise<void> {
           project_executions:
             snapshot.project_executions?.summary.project_count ?? 0,
           project_controls:
-            snapshot.schema_version === "6.0.0"
+            "project_controls" in snapshot
               ? snapshot.project_controls?.summary.project_count ?? 0
+              : 0,
+          agent_activity:
+            "agent_activity" in snapshot
+              ? snapshot.agent_activity.agents.length
               : 0,
           milestones: snapshot.delivery_governance.summary.milestone_count,
           features: snapshot.delivery_governance.summary.feature_count,

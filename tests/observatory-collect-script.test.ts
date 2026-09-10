@@ -76,17 +76,23 @@ describe("Observatory collection script", () => {
   it("retains a validated Project Control last-known-good when the source disappears", () => {
     expect(source).toContain("readPreviousProjectControl");
     expect(source).toContain("retainProjectControlLastKnownGood");
-    expect(source).toContain("ObservatoryCollectionEnvelopeV6Schema.safeParse");
+    expect(source).toContain("ObservatoryCollectionEnvelopeSchema.safeParse");
     expect(source).toContain("computeObservatorySnapshotDigest(previous.data)");
     expect(source).toContain("computeProjectControlDigest(previous.data.project_controls)");
+  });
+
+  it("upgrades v6 with the fail-soft Agent activity projection", () => {
+    expect(source).toContain("collectAgentActivity");
+    expect(source).toContain("upgradeObservatorySnapshotToV7");
   });
 });
 
 describe("Observatory Snapshot verifier", () => {
-  it("accepts v5/v6 and verifies the versioned source domains and Project counts", () => {
+  it("accepts v5/v6/v7 and verifies the versioned source domains and Project counts", () => {
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV5Schema");
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV6Schema");
-    expect(verifierSource).toContain('snapshot.schema_version === "6.0.0" ? 9 : 8');
+    expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV7Schema");
+    expect(verifierSource).toContain('"project_controls" in snapshot ? 9 : 8');
     expect(verifierSource).toContain(
       "source_repositories.repositories.length",
     );
@@ -96,5 +102,6 @@ describe("Observatory Snapshot verifier", () => {
     expect(verifierSource).toContain(
       "project_controls?.summary.project_count",
     );
+    expect(verifierSource).toContain("agent_activity.agents.length");
   });
 });

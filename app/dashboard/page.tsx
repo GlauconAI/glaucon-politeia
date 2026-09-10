@@ -31,7 +31,10 @@ function dashboardSections(
         { id: "dashboard-topology", label: "Topology" },
       );
     }
-    sections.push({ id: "dashboard-objects", label: "Objects" });
+    sections.push(
+      { id: "dashboard-agents", label: "Agents" },
+      { id: "dashboard-objects", label: "Objects" },
+    );
     if ("delivery_governance" in state.snapshot) {
       sections.push(
         { id: "dashboard-projects", label: "Projects" },

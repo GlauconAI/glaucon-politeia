@@ -6,6 +6,7 @@ import { ObservatoryRegistrySnapshotSchema } from "#observatory-schema";
 import { ObservatorySourceRepositoryInventorySchema } from "#observatory-source-repository-schema";
 import { ProjectExecutionSnapshotSchema } from "#observatory-project-execution-schema";
 import { ProjectControlSnapshotSchema } from "#observatory-project-control-schema";
+import { ObservatoryAgentActivitySnapshotSchema } from "#observatory-agent-activity-schema";
 
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1 = "1.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2 = "2.0.0" as const;
@@ -13,6 +14,7 @@ export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4 = "4.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V6 = "6.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7 = "7.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION =
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
@@ -21,6 +23,7 @@ export const OBSERVATORY_COLLECTOR_VERSION_V3 = "3.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V4 = "4.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V6 = "6.0.0" as const;
+export const OBSERVATORY_COLLECTOR_VERSION_V7 = "7.0.0" as const;
 export const OBSERVATORY_AGENT_MAX_COUNT = 256;
 export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
@@ -334,6 +337,92 @@ export const ObservatoryCollectionEnvelopeV6Schema = z
     }
   });
 
+export const ObservatoryCollectionEnvelopeV7Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION_V7),
+    ...CollectionEnvelopeBaseShape,
+    ...ObservatoryAssetInventorySchema.shape,
+    delivery_governance: DeliveryGovernanceSchema,
+    source_repositories: ObservatorySourceRepositoryInventorySchema,
+    project_executions: ProjectExecutionSnapshotSchema.nullable(),
+    project_controls: ProjectControlSnapshotSchema.nullable(),
+    agent_activity: ObservatoryAgentActivitySnapshotSchema,
+  })
+  .superRefine((snapshot, context) => {
+    validateSummary(snapshot, context);
+    const inventoryResult = ObservatoryAssetInventorySchema.safeParse({
+      assets: snapshot.assets,
+      core_endpoint_ids: snapshot.core_endpoint_ids,
+      relationships: snapshot.relationships,
+      source_health: snapshot.source_health,
+    });
+    if (!inventoryResult.success) {
+      inventoryResult.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        }),
+      );
+    }
+    for (const source of [
+      {
+        domain: "project_executions" as const,
+        value: snapshot.project_executions,
+      },
+      {
+        domain: "project_controls" as const,
+        value: snapshot.project_controls,
+      },
+    ]) {
+      const health = snapshot.source_health.find(
+        (entry) => entry.domain === source.domain,
+      );
+      if (!health) {
+        context.addIssue({
+          code: "custom",
+          path: ["source_health"],
+          message: "Expected " + source.domain + " source health.",
+        });
+      } else if (source.value === null && health.status !== "unknown") {
+        context.addIssue({
+          code: "custom",
+          path: [source.domain],
+          message: "Unavailable data must report unknown source status.",
+        });
+      } else if (
+        source.value &&
+        health.asset_count !== source.value.summary.project_count
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["source_health"],
+          message: source.domain + " source count does not match its snapshot.",
+        });
+      }
+    }
+    const configuredAgentIds = new Set(snapshot.agents.map((agent) => agent.id));
+    const activityAgentIds = new Set<string>();
+    snapshot.agent_activity.agents.forEach((agent, index) => {
+      if (!configuredAgentIds.has(agent.agent_id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["agent_activity", "agents", index, "agent_id"],
+          message: "Agent activity must reference a configured Agent.",
+        });
+      }
+      if (activityAgentIds.has(agent.agent_id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["agent_activity", "agents", index, "agent_id"],
+          message: "Agent activity IDs must be unique.",
+        });
+      }
+      activityAgentIds.add(agent.agent_id);
+    });
+  });
+
 export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
@@ -341,6 +430,7 @@ export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV4Schema,
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
+  ObservatoryCollectionEnvelopeV7Schema,
 ]);
 
 export type ObservatoryCollectionEnvelope = z.infer<
@@ -363,6 +453,9 @@ export type ObservatoryCollectionEnvelopeV5 = z.infer<
 >;
 export type ObservatoryCollectionEnvelopeV6 = z.infer<
   typeof ObservatoryCollectionEnvelopeV6Schema
+>;
+export type ObservatoryCollectionEnvelopeV7 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV7Schema
 >;
 export type ObservatoryAgent = z.infer<typeof ObservatoryAgentSchema>;
 export type ObservatoryRuntime = z.infer<typeof ObservatoryRuntimeSchema>;

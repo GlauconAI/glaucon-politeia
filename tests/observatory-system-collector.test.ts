@@ -12,6 +12,7 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V3,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
   ObservatoryCollectionEnvelopeSchema,
 } from "@/lib/observatory/collection-schema";
 import {
@@ -20,10 +21,14 @@ import {
   upgradeObservatorySnapshotToV3,
   upgradeObservatorySnapshotToV4,
   upgradeObservatorySnapshotToV5,
+  upgradeObservatorySnapshotToV6,
+  upgradeObservatorySnapshotToV7,
   type CommandInvocation,
 } from "@/lib/observatory/collector";
 import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
 import { projectExecutionFixture } from "./observatory-project-execution-schema.test";
+import { asgardProjectControlFixture } from "./fixtures/project-control/asgard-plan-v3";
+import { ProjectControlSnapshotSchema } from "@/lib/observatory/project-control-schema";
 
 const generatedAt = "2026-07-22T22:00:00.000Z";
 
@@ -372,5 +377,41 @@ describe("v2 collection envelope", () => {
     });
     expect(v5.source_digest).toBe(computeObservatorySnapshotDigest(v5));
     expect(ObservatoryCollectionEnvelopeSchema.parse(v5)).toEqual(v5);
+
+    const v6 = upgradeObservatorySnapshotToV6(v5, {
+      snapshot: ProjectControlSnapshotSchema.parse(asgardProjectControlFixture()),
+      sourceHealth: {
+        domain: "project_controls",
+        status: "fresh",
+        health: "healthy",
+        collected_at: generatedAt,
+        last_success_at: generatedAt,
+        asset_count: 1,
+      },
+    });
+    const v7 = upgradeObservatorySnapshotToV7(v6, {
+      status: "ready",
+      collected_at: generatedAt,
+      agents: [
+        {
+          agent_id: "plato",
+          default_thinking_level: "medium",
+          latest_direct: null,
+          telegram_groups: [],
+        },
+      ],
+    });
+
+    expect(v7.schema_version).toBe(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7);
+    expect(v7.collector_version).toBe("7.0.0");
+    expect(v7.project_controls?.summary.project_count).toBe(1);
+    expect(v7.agent_activity.agents[0]).toMatchObject({
+      agent_id: "plato",
+      default_thinking_level: "medium",
+    });
+    expect(v7.source_health).toHaveLength(9);
+    expect(v7.source_digest).toBe(computeObservatorySnapshotDigest(v7));
+    expect(v7.registry.source.digest).toBe(v7.source_digest);
+    expect(ObservatoryCollectionEnvelopeSchema.parse(v7)).toEqual(v7);
   });
 });
