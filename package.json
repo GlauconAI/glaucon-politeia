@@ -28,7 +28,8 @@
     "#observatory-project-execution-schema": "./lib/observatory/project-execution-schema.ts",
     "#observatory-project-execution-collector": "./lib/observatory/project-execution-collector.ts",
     "#observatory-project-control-schema": "./lib/observatory/project-control-schema.ts",
-    "#observatory-project-control-collector": "./lib/observatory/project-control-collector.ts"
+    "#observatory-project-control-collector": "./lib/observatory/project-control-collector.ts",
+    "#observatory-agent-activity-schema": "./lib/observatory/agent-activity-schema.ts"
   },
   "scripts": {
     "dev": "next dev",
