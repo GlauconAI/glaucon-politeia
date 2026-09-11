@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { themeInitScript } from "@/lib/theme/init";
 
 import "./globals.css";
+import "./agent-status.css";
 
 export const metadata: Metadata = {
   title: "402v",

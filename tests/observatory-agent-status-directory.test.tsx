@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -53,6 +56,15 @@ const activity: ObservatoryAgentActivitySnapshot = {
 };
 
 describe("AgentStatusDirectory", () => {
+  it("ships its styles through a dedicated production stylesheet entry", () => {
+    const layout = readFileSync(join(process.cwd(), "app/layout.tsx"), "utf8");
+    const css = readFileSync(join(process.cwd(), "app/agent-status.css"), "utf8");
+
+    expect(layout).toContain('import "./agent-status.css";');
+    expect(css).toMatch(/\.agent-status-grid\s*\{[^}]*display:\s*grid/u);
+    expect(css).toMatch(/@media\s*\(max-width:\s*720px\)[\s\S]*\.agent-status-grid/u);
+  });
+
   it("shows default, latest TD, runtime state, and collapsed group activity", () => {
     render(<AgentStatusDirectory agents={agents} activity={activity} />);
 
