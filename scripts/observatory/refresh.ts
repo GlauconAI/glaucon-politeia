@@ -145,6 +145,8 @@ async function main(): Promise<void> {
     configPath,
     projectExecutionPath,
     projectControlPath,
+    catalogProjectionDirectory,
+    catalogMirrorPath,
   ] = process.argv.slice(2);
   if (
     !registryPath ||
@@ -154,7 +156,7 @@ async function main(): Promise<void> {
     !projectControlPath
   ) {
     process.stderr.write(
-      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, Vault, Project execution, and Project Control export paths.\n",
+      "OBSERVATORY_REFRESH_CONFIG_INVALID: Usage requires registry, workspace, Vault, Project execution, and Project Control paths; Catalog audit paths are optional.\n",
     );
     process.exitCode = 2;
     return;
@@ -188,6 +190,12 @@ async function main(): Promise<void> {
       resolve(projectExecutionPath),
       "--project-control-path",
       resolve(projectControlPath),
+      ...(catalogProjectionDirectory
+        ? ["--catalog-projection-dir", resolve(catalogProjectionDirectory)]
+        : []),
+      ...(catalogMirrorPath
+        ? ["--catalog-mirror-path", resolve(catalogMirrorPath)]
+        : []),
       ...(configPath ? ["--config-path", resolve(configPath)] : []),
     ];
     const collected = await runStep(

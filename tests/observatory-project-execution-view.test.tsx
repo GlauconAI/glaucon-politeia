@@ -74,6 +74,7 @@ describe("Project execution directory", () => {
     ]);
     expect(entries[0].executionLines).toHaveLength(2);
     expect(entries[1].executionLines).toEqual([]);
+    expect(entries[1].owner).toBeNull();
   });
 });
 
@@ -95,9 +96,10 @@ describe("ProjectExecutionPortfolio", () => {
     expect(screen.getByText("1 active Project")).toBeInTheDocument();
     expect(screen.getByText("1 active Agent line")).toBeInTheDocument();
     expect(screen.getByText("1 independent Owner line")).toBeInTheDocument();
-    expect(screen.getAllByText("Returns to PM")).toHaveLength(2);
+    expect(screen.getAllByText("Returns to Project Owner")).toHaveLength(2);
+    expect(screen.getAllByText("Runtime Owner")).toHaveLength(3);
     expect(screen.getAllByText("User + Owner line")).toHaveLength(2);
-    expect(screen.getByText("PM no longer waiting")).toBeInTheDocument();
+    expect(screen.getByText("Project Owner no longer waiting")).toBeInTheDocument();
     expect(screen.getByText(/depends on dashboard/i)).toBeInTheDocument();
     expect(screen.getByText("Catalog only — runtime unmatched")).toBeInTheDocument();
     expect(screen.getByText("Runtime only — catalog unmatched")).toBeInTheDocument();

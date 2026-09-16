@@ -2,12 +2,16 @@ import { z } from "zod";
 
 export const OBSERVATORY_SNAPSHOT_SCHEMA_VERSION = "1.0.0" as const;
 export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V2 = "2.0.0" as const;
-export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION = "3.0.0" as const;
+export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V3 = "3.0.0" as const;
+export const ORCHESTRATION_REGISTRY_SCHEMA_VERSION = "4.0.0" as const;
 export const ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS = [
   ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V2,
+  ORCHESTRATION_REGISTRY_SCHEMA_VERSION_V3,
   ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
 ] as const;
 export const ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE =
+  "shared/projects/openclaw-orchestrator/orchestration-system-design.html#orchestration-registry" as const;
+export const ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE_LEGACY =
   "shared/projects/openclaw-orchestration-control/orchestration-system-design.html#orchestration-registry" as const;
 export const DERIVED_PROJECT_KEY_PATTERN =
   /^[a-z0-9]+(?:-[a-z0-9]+)*\/(?!\.{1,2}$)(?!\s*$)[^/\\\p{C}]+$/u;
@@ -21,12 +25,22 @@ const RegistryTextSchema = z
 const RequiredRegistryTextSchema = RegistryTextSchema.min(1);
 
 export const ObservatorySourceSchema = z.strictObject({
-  logical_reference: z.literal(ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE),
+  logical_reference: z.enum([
+    ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE_LEGACY,
+    ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
+  ]),
   authority: z.literal("canonical"),
-  owner: z.literal("Socrates"),
+  owner: z.enum(["Socrates", "Plato"]),
   collected_at: IsoTimestampSchema,
   freshness: z.enum(["fresh", "stale", "failed", "unknown"]),
   digest: z.string().regex(/^[a-f0-9]{64}$/, "Expected a SHA-256 digest."),
+});
+
+export const ObservatoryProjectModuleSchema = z.strictObject({
+  id: RequiredRegistryTextSchema,
+  title: RequiredRegistryTextSchema,
+  description: RegistryTextSchema,
+  module_owner: RequiredRegistryTextSchema,
 });
 
 export const ObservatoryProjectSchema = z.strictObject({
@@ -42,6 +56,14 @@ export const ObservatoryProjectSchema = z.strictObject({
     ),
   name: RequiredRegistryTextSchema,
   title: RequiredRegistryTextSchema.optional(),
+  project_owner: RequiredRegistryTextSchema.optional(),
+  project_owner_source: z
+    .enum(["explicit", "legacy_group_inference"])
+    .optional(),
+  modules: z
+    .array(ObservatoryProjectModuleSchema)
+    .max(OBSERVATORY_REGISTRY_MAX_ITEMS)
+    .optional(),
   status: RequiredRegistryTextSchema,
   description: RegistryTextSchema,
   scene_ids: z
@@ -171,6 +193,27 @@ export const ObservatoryRegistrySnapshotSchema = z
     const projectKeys = new Set<string>();
     snapshot.project_groups.forEach((group, groupIndex) => {
       group.projects.forEach((project, projectIndex) => {
+        if (snapshot.registry_schema_version === "4.0.0") {
+          for (const field of [
+            "project_owner",
+            "project_owner_source",
+            "modules",
+          ] as const) {
+            if (project[field] === undefined) {
+              context.addIssue({
+                code: "custom",
+                path: [
+                  "project_groups",
+                  groupIndex,
+                  "projects",
+                  projectIndex,
+                  field,
+                ],
+                message: `Registry v4 requires ${field}.`,
+              });
+            }
+          }
+        }
         if (projectKeys.has(project.project_key)) {
           context.addIssue({
             code: "custom",

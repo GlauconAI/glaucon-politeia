@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   mkdir,
   open,
+  readdir,
   realpath,
   rename,
   stat,
@@ -21,6 +22,7 @@ import {
   upgradeObservatorySnapshotToV5,
   upgradeObservatorySnapshotToV6,
   upgradeObservatorySnapshotToV7,
+  upgradeObservatorySnapshotToV8,
   writeObservatorySnapshotWithSourceProtection,
   type AtomicFileAdapter,
   type FileIdentityAdapter,
@@ -29,6 +31,7 @@ import { runCommand } from "#observatory-command-runner";
 import { parseObservatoryCollectOptions } from "#observatory-collect-options";
 import { ObservatoryCollectionEnvelopeSchema } from "#observatory-collection-schema";
 import { collectAgentActivity } from "#observatory-agent-activity-collector";
+import { collectProjectCatalogAudit } from "#observatory-project-catalog-audit";
 import { computeProjectControlDigest } from "#observatory-project-control-schema";
 import { collectSystemMetadataFromRoots } from "#observatory-filesystem-metadata";
 import { collectSystemInventory } from "#observatory-system-collector";
@@ -280,11 +283,43 @@ async function main(): Promise<void> {
           previousProjectControl,
         ),
       );
-      snapshot = upgradeObservatorySnapshotToV7(
+      const activitySnapshot = upgradeObservatorySnapshotToV7(
         controlSnapshot,
         await collectAgentActivity(
           { agents: controlSnapshot.agents },
           { runCommand, now: () => new Date() },
+        ),
+      );
+      const registryHtml = await readTextFileBounded(registryPath);
+      snapshot = upgradeObservatorySnapshotToV8(
+        activitySnapshot,
+        await collectProjectCatalogAudit(
+          {
+            registryHtml,
+            registrySnapshot: activitySnapshot.registry,
+            ...(options.systemRoots.catalogProjectionDirectory
+              ? {
+                  projectionDirectory: resolve(
+                    options.systemRoots.catalogProjectionDirectory,
+                  ),
+                }
+              : {}),
+            ...(options.systemRoots.catalogMirrorPath
+              ? { mirrorPath: resolve(options.systemRoots.catalogMirrorPath) }
+              : {}),
+          },
+          {
+            readTextFile: readTextFileBounded,
+            listDirectories: async (path) =>
+              (await readdir(path, { withFileTypes: true }))
+                .filter((entry) => entry.isDirectory())
+                .map((entry) => entry.name),
+            listFiles: async (path) =>
+              (await readdir(path, { withFileTypes: true }))
+                .filter((entry) => entry.isFile())
+                .map((entry) => entry.name),
+            now: () => new Date(),
+          },
         ),
       );
     } else {

@@ -60,6 +60,9 @@ const snapshot = {
             project_key: "plato/dashboard",
             name: "dashboard",
             title: "Dashboard",
+            project_owner: "plato",
+            project_owner_source: "explicit",
+            modules: [],
             status: "active",
             description: "Operational view.",
             scene_ids: ["S13"],
@@ -163,7 +166,7 @@ describe("Dashboard directory pages", () => {
   it("renders Projects with URL-derived filters", async () => {
     render(
       await ProjectsPage({
-        searchParams: Promise.resolve({ q: "Dashboard", owner: "Plato" }),
+        searchParams: Promise.resolve({ q: "Dashboard", owner: "plato" }),
       }),
     );
 
@@ -173,7 +176,7 @@ describe("Dashboard directory pages", () => {
     expect(screen.getByRole("searchbox", { name: /search projects/i }))
       .toHaveValue("Dashboard");
     expect(screen.getByRole("combobox", { name: /project owner/i }))
-      .toHaveValue("Plato");
+      .toHaveValue("plato");
     expect(screen.getByRole("heading", { name: "Dashboard" }))
       .toBeInTheDocument();
     expect(screen.getByText(/project execution data unavailable/i))
@@ -208,7 +211,7 @@ describe("Dashboard directory pages", () => {
     expect(screen.getByRole("heading", { name: /project execution/i }))
       .toBeInTheDocument();
     expect(screen.getByText("Build Dashboard")).toBeInTheDocument();
-    expect(screen.getAllByText("Returns to PM")).toHaveLength(2);
+    expect(screen.getAllByText("Returns to Project Owner")).toHaveLength(2);
   });
 
   it("renders de-duplicated Skills with URL-derived filters", async () => {

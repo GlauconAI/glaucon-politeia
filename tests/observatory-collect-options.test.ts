@@ -59,6 +59,34 @@ describe("parseObservatoryCollectOptions", () => {
     ).toThrow(/project-execution-path/u);
   });
 
+  it("requires and preserves explicit read-only Catalog audit inputs for v8", () => {
+    const argv = [
+      "registry.html",
+      "snapshot.json",
+      "--workspace-root",
+      "/explicit/workspace",
+      "--vault-root",
+      "/explicit/vault",
+      "--project-execution-path",
+      "/explicit/project-execution.json",
+      "--project-control-path",
+      "/explicit/project-control.json",
+      "--catalog-projection-dir",
+      "/explicit/projections",
+      "--catalog-mirror-path",
+      "/explicit/mirror.html",
+    ];
+    expect(parseObservatoryCollectOptions(argv).systemRoots).toMatchObject({
+      catalogProjectionDirectory: "/explicit/projections",
+      catalogMirrorPath: "/explicit/mirror.html",
+    });
+    expect(
+      parseObservatoryCollectOptions(argv.slice(0, -2)).systemRoots,
+    ).toMatchObject({
+      catalogProjectionDirectory: "/explicit/projections",
+    });
+  });
+
   it("rejects missing registry and unknown flags", () => {
     expect(() => parseObservatoryCollectOptions([])).toThrow(/Usage/u);
     expect(() =>

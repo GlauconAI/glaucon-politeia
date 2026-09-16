@@ -4,6 +4,7 @@ import {
   OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   DERIVED_PROJECT_KEY_PATTERN,
   ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
+  ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE_LEGACY,
   ORCHESTRATION_REGISTRY_SCHEMA_VERSIONS,
   ObservatoryRegistrySnapshotSchema,
   ObservatorySourceSchema,
@@ -12,7 +13,10 @@ import {
 
 export const ORCHESTRATION_REGISTRY_SCRIPT_ID =
   "orchestration-registry" as const;
-export { ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE } from "#observatory-schema";
+export {
+  ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
+  ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE_LEGACY,
+} from "#observatory-schema";
 
 export type OrchestrationRegistryErrorCode =
   | "REGISTRY_SCRIPT_MISSING"
@@ -44,6 +48,19 @@ const CanonicalProjectSchema = z
     status: z.string().min(1),
     description: z.string(),
     scenes: z.array(z.string().min(1)),
+    project_owner: z.string().min(1).optional(),
+    modules: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            title: z.string().min(1),
+            description: z.string(),
+            module_owner: z.string().min(1),
+          })
+          .passthrough(),
+      )
+      .optional(),
   })
   .passthrough();
 
@@ -284,6 +301,24 @@ export function parseOrchestrationRegistryHtml(
   }
 
   const registry = registryResult.data;
+  if (registry.schema_version === "4.0.0") {
+    for (const [groupIndex, group] of registry.project_groups.entries()) {
+      for (const [projectIndex, project] of group.projects.entries()) {
+        if (project.project_owner === undefined) {
+          throw new OrchestrationRegistryError(
+            "REGISTRY_SCHEMA_INVALID",
+            `The canonical registry structure is invalid at project_groups.${groupIndex}.projects.${projectIndex}.project_owner: Required`,
+          );
+        }
+        if (project.modules === undefined) {
+          throw new OrchestrationRegistryError(
+            "REGISTRY_SCHEMA_INVALID",
+            `The canonical registry structure is invalid at project_groups.${groupIndex}.projects.${projectIndex}.modules: Required`,
+          );
+        }
+      }
+    }
+  }
   const projectKeys = new Set<string>();
   const projectGroups = registry.project_groups.map((group) => ({
     owner: group.owner,
@@ -302,6 +337,23 @@ export function parseOrchestrationRegistryHtml(
         project_key: projectKey,
         name: project.name,
         ...(project.title === undefined ? {} : { title: project.title }),
+        project_owner:
+          registry.schema_version === "4.0.0"
+            ? project.project_owner!
+            : group.owner,
+        project_owner_source:
+          registry.schema_version === "4.0.0"
+            ? ("explicit" as const)
+            : ("legacy_group_inference" as const),
+        modules:
+          registry.schema_version === "4.0.0"
+            ? project.modules!.map((module) => ({
+                id: module.id,
+                title: module.title,
+                description: module.description,
+                module_owner: module.module_owner,
+              }))
+            : [],
         status: project.status,
         description: project.description,
         scene_ids: [...project.scenes],
@@ -338,9 +390,12 @@ export function parseOrchestrationRegistryHtml(
     registry_schema_version: registry.schema_version,
     registry_version: registry.registry_version,
     source: {
-      logical_reference: ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
+      logical_reference:
+        registry.schema_version === "4.0.0"
+          ? ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE
+          : ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE_LEGACY,
       authority: "canonical",
-      owner: "Socrates",
+      owner: registry.schema_version === "4.0.0" ? "Plato" : "Socrates",
       collected_at: provenanceResult.data.collected_at,
       freshness: "fresh",
       digest: provenanceResult.data.digest,

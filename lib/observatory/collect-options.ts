@@ -7,6 +7,8 @@ export interface ObservatoryCollectOptions {
     configPath?: string;
     projectExecutionPath: string;
     projectControlPath?: string;
+    catalogProjectionDirectory?: string;
+    catalogMirrorPath?: string;
   } | null;
 }
 
@@ -31,6 +33,8 @@ export function parseObservatoryCollectOptions(
         "--config-path",
         "--project-execution-path",
         "--project-control-path",
+        "--catalog-projection-dir",
+        "--catalog-mirror-path",
       ].includes(flag)
     ) {
       throw new Error(`Unknown System Observatory collection option: ${flag ?? "missing"}.`);
@@ -53,6 +57,9 @@ export function parseObservatoryCollectOptions(
       "System Observatory v5 requires --project-execution-path with explicit roots.",
     );
   }
+  const projectControlPath = values.get("--project-control-path");
+  const catalogProjectionDirectory = values.get("--catalog-projection-dir");
+  const catalogMirrorPath = values.get("--catalog-mirror-path");
   return {
     registryPath,
     ...(outputPath ? { outputPath } : {}),
@@ -62,9 +69,13 @@ export function parseObservatoryCollectOptions(
             workspaceRoot,
             vaultRoot,
             projectExecutionPath: projectExecutionPath!,
-            ...(values.get("--project-control-path")
-              ? { projectControlPath: values.get("--project-control-path") }
+            ...(projectControlPath
+              ? { projectControlPath }
               : {}),
+            ...(catalogProjectionDirectory
+              ? { catalogProjectionDirectory }
+              : {}),
+            ...(catalogMirrorPath ? { catalogMirrorPath } : {}),
             ...(values.get("--config-path")
               ? { configPath: values.get("--config-path") }
               : {}),

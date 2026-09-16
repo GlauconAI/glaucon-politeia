@@ -7,6 +7,7 @@ import { ObservatorySourceRepositoryInventorySchema } from "#observatory-source-
 import { ProjectExecutionSnapshotSchema } from "#observatory-project-execution-schema";
 import { ProjectControlSnapshotSchema } from "#observatory-project-control-schema";
 import { ObservatoryAgentActivitySnapshotSchema } from "#observatory-agent-activity-schema";
+import { ProjectCatalogAuditSchema } from "#observatory-project-catalog-audit-schema";
 
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1 = "1.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V2 = "2.0.0" as const;
@@ -15,6 +16,7 @@ export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4 = "4.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V6 = "6.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7 = "7.0.0" as const;
+export const OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8 = "8.0.0" as const;
 export const OBSERVATORY_COLLECTION_SCHEMA_VERSION =
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V1;
 export const OBSERVATORY_COLLECTOR_VERSION = "1.0.0" as const;
@@ -24,6 +26,7 @@ export const OBSERVATORY_COLLECTOR_VERSION_V4 = "4.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V5 = "5.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V6 = "6.0.0" as const;
 export const OBSERVATORY_COLLECTOR_VERSION_V7 = "7.0.0" as const;
+export const OBSERVATORY_COLLECTOR_VERSION_V8 = "8.0.0" as const;
 export const OBSERVATORY_AGENT_MAX_COUNT = 256;
 export const OBSERVATORY_AGENT_MAX_TEXT_LENGTH = 512;
 
@@ -423,6 +426,38 @@ export const ObservatoryCollectionEnvelopeV7Schema = z
     });
   });
 
+export const ObservatoryCollectionEnvelopeV8Schema = z
+  .strictObject({
+    schema_version: z.literal(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8),
+    collector_version: z.literal(OBSERVATORY_COLLECTOR_VERSION_V8),
+    ...CollectionEnvelopeBaseShape,
+    ...ObservatoryAssetInventorySchema.shape,
+    delivery_governance: DeliveryGovernanceSchema,
+    source_repositories: ObservatorySourceRepositoryInventorySchema,
+    project_executions: ProjectExecutionSnapshotSchema.nullable(),
+    project_controls: ProjectControlSnapshotSchema.nullable(),
+    agent_activity: ObservatoryAgentActivitySnapshotSchema,
+    project_catalog_audit: ProjectCatalogAuditSchema,
+  })
+  .superRefine((snapshot, context) => {
+    const { project_catalog_audit: _audit, ...snapshotWithoutAudit } = snapshot;
+    const v7Candidate = {
+      ...snapshotWithoutAudit,
+      schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
+      collector_version: OBSERVATORY_COLLECTOR_VERSION_V7,
+    };
+    const v7Result = ObservatoryCollectionEnvelopeV7Schema.safeParse(v7Candidate);
+    if (!v7Result.success) {
+      v7Result.error.issues.forEach((issue) =>
+        context.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        }),
+      );
+    }
+  });
+
 export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV1Schema,
   ObservatoryCollectionEnvelopeV2Schema,
@@ -431,6 +466,7 @@ export const ObservatoryCollectionEnvelopeSchema = z.union([
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
   ObservatoryCollectionEnvelopeV7Schema,
+  ObservatoryCollectionEnvelopeV8Schema,
 ]);
 
 export type ObservatoryCollectionEnvelope = z.infer<
@@ -456,6 +492,9 @@ export type ObservatoryCollectionEnvelopeV6 = z.infer<
 >;
 export type ObservatoryCollectionEnvelopeV7 = z.infer<
   typeof ObservatoryCollectionEnvelopeV7Schema
+>;
+export type ObservatoryCollectionEnvelopeV8 = z.infer<
+  typeof ObservatoryCollectionEnvelopeV8Schema
 >;
 export type ObservatoryAgent = z.infer<typeof ObservatoryAgentSchema>;
 export type ObservatoryRuntime = z.infer<typeof ObservatoryRuntimeSchema>;

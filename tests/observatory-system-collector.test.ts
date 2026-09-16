@@ -13,6 +13,7 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V4,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8,
   ObservatoryCollectionEnvelopeSchema,
 } from "@/lib/observatory/collection-schema";
 import {
@@ -23,6 +24,7 @@ import {
   upgradeObservatorySnapshotToV5,
   upgradeObservatorySnapshotToV6,
   upgradeObservatorySnapshotToV7,
+  upgradeObservatorySnapshotToV8,
   type CommandInvocation,
 } from "@/lib/observatory/collector";
 import { projectDashboardGovernance } from "@/lib/observatory/governance-markdown";
@@ -413,5 +415,26 @@ describe("v2 collection envelope", () => {
     expect(v7.source_digest).toBe(computeObservatorySnapshotDigest(v7));
     expect(v7.registry.source.digest).toBe(v7.source_digest);
     expect(ObservatoryCollectionEnvelopeSchema.parse(v7)).toEqual(v7);
+
+    const v8 = upgradeObservatorySnapshotToV8(v7, {
+        schema_version: "1.0.0",
+        collected_at: generatedAt,
+        status: "drift",
+        unregistered_surfaces: ["Shared/asgard-archaea-gacha-game"],
+        registered_paths_missing: [],
+        mapping_incomplete: [],
+        projection_drift: false,
+        mirror_drift: false,
+        snapshot_drift: false,
+        error_code: null,
+    });
+    expect(v8.schema_version).toBe(OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8);
+    expect(v8.collector_version).toBe("8.0.0");
+    expect(v8.project_catalog_audit.unregistered_surfaces).toEqual([
+      "Shared/asgard-archaea-gacha-game",
+    ]);
+    expect(v8.source_digest).toBe(computeObservatorySnapshotDigest(v8));
+    expect(v8.registry.source.digest).toBe(v8.source_digest);
+    expect(ObservatoryCollectionEnvelopeSchema.parse(v8)).toEqual(v8);
   });
 });

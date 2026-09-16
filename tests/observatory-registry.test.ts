@@ -286,7 +286,68 @@ describe("parseOrchestrationRegistryHtml", () => {
 
     expect(snapshot.registry_schema_version).toBe("3.0.0");
     expect(snapshot.summary.project_count).toBe(3);
+    expect(snapshot.source.owner).toBe("Socrates");
+    expect(snapshot.project_groups[0].projects[0]).toMatchObject({
+      project_owner: "Socrates",
+      project_owner_source: "legacy_group_inference",
+      modules: [],
+    });
     expect(JSON.stringify(snapshot)).not.toContain("private_runtime_field");
+  });
+
+  it("accepts v4 explicit Project and Module ownership without exposing unrelated fields", () => {
+    const registry = JSON.parse(expectedFixturePayload) as Record<string, any>;
+    registry.schema_version = "4.0.0";
+    for (const group of registry.project_groups) {
+      for (const project of group.projects) {
+        project.project_owner = group.owner === "Socrates" ? "main" : "plato";
+        project.modules = [];
+      }
+    }
+    registry.project_groups[1].projects[0].modules = [
+      {
+        id: "delivery",
+        title: "Delivery",
+        description: "Own delivery.",
+        module_owner: "plato",
+        private_runtime_field: "must-not-escape",
+      },
+    ];
+    const html = `<script id="orchestration-registry" type="application/json">${JSON.stringify(registry)}</script>`;
+
+    const snapshot = parseOrchestrationRegistryHtml(html, provenance);
+
+    expect(snapshot.registry_schema_version).toBe("4.0.0");
+    expect(snapshot.source.owner).toBe("Plato");
+    expect(snapshot.source.logical_reference).toBe(
+      "shared/projects/openclaw-orchestrator/orchestration-system-design.html#orchestration-registry",
+    );
+    expect(snapshot.project_groups[1].projects[0]).toMatchObject({
+      project_owner: "plato",
+      project_owner_source: "explicit",
+      modules: [
+        {
+          id: "delivery",
+          title: "Delivery",
+          description: "Own delivery.",
+          module_owner: "plato",
+        },
+      ],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("private_runtime_field");
+  });
+
+  it("rejects v4 Projects that omit explicit ownership fields", () => {
+    const registry = JSON.parse(expectedFixturePayload) as Record<string, any>;
+    registry.schema_version = "4.0.0";
+    const html = `<script id="orchestration-registry" type="application/json">${JSON.stringify(registry)}</script>`;
+
+    const error = captureRegistryError(() =>
+      parseOrchestrationRegistryHtml(html, provenance),
+    );
+
+    expect(error.code).toBe("REGISTRY_SCHEMA_INVALID");
+    expect(error.message).toMatch(/project_owner/i);
   });
 
   it("returns correct project, primary/secondary scene, and flow summaries", () => {
@@ -417,7 +478,7 @@ describe("parseOrchestrationRegistryHtml", () => {
   it("reports unsupported canonical registry schema versions explicitly", () => {
     const html = fixtureHtml.replace(
       '"schema_version": "2.0.0"',
-      '"schema_version": "4.0.0"',
+      '"schema_version": "5.0.0"',
     );
 
     const error = captureRegistryError(() =>
@@ -426,7 +487,7 @@ describe("parseOrchestrationRegistryHtml", () => {
 
     expect(error.code).toBe("REGISTRY_SCHEMA_UNSUPPORTED");
     expect(error.message).toBe(
-      'Unsupported orchestration registry schema version "4.0.0"; expected one of "2.0.0", "3.0.0".',
+      'Unsupported orchestration registry schema version "5.0.0"; expected one of "2.0.0", "3.0.0", "4.0.0".',
     );
   });
 

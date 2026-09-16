@@ -9,7 +9,9 @@ function words(value: string) {
 }
 
 function controlLabel(mode: "project_executor" | "independent_owner_line") {
-  return mode === "independent_owner_line" ? "User + Owner line" : "Returns to PM";
+  return mode === "independent_owner_line"
+    ? "User + Owner line"
+    : "Returns to runtime controller";
 }
 
 function formatTime(value: string | null) {
@@ -224,7 +226,7 @@ export function ProjectControlView({
             {project.gates.map((gate) => (
               <li id={gate.gate_id} key={gate.gate_id}>
                 <strong>{gate.title}</strong><span>{words(gate.status)}</span>
-                <small>{gate.decision_authority === "user" ? "User authority" : "Project Manager authority"}</small>
+                <small>{gate.decision_authority === "user" ? "User authority" : "Runtime controller authority"}</small>
               </li>
             ))}
             {project.user_decisions.map((decision) => (

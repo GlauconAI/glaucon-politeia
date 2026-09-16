@@ -30,7 +30,9 @@
     "#observatory-project-control-schema": "./lib/observatory/project-control-schema.ts",
     "#observatory-project-control-collector": "./lib/observatory/project-control-collector.ts",
     "#observatory-agent-activity-schema": "./lib/observatory/agent-activity-schema.ts",
-    "#observatory-agent-activity-collector": "./lib/observatory/agent-activity-collector.ts"
+    "#observatory-agent-activity-collector": "./lib/observatory/agent-activity-collector.ts",
+    "#observatory-project-catalog-audit-schema": "./lib/observatory/project-catalog-audit-schema.ts",
+    "#observatory-project-catalog-audit": "./lib/observatory/project-catalog-audit.ts"
   },
   "scripts": {
     "dev": "next dev",

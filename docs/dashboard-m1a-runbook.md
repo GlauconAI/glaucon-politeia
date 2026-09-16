@@ -68,28 +68,34 @@ supabase stop --no-backup
 docker network rm observatory-local-loopback
 ```
 
-### 3. Collect the real local v5 snapshot
+### 3. Collect the real local v8 snapshot
 
 ```bash
 umask 077
-OBSERVATORY_REGISTRY_PATH="/Users/glaucon/Obsidian/Glaucon's Vault/🗺️ shared/projects/openclaw-orchestrator/orchestration-system-design.html"
+OBSERVATORY_REGISTRY_PATH="/Users/glaucon/.openclaw/workspace/socrates/projects/openclaw-orchestrator/orchestration-system-design.html"
 OBSERVATORY_WORKSPACE_ROOT="/Users/glaucon/.openclaw/workspace"
 OBSERVATORY_VAULT_ROOT="/Users/glaucon/Obsidian/Glaucon's Vault"
 OBSERVATORY_CONFIG_PATH="/Users/glaucon/.openclaw/openclaw.json"
 OBSERVATORY_PROJECT_EXECUTION_PATH="/absolute/path/to/exports/project-execution-snapshot.json"
+OBSERVATORY_PROJECT_CONTROL_PATH="/absolute/path/to/exports/project-control-snapshot.json"
+OBSERVATORY_CATALOG_PROJECTION_DIR="/Users/glaucon/.openclaw/workspace/socrates/projects/openclaw-orchestrator/runtime-control"
+OBSERVATORY_CATALOG_MIRROR_PATH="/Users/glaucon/Obsidian/Glaucon's Vault/🗺️ shared/projects/openclaw-orchestrator/orchestration-system-design.html"
 npm run observatory:collect -- \
   "$OBSERVATORY_REGISTRY_PATH" \
   ".observatory/observatory-snapshot.json" \
   --workspace-root "$OBSERVATORY_WORKSPACE_ROOT" \
   --vault-root "$OBSERVATORY_VAULT_ROOT" \
   --config-path "$OBSERVATORY_CONFIG_PATH" \
-  --project-execution-path "$OBSERVATORY_PROJECT_EXECUTION_PATH"
+  --project-execution-path "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
+  --project-control-path "$OBSERVATORY_PROJECT_CONTROL_PATH" \
+  --catalog-projection-dir "$OBSERVATORY_CATALOG_PROJECTION_DIR" \
+  --catalog-mirror-path "$OBSERVATORY_CATALOG_MIRROR_PATH"
 git check-ignore -v .observatory/observatory-snapshot.json
 ```
 
 The explicit trusted roots are used only to derive bounded metadata; snapshot
 output never contains absolute paths or file content. Omitting all trusted
-roots remains a legacy v1 compatibility path and is not a v5 release input.
+roots remains a legacy v1 compatibility path and is not a v8 release input.
 
 The legacy collector invokes only these OpenClaw commands, each with a 30-second timeout:
 
@@ -98,7 +104,7 @@ openclaw agents list --json
 openclaw status --json
 ```
 
-The v5 collector extends that committed read-only allowlist with per-agent
+The v8 collector extends that committed read-only allowlist with per-agent
 skill availability plus global plugin/tool, Cron, Gateway, runtime, and local
 Git summaries. It also projects only four exact Dashboard governance
 documents—README, Development Baseline, EDAD Tracker, and estimate
@@ -106,6 +112,12 @@ calibration—into the strict Project Cockpit read model. Repository archive
 state remains `unknown` in this local-only slice. Raw command objects, raw
 Markdown, Cron payloads, delivery destinations, session keys, config values,
 file contents, raw Git remotes, and absolute roots are never serialized.
+The Project Catalog audit runs during every configured refresh (currently every
+15 minutes, which subsumes the daily requirement). It compares the canonical
+HTML to physical Project surfaces, all generated YAML projections, the Shared
+mirror, and the safe Dashboard projection. Drift is serialized as logical
+labels only; audit failures do not block collection, and the audit never adopts,
+deletes, moves, or ignores a Project surface.
 The Project execution source is separately bounded to 5 MiB, strict schema
 `1.0.0`, canonical SHA-256 digest validation, and an explicit realpath-contained
 file. Missing input is represented as unavailable; invalid input fails closed
@@ -130,8 +142,8 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module <<'VERIF
 import { readFile } from "node:fs/promises";
 import {
   ObservatoryCollectionEnvelopeSchema,
-  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
-  OBSERVATORY_COLLECTOR_VERSION_V5,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8,
+  OBSERVATORY_COLLECTOR_VERSION_V8,
 } from "./lib/observatory/collection-schema.ts";
 import { computeProjectExecutionDigest } from "./lib/observatory/project-execution-schema.ts";
 import {
@@ -189,13 +201,13 @@ const counts = {
   project_executions: snapshot.project_executions?.summary.project_count ?? 0,
 };
 const checks = {
-  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
-  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION_V5,
+  collection_schema: snapshot.schema_version === OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8,
+  collector_version: snapshot.collector_version === OBSERVATORY_COLLECTOR_VERSION_V8,
   snapshot_schema: snapshot.registry.schema_version === OBSERVATORY_SNAPSHOT_SCHEMA_VERSION,
   registry_schema: snapshot.registry.registry_schema_version === ORCHESTRATION_REGISTRY_SCHEMA_VERSION,
   source_reference: snapshot.registry.source.logical_reference === ORCHESTRATION_REGISTRY_LOGICAL_REFERENCE,
   source_authority: snapshot.registry.source.authority === "canonical",
-  source_owner: snapshot.registry.source.owner === "Socrates",
+  source_owner: snapshot.registry.source.owner === "Plato",
   freshness: snapshot.registry.source.freshness === "fresh" && snapshot.summary.freshness === "fresh",
   digest_shapes: /^[a-f0-9]{64}$/.test(snapshot.source_digest) && /^[a-f0-9]{64}$/.test(snapshot.registry.source.digest),
   project_summary: counts.projects === snapshot.registry.summary.project_count && counts.projects === snapshot.summary.project_count,
@@ -204,10 +216,11 @@ const checks = {
   agent_summary: counts.agents === snapshot.summary.agent_count,
   binding_summary: counts.bindings === snapshot.summary.binding_count,
   runtime_summary: snapshot.runtime.configured_agent_count === snapshot.summary.configured_agent_count && JSON.stringify(snapshot.runtime.task_totals) === JSON.stringify(snapshot.summary.task_totals),
-  canonical_counts: counts.projects === 62 && counts.primary_scenes === 37 && counts.secondary_scenes === 10,
+  canonical_counts: counts.projects === 70 && counts.primary_scenes === 37 && counts.secondary_scenes === 10,
   governance_counts: counts.milestones === 5 && counts.features === 17 && counts.tasks === 74 && counts.executor_runs === 28 && counts.gates === 11,
-  source_health_domains: snapshot.source_health.length === 8 && snapshot.source_health.some((source) => source.domain === "project_executions"),
+  source_health_domains: snapshot.source_health.length === 9 && snapshot.source_health.some((source) => source.domain === "project_executions") && snapshot.source_health.some((source) => source.domain === "project_controls"),
   project_execution_projection: snapshot.project_executions !== null && computeProjectExecutionDigest(snapshot.project_executions) === snapshot.project_executions.digest,
+  catalog_audit_recorded: snapshot.project_catalog_audit.status === "clean" || snapshot.project_catalog_audit.status === "drift",
 };
 console.log(JSON.stringify({ schema: "pass", counts, checks, privacy_category_counts: violations }, null, 2));
 if (Object.values(checks).some((value) => !value) || Object.values(violations).some((value) => value !== 0)) process.exitCode = 1;
@@ -233,7 +246,18 @@ If resources are constrained, Vitest can be serialized with `npm test -- --maxWo
 
 ### One-shot refresh
 
-The refresh command takes the registry, workspace root, Vault root, config path, explicit Project execution snapshot path, and explicit Project Control snapshot path as positional arguments. It acquires `.observatory/refresh.lock` exclusively, collects into the local last-known-good file, validates and publishes it idempotently, and writes only bounded state to `.observatory/refresh-state.json`. Lock and state files are mode `0600`; raw stderr is discarded. A missing canonical Project Control export produces v6 with `project_controls=null` and an `unknown` source-health entry; it never falls back to a v5 write.
+The refresh command takes the canonical registry, workspace root, Vault root,
+config path, explicit Project execution snapshot, and explicit Project Control
+snapshot as required positional arguments. The generated projection directory
+and Shared mirror path are optional rollout inputs. It acquires
+`.observatory/refresh.lock` exclusively, collects into
+the local last-known-good file, validates and publishes it idempotently, and
+writes only bounded state to `.observatory/refresh-state.json`. Lock and state
+files are mode `0600`; raw stderr is discarded. The Catalog audit is fail-soft:
+an unavailable optional audit input produces `status=failed` with
+`AUDIT_INPUT_UNAVAILABLE` in v8 while the refresh
+continues. Project execution and Project Control retain their existing fail-
+closed / last-known-good rules.
 
 The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory while remaining below the 15-minute schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
 
@@ -246,7 +270,9 @@ npm run observatory:refresh -- \
   "$OBSERVATORY_VAULT_ROOT" \
   "$OBSERVATORY_CONFIG_PATH" \
   "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
-  "$OBSERVATORY_PROJECT_CONTROL_PATH"
+  "$OBSERVATORY_PROJECT_CONTROL_PATH" \
+  "$OBSERVATORY_CATALOG_PROJECTION_DIR" \
+  "$OBSERVATORY_CATALOG_MIRROR_PATH"
 ```
 
 Safe machine-readable results are:
@@ -271,7 +297,9 @@ for attempt in 1 2 3; do
     "$OBSERVATORY_VAULT_ROOT" \
     "$OBSERVATORY_CONFIG_PATH" \
     "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
-    "$OBSERVATORY_PROJECT_CONTROL_PATH" || true
+    "$OBSERVATORY_PROJECT_CONTROL_PATH" \
+    "$OBSERVATORY_CATALOG_PROJECTION_DIR" \
+    "$OBSERVATORY_CATALOG_MIRROR_PATH" || true
 done
 npm run observatory:refresh -- \
   "$OBSERVATORY_REGISTRY_PATH" \
@@ -279,7 +307,9 @@ npm run observatory:refresh -- \
   "$OBSERVATORY_VAULT_ROOT" \
   "$OBSERVATORY_CONFIG_PATH" \
   "$OBSERVATORY_PROJECT_EXECUTION_PATH" \
-  "$OBSERVATORY_PROJECT_CONTROL_PATH"
+  "$OBSERVATORY_PROJECT_CONTROL_PATH" \
+  "$OBSERVATORY_CATALOG_PROJECTION_DIR" \
+  "$OBSERVATORY_CATALOG_MIRROR_PATH"
 ```
 
 ### Release evidence and retention
