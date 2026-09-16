@@ -27,6 +27,22 @@ function snapshot(options: {
     name: string;
     owner: string;
   }>;
+  projectCatalogAudit?: {
+    schema_version: "1.0.0";
+    collected_at: string;
+    status: "clean" | "drift" | "failed";
+    unregistered_surfaces: string[];
+    registered_paths_missing: string[];
+    mapping_incomplete: string[];
+    projection_drift: boolean;
+    mirror_drift: boolean;
+    snapshot_drift: boolean;
+    error_code:
+      | "AUDIT_INPUT_UNAVAILABLE"
+      | "AUDIT_INPUT_INVALID"
+      | "AUDIT_READ_FAILED"
+      | null;
+  };
 } = {}) {
   const projects = options.projects ?? [];
   const agents = options.agents ?? [];
@@ -38,6 +54,7 @@ function snapshot(options: {
     agents,
     assets,
     relationships: [{ from: "agent:plato", to: "skill:one" }],
+    project_catalog_audit: options.projectCatalogAudit,
   };
 }
 
@@ -164,6 +181,78 @@ describe("Observatory refresh report", () => {
     expect(message).toContain("本次未发现受监控资产的新增和删除");
     expect(message).toContain("Project 1 · Skill 1 · Agent 1 · Tool 0 · Repository 0");
     expect(message).toContain("历史 Snapshot 保留：正常");
+  });
+
+  it("reports Project Catalog drift even when the asset inventory is unchanged", () => {
+    const current = snapshot({
+      projectCatalogAudit: {
+        schema_version: "1.0.0",
+        collected_at: "2026-09-16T22:48:54.290Z",
+        status: "drift",
+        unregistered_surfaces: [
+          "Shared/asgard-archaea-gacha-game",
+          "Socrates/nas-map",
+        ],
+        registered_paths_missing: ["Plato/missing-project"],
+        mapping_incomplete: ["shared/wenya-ai"],
+        projection_drift: false,
+        mirror_drift: true,
+        snapshot_drift: false,
+        error_code: null,
+      },
+    });
+    const report = createObservatoryRefreshReport(
+      current,
+      current,
+      "2026-09-16T22:49:00.000Z",
+      49_000,
+    );
+
+    const message = formatObservatoryRefreshSuccessMessage(report, {
+      recovered: false,
+      retentionOk: true,
+    });
+
+    expect(message).toContain("Project Catalog 审计：发现漂移");
+    expect(message).toContain(
+      "未登记：Shared/asgard-archaea-gacha-game、Socrates/nas-map",
+    );
+    expect(message).toContain("已登记但缺失：Plato/missing-project");
+    expect(message).toContain("映射待补：shared/wenya-ai");
+    expect(message).toContain("Mirror 漂移");
+  });
+
+  it("does not report Catalog alignment when the audit could not run", () => {
+    const current = snapshot({
+      projectCatalogAudit: {
+        schema_version: "1.0.0",
+        collected_at: "2026-09-16T22:48:54.290Z",
+        status: "failed",
+        unregistered_surfaces: [],
+        registered_paths_missing: [],
+        mapping_incomplete: [],
+        projection_drift: false,
+        mirror_drift: false,
+        snapshot_drift: false,
+        error_code: "AUDIT_INPUT_UNAVAILABLE",
+      },
+    });
+    const report = createObservatoryRefreshReport(
+      current,
+      current,
+      "2026-09-16T22:49:00.000Z",
+      49_000,
+    );
+
+    const message = formatObservatoryRefreshSuccessMessage(report, {
+      recovered: false,
+      retentionOk: true,
+    });
+
+    expect(message).toContain(
+      "Project Catalog 审计：未完成（AUDIT_INPUT_UNAVAILABLE）",
+    );
+    expect(message).not.toContain("Project Catalog 审计：一致");
   });
 
   it("redacts secrets from persisted diagnostics and formats a safe failure message", () => {
