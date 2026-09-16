@@ -1,3 +1,5 @@
+import type { ProjectCatalogAudit } from "#observatory-project-catalog-audit-schema";
+
 type ReportCategory =
   | "projects"
   | "skills"
@@ -36,6 +38,7 @@ interface SnapshotLike {
     owner?: string;
   }>;
   relationships?: unknown[];
+  project_catalog_audit?: ProjectCatalogAudit;
 }
 
 export interface ObservatoryRefreshReport {
@@ -54,6 +57,7 @@ export interface ObservatoryRefreshReport {
     relationships: number;
   };
   changes: Record<ReportCategory, { added: string[]; removed: string[] }>;
+  catalog_audit: ProjectCatalogAudit | null;
 }
 
 const CATEGORY_LABELS: Record<ReportCategory, string> = {
@@ -182,6 +186,7 @@ export function createObservatoryRefreshReport(
       relationships: snapshot.relationships?.length ?? 0,
     },
     changes,
+    catalog_audit: snapshot.project_catalog_audit ?? null,
   };
 }
 
@@ -211,6 +216,36 @@ function itemSummary(items: string[]): string {
   const visible = items.slice(0, 8);
   const remainder = items.length - visible.length;
   return `${visible.join("、")}${remainder > 0 ? `，另有 ${remainder} 项` : ""}`;
+}
+
+function catalogAuditSummary(audit: ProjectCatalogAudit | null): string[] {
+  if (audit === null) return ["Project Catalog 审计：未配置"];
+  if (audit.status === "failed") {
+    return [
+      `Project Catalog 审计：未完成（${audit.error_code ?? "AUDIT_READ_FAILED"}）`,
+    ];
+  }
+  if (audit.status === "clean") return ["Project Catalog 审计：一致"];
+
+  const findings = [
+    audit.unregistered_surfaces.length > 0
+      ? `• 未登记：${itemSummary(audit.unregistered_surfaces)}`
+      : "",
+    audit.registered_paths_missing.length > 0
+      ? `• 已登记但缺失：${itemSummary(audit.registered_paths_missing)}`
+      : "",
+    audit.mapping_incomplete.length > 0
+      ? `• 映射待补：${itemSummary(audit.mapping_incomplete)}`
+      : "",
+    [
+      audit.projection_drift ? "Projection 漂移" : "",
+      audit.mirror_drift ? "Mirror 漂移" : "",
+      audit.snapshot_drift ? "Snapshot 漂移" : "",
+    ]
+      .filter(Boolean)
+      .join("、"),
+  ].filter(Boolean);
+  return ["Project Catalog 审计：发现漂移", ...findings];
 }
 
 export function formatObservatoryRefreshSuccessMessage(
@@ -248,6 +283,8 @@ export function formatObservatoryRefreshSuccessMessage(
     "当前规模",
     `• Project ${report.totals.projects} · Skill ${report.totals.skills} · Agent ${report.totals.agents} · Tool ${report.totals.tools} · Repository ${report.totals.repositories}`,
     `• 资产 ${report.totals.assets} · 关系 ${report.totals.relationships}`,
+    "",
+    ...catalogAuditSummary(report.catalog_audit),
     `历史 Snapshot 保留：${options.retentionOk ? "正常" : "异常"}`,
   ].join("\n");
 }

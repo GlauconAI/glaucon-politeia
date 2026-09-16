@@ -112,8 +112,8 @@ calibration—into the strict Project Cockpit read model. Repository archive
 state remains `unknown` in this local-only slice. Raw command objects, raw
 Markdown, Cron payloads, delivery destinations, session keys, config values,
 file contents, raw Git remotes, and absolute roots are never serialized.
-The Project Catalog audit runs during every configured refresh (currently every
-15 minutes, which subsumes the daily requirement). It compares the canonical
+The Project Catalog audit runs during every configured refresh (currently once
+per day). It compares the canonical
 HTML to physical Project surfaces, all generated YAML projections, the Shared
 mirror, and the safe Dashboard projection. Drift is serialized as logical
 labels only; audit failures do not block collection, and the audit never adopts,
@@ -259,7 +259,7 @@ an unavailable optional audit input produces `status=failed` with
 continues. Project execution and Project Control retain their existing fail-
 closed / last-known-good rules.
 
-The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory while remaining below the 15-minute schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
+The outer collection/publication step allows 10 minutes. This is calibrated for the sequential 1,600+ asset host inventory and remains well below the daily schedule; the exclusive lock rejects overlap. Do not use `launchctl kickstart -k` as a short health probe while a refresh is running, because it terminates the valid in-flight collection and records a failure. Wait for the job to exit, then verify the Snapshot mtime and refresh state.
 
 The macOS LaunchAgent must use `ProcessType=Standard`. `Background` applies stricter CPU and I/O limits; at production scale it caused the core `openclaw agents list --json` command to exceed its trusted 30-second bound even though the same command completed in about five to six seconds in a normal host shell. Do not use `Interactive`; the refresh is not user-interactive. On a failed child step, the orchestrator may retain up to 8 KiB in memory only long enough to reduce stderr to a whitelisted error code such as `COMMAND_TIMEOUT_AGENTS`; raw child output must never enter notification text or refresh state.
 
@@ -349,7 +349,7 @@ The owner must explicitly approve each of these gates, in order:
 3. **First production snapshot publication:** the exact digest and privacy-scan result reviewed; `npm run observatory:publish` authorized against the named production Supabase URL.
 4. **Deployment:** production build evidence reviewed; the exact Vercel deployment authorized; auth callback and admin identity verified.
 5. **First user mutation:** an authorized admin explicitly approves a production Quick Capture smoke test and its retained audit row.
-6. **Automation:** create or update only the approved isolated 15-minute refresh Cron after all System Observatory production gates pass. The payload may run collect/publish/retention and announce only safe failure/stale/recovery codes. It must never contain secrets or a Gateway start/stop/restart/update action.
+6. **Automation:** create or update only the approved isolated daily refresh after all System Observatory production gates pass. The payload may run collect/publish/retention and announce only safe failure/stale/recovery codes. It must never contain secrets or a Gateway start/stop/restart/update action.
 
 ## Last-known-good, stale state, and rollback
 
