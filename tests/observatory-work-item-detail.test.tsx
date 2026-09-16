@@ -445,8 +445,10 @@ describe("WorkItemDetail", () => {
     await waitFor(() =>
       expect(screen.getByText(/fields saved\. version 4/i)).toBeInTheDocument(),
     );
-    expect(priority).toHaveValue("high");
-    expect(owner).toHaveValue(item.created_by);
+    await waitFor(() => {
+      expect(priority).toHaveValue("high");
+      expect(owner).toHaveValue(item.created_by);
+    });
   });
 
   it("renders policy eligibility, active lease history, and admin cancellation", () => {

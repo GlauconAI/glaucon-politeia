@@ -2,7 +2,7 @@ import type { ProjectExecutionLine } from "@/lib/observatory/project-execution-s
 
 function transferLabel(line: ProjectExecutionLine) {
   return line.transfer_mode === "project_executor"
-    ? "Returns to PM"
+    ? "Returns to Project Owner"
     : "User + Owner line";
 }
 
@@ -49,7 +49,7 @@ export function ProjectExecutionLanes({
             </dl>
             {line.transfer_mode === "independent_owner_line" &&
             line.status === "transferred" ? (
-              <p className="project-execution-control-note">PM no longer waiting</p>
+              <p className="project-execution-control-note">Project Owner no longer waiting</p>
             ) : null}
             <p className="project-execution-dependencies">
               {line.dependencies.length

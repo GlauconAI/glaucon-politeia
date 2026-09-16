@@ -59,7 +59,9 @@ export function ProjectDirectory({
     useState<ProjectDirectoryFilters>(initialFilters);
   const options = useMemo(
     () => ({
-      owners: [...new Set(projects.map((project) => project.owner))].sort(),
+      owners: [
+        ...new Set(projects.map((project) => project.projectOwner)),
+      ].sort(),
       statuses: [...new Set(projects.map((project) => project.status))].sort(),
       scenes: [
         ...new Set(projects.flatMap((project) => project.sceneIds)),
@@ -71,7 +73,10 @@ export function ProjectDirectory({
     const query = filters.q.trim().toLocaleLowerCase();
     return projects
       .filter((project) => {
-        if (filters.owner !== "all" && project.owner !== filters.owner) {
+        if (
+          filters.owner !== "all" &&
+          project.projectOwner !== filters.owner
+        ) {
           return false;
         }
         if (filters.status !== "all" && project.status !== filters.status) {
@@ -100,7 +105,12 @@ export function ProjectDirectory({
           project.projectKey,
           project.name,
           project.title,
-          project.owner,
+          project.workspace,
+          project.projectOwner,
+          ...project.modules.flatMap((module) => [
+            module.title,
+            module.moduleOwner,
+          ]),
           project.focus,
           project.status,
           project.description,
@@ -122,13 +132,13 @@ export function ProjectDirectory({
           filters.sort === "name"
             ? left.title
             : filters.sort === "owner"
-              ? left.owner
+              ? left.projectOwner
               : left.status;
         const rightValue =
           filters.sort === "name"
             ? right.title
             : filters.sort === "owner"
-              ? right.owner
+              ? right.projectOwner
               : right.status;
         return (
           leftValue.localeCompare(rightValue) ||
@@ -259,8 +269,31 @@ export function ProjectDirectory({
                     <dd><code>{project.projectKey}</code></dd>
                   </div>
                   <div>
-                    <dt>Owner</dt>
-                    <dd>{project.owner}</dd>
+                    <dt>Project Owner</dt>
+                    <dd>
+                      {project.projectOwner}
+                      {project.projectOwnerSource ===
+                      "legacy_group_inference" ? (
+                        <span> · legacy inferred</span>
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Workspace</dt>
+                    <dd>{project.workspace}</dd>
+                  </div>
+                  <div className="dashboard-directory-wide">
+                    <dt>Modules</dt>
+                    <dd>
+                      {project.modules.length
+                        ? project.modules
+                            .map(
+                              (module) =>
+                                `${module.title} · ${module.moduleOwner}`,
+                            )
+                            .join(", ")
+                        : "None"}
+                    </dd>
                   </div>
                   <div>
                     <dt>Scenes</dt>

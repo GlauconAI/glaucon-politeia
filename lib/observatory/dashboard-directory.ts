@@ -10,7 +10,15 @@ export type DashboardProjectEntry = {
   projectKey: string;
   name: string;
   title: string;
-  owner: string;
+  workspace: string;
+  projectOwner: string;
+  projectOwnerSource: "explicit" | "legacy_group_inference";
+  modules: Array<{
+    id: string;
+    title: string;
+    description: string;
+    moduleOwner: string;
+  }>;
   focus: string;
   status: string;
   description: string;
@@ -22,7 +30,7 @@ export type DashboardProjectEntry = {
 export type DashboardProjectExecutionEntry = {
   projectKey: string;
   title: string;
-  owner: string;
+  owner: string | null;
   status: string;
   currentStage: string | null;
   currentGate: string | null;
@@ -82,7 +90,7 @@ export function buildProjectExecutionDirectory(
         return {
           projectKey: project.project_key,
           title: project.title ?? project.name,
-          owner: group.owner,
+          owner: null,
           status: project.status,
           currentStage: null,
           currentGate: null,
@@ -205,7 +213,16 @@ export function buildProjectDirectory(
         projectKey: project.project_key,
         name: project.name,
         title: project.title ?? project.name,
-        owner: group.owner,
+        workspace: group.owner,
+        projectOwner: project.project_owner ?? group.owner,
+        projectOwnerSource:
+          project.project_owner_source ?? "legacy_group_inference",
+        modules: (project.modules ?? []).map((module) => ({
+          id: module.id,
+          title: module.title,
+          description: module.description,
+          moduleOwner: module.module_owner,
+        })),
         focus: group.focus,
         status: project.status,
         description: project.description,

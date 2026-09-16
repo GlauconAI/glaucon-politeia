@@ -1128,6 +1128,7 @@
 .observatory-system-inventory,
 .observatory-topology,
 .observatory-v1-notice,
+.observatory-project-catalog-audit,
 .project-cockpit,
 .observatory-capture-panel {
   padding: 18px;
@@ -1142,6 +1143,41 @@
   border-radius: 8px;
   background: var(--panel);
   padding: 18px;
+}
+
+.observatory-project-catalog-audit {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+}
+
+.observatory-audit-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.observatory-audit-findings ul,
+.observatory-audit-contracts {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.observatory-audit-findings li,
+.observatory-audit-contracts li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 10px 12px;
+}
+
+.observatory-audit-contracts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .observatory-health-counts,

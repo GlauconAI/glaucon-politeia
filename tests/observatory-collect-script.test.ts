@@ -50,8 +50,14 @@ describe("Observatory collection script", () => {
     expect(refreshSource).toContain("resolve(projectExecutionPath)");
     expect(refreshSource).toContain('"--project-control-path"');
     expect(refreshSource).toContain("resolve(projectControlPath)");
+    expect(refreshSource).toContain('"--catalog-projection-dir"');
+    expect(refreshSource).toContain("resolve(catalogProjectionDirectory)");
+    expect(refreshSource).toContain('"--catalog-mirror-path"');
+    expect(refreshSource).toContain("resolve(catalogMirrorPath)");
     expect(cronSource).toContain("OBSERVATORY_PROJECT_EXECUTION_PATH");
     expect(cronSource).toContain("OBSERVATORY_PROJECT_CONTROL_PATH");
+    expect(cronSource).toContain("OBSERVATORY_CATALOG_PROJECTION_DIR");
+    expect(cronSource).toContain("OBSERVATORY_CATALOG_MIRROR_PATH");
     expect(cronSource).not.toContain("/Users/");
   });
 
@@ -85,13 +91,19 @@ describe("Observatory collection script", () => {
     expect(source).toContain("collectAgentActivity");
     expect(source).toContain("upgradeObservatorySnapshotToV7");
   });
+
+  it("upgrades v7 with a fail-soft read-only Project Catalog audit", () => {
+    expect(source).toContain("collectProjectCatalogAudit");
+    expect(source).toContain("upgradeObservatorySnapshotToV8");
+  });
 });
 
 describe("Observatory Snapshot verifier", () => {
-  it("accepts v5/v6/v7 and verifies the versioned source domains and Project counts", () => {
+  it("accepts v5/v6/v7/v8 and verifies the versioned source domains and Project counts", () => {
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV5Schema");
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV6Schema");
     expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV7Schema");
+    expect(verifierSource).toContain("ObservatoryCollectionEnvelopeV8Schema");
     expect(verifierSource).toContain('"project_controls" in snapshot ? 9 : 8');
     expect(verifierSource).toContain(
       "source_repositories.repositories.length",

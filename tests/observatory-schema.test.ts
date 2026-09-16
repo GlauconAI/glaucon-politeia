@@ -75,6 +75,28 @@ describe("ObservatoryRegistrySnapshotSchema", () => {
     );
   });
 
+  it("requires first-class ownership fields only for v4 registry snapshots", () => {
+    const result = ObservatoryRegistrySnapshotSchema.safeParse({
+      ...validSnapshot,
+      registry_schema_version: "4.0.0",
+      source: {
+        ...validSnapshot.source,
+        logical_reference:
+          "shared/projects/openclaw-orchestrator/orchestration-system-design.html#orchestration-registry",
+        owner: "Plato",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path)).toEqual([
+        ["project_groups", 0, "projects", 0, "project_owner"],
+        ["project_groups", 0, "projects", 0, "project_owner_source"],
+        ["project_groups", 0, "projects", 0, "modules"],
+      ]);
+    }
+  });
+
   it("rejects impossible provenance timestamps at the collected_at path", () => {
     const result = ObservatoryRegistrySnapshotSchema.safeParse({
       ...validSnapshot,

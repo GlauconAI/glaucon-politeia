@@ -12,7 +12,17 @@ const projects: DashboardProjectEntry[] = [
     projectKey: "plato/dashboard",
     name: "dashboard",
     title: "Dashboard",
-    owner: "Plato",
+    workspace: "Plato",
+    projectOwner: "plato",
+    projectOwnerSource: "explicit",
+    modules: [
+      {
+        id: "delivery",
+        title: "Delivery",
+        description: "Own delivery.",
+        moduleOwner: "plato",
+      },
+    ],
     focus: "Product delivery",
     status: "active",
     description: "Operational system view.",
@@ -24,7 +34,10 @@ const projects: DashboardProjectEntry[] = [
     projectKey: "aristotle/wiki",
     name: "wiki",
     title: "LLM Wiki",
-    owner: "Aristotle",
+    workspace: "Aristotle",
+    projectOwner: "Aristotle",
+    projectOwnerSource: "legacy_group_inference",
+    modules: [],
     focus: "Knowledge",
     status: "planned",
     description: "Durable knowledge system.",
@@ -36,7 +49,10 @@ const projects: DashboardProjectEntry[] = [
     projectKey: "plato/archive",
     name: "archive",
     title: "Archive",
-    owner: "Plato",
+    workspace: "Plato",
+    projectOwner: "plato",
+    projectOwnerSource: "explicit",
+    modules: [],
     focus: "Publishing",
     status: "active",
     description: "Published notes.",
@@ -102,7 +118,7 @@ describe("ProjectDirectory", () => {
     render(<ProjectDirectory projects={projects} initialFilters={defaults} />);
 
     fireEvent.change(screen.getByRole("combobox", { name: /project owner/i }), {
-      target: { value: "Plato" },
+      target: { value: "plato" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: /project status/i }), {
       target: { value: "active" },
@@ -139,6 +155,28 @@ describe("ProjectDirectory", () => {
       "Archive",
       "LLM Wiki",
     ]);
+  });
+
+  it("separates workspace, Project Owner, and Module Owner in each card", () => {
+    render(<ProjectDirectory projects={projects} initialFilters={defaults} />);
+
+    const dashboardCard = screen
+      .getByRole("heading", { name: "Dashboard" })
+      .closest("article");
+    expect(dashboardCard).not.toBeNull();
+    expect(within(dashboardCard!).getByText("plato")).toBeInTheDocument();
+    expect(within(dashboardCard!).getByText("Plato")).toBeInTheDocument();
+    expect(
+      within(dashboardCard!).getByText("Delivery · plato"),
+    ).toBeInTheDocument();
+
+    const wikiCard = screen
+      .getByRole("heading", { name: "LLM Wiki" })
+      .closest("article");
+    expect(wikiCard).not.toBeNull();
+    expect(
+      within(wikiCard!).getByText(/legacy inferred/i),
+    ).toBeInTheDocument();
   });
 
   it("honors URL-derived initial filters and renders a useful empty result", () => {

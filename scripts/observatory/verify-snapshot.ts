@@ -5,6 +5,7 @@ import {
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
   ObservatoryCollectionEnvelopeV7Schema,
+  ObservatoryCollectionEnvelopeV8Schema,
 } from "#observatory-collection-schema";
 import { computeObservatorySnapshotDigest } from "#observatory-collector";
 import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
@@ -18,6 +19,8 @@ async function main(): Promise<void> {
     ObservatoryCollectionEnvelopeV6Schema,
   ).or(
     ObservatoryCollectionEnvelopeV7Schema,
+  ).or(
+    ObservatoryCollectionEnvelopeV8Schema,
   ).parse(
     JSON.parse(await readFile(snapshotPath, "utf8")),
   );

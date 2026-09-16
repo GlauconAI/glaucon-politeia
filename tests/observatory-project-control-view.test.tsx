@@ -56,6 +56,10 @@ describe("ProjectControlView", () => {
     expect(screen.getByText("OpenClaw Orchestrator")).toBeInTheDocument();
     expect(screen.getByText("Plan revision 3")).toBeInTheDocument();
     expect(screen.getAllByText("User + Owner line").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Returns to runtime controller").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Returns to Project Owner")).not.toBeInTheDocument();
     expect(screen.getByText("Prototype freeze")).toBeInTheDocument();
     expect(screen.getByText("Coordinate interaction slice")).toBeInTheDocument();
 

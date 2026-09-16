@@ -7,6 +7,7 @@ import {
 } from "@/components/observatory/ProjectDirectory";
 import { ProjectExecutionPortfolio } from "@/components/observatory/ProjectExecutionPortfolio";
 import { ProjectControlPortfolio } from "@/components/observatory/ProjectControlPortfolio";
+import { ProjectCatalogAuditPanel } from "@/components/observatory/ProjectCatalogAuditPanel";
 import { SourceStatus } from "@/components/observatory/SourceStatus";
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 import {
@@ -118,6 +119,13 @@ export default async function ProjectsPage({
       </header>
       {state.status === "ready" ? (
         <>
+          <ProjectCatalogAuditPanel
+            audit={
+              "project_catalog_audit" in state.snapshot
+                ? state.snapshot.project_catalog_audit
+                : null
+            }
+          />
           <ProjectControlPortfolio
             snapshot={projectControlSnapshot}
             sourceStatus={

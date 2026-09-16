@@ -61,7 +61,9 @@ export function ProjectExecutionPortfolio({
             ...project.executionLines.map((line) => line.owner_agent_id),
           ]),
         ),
-      ].sort(),
+      ]
+        .filter((owner): owner is string => owner !== null)
+        .sort(),
       statuses: [
         ...new Set(
           projects.flatMap((project) =>
@@ -199,7 +201,7 @@ export function ProjectExecutionPortfolio({
                   <span>Transfer mode</span>
                   <select value={filters.transferMode} onChange={(event) => setFilter("transferMode", event.target.value)}>
                     <option value="all">All control modes</option>
-                    <option value="project_executor">Returns to PM</option>
+                    <option value="project_executor">Returns to Project Owner</option>
                     <option value="independent_owner_line">User + Owner line</option>
                   </select>
                 </label>
@@ -230,7 +232,7 @@ export function ProjectExecutionPortfolio({
                         </header>
                         <p className="project-execution-match">{matchLabel(project.match)}</p>
                         <dl className="project-execution-project-meta">
-                          <div><dt>Owner</dt><dd>{project.owner}</dd></div>
+                          <div><dt>Runtime Owner</dt><dd>{project.owner ?? "Not reported"}</dd></div>
                           <div><dt>Status</dt><dd>{project.status}</dd></div>
                           <div><dt>Stage</dt><dd>{project.currentStage ?? "Not reported"}</dd></div>
                           <div><dt>Gate</dt><dd>{project.currentGate ?? "Not reported"}</dd></div>

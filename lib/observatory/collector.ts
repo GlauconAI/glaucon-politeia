@@ -10,12 +10,14 @@ import {
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V5,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V6,
   OBSERVATORY_COLLECTION_SCHEMA_VERSION_V7,
+  OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8,
   OBSERVATORY_COLLECTOR_VERSION_V2,
   OBSERVATORY_COLLECTOR_VERSION_V3,
   OBSERVATORY_COLLECTOR_VERSION_V4,
   OBSERVATORY_COLLECTOR_VERSION_V5,
   OBSERVATORY_COLLECTOR_VERSION_V6,
   OBSERVATORY_COLLECTOR_VERSION_V7,
+  OBSERVATORY_COLLECTOR_VERSION_V8,
   ObservatoryAgentSchema,
   ObservatoryCollectionEnvelopeSchema,
   ObservatoryCollectionEnvelopeV1Schema,
@@ -25,6 +27,7 @@ import {
   ObservatoryCollectionEnvelopeV5Schema,
   ObservatoryCollectionEnvelopeV6Schema,
   ObservatoryCollectionEnvelopeV7Schema,
+  ObservatoryCollectionEnvelopeV8Schema,
   ObservatoryRuntimeSchema,
   type ObservatoryAgent,
   type ObservatoryCollectionEnvelope,
@@ -34,12 +37,17 @@ import {
   type ObservatoryCollectionEnvelopeV5,
   type ObservatoryCollectionEnvelopeV6,
   type ObservatoryCollectionEnvelopeV7,
+  type ObservatoryCollectionEnvelopeV8,
   type ObservatoryRuntime,
 } from "#observatory-collection-schema";
 import {
   ObservatoryAgentActivitySnapshotSchema,
   type ObservatoryAgentActivitySnapshot,
 } from "#observatory-agent-activity-schema";
+import {
+  ProjectCatalogAuditSchema,
+  type ProjectCatalogAudit,
+} from "#observatory-project-catalog-audit-schema";
 import {
   ObservatoryAssetInventorySchema,
   ObservatoryAssetSchema,
@@ -758,6 +766,42 @@ export function upgradeObservatorySnapshotToV7(
   });
   const digest = computeObservatorySnapshotDigest(draft);
   return ObservatoryCollectionEnvelopeV7Schema.parse({
+    ...draft,
+    source_digest: digest,
+    registry: {
+      ...draft.registry,
+      source: { ...draft.registry.source, digest },
+    },
+  });
+}
+
+export function upgradeObservatorySnapshotToV8(
+  activitySnapshotInput: unknown,
+  projectCatalogAuditInput: ProjectCatalogAudit,
+): ObservatoryCollectionEnvelopeV8 {
+  const activitySnapshot = ObservatoryCollectionEnvelopeV7Schema.parse(
+    activitySnapshotInput,
+  );
+  const projectCatalogAudit = ProjectCatalogAuditSchema.parse(
+    projectCatalogAuditInput,
+  );
+  const placeholderDigest = "0".repeat(64);
+  const draft = ObservatoryCollectionEnvelopeV8Schema.parse({
+    ...activitySnapshot,
+    schema_version: OBSERVATORY_COLLECTION_SCHEMA_VERSION_V8,
+    collector_version: OBSERVATORY_COLLECTOR_VERSION_V8,
+    source_digest: placeholderDigest,
+    registry: {
+      ...activitySnapshot.registry,
+      source: {
+        ...activitySnapshot.registry.source,
+        digest: placeholderDigest,
+      },
+    },
+    project_catalog_audit: projectCatalogAudit,
+  });
+  const digest = computeObservatorySnapshotDigest(draft);
+  return ObservatoryCollectionEnvelopeV8Schema.parse({
     ...draft,
     source_digest: digest,
     registry: {
