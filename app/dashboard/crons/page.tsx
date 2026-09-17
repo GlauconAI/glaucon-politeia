@@ -32,6 +32,11 @@ function oneOf<Value extends string>(
 
 function filtersFrom(params: SearchParams): CronDirectoryFilters {
   return {
+    view: oneOf(
+      value(params, "view"),
+      ["time", "agents", "all"] as const,
+      "time",
+    ),
     q: value(params, "q") ?? "",
     owner: value(params, "owner") ?? "all",
     type: oneOf(
@@ -103,6 +108,7 @@ export default async function CronsPage({
         <CronDirectory
           crons={crons}
           initialFilters={filtersFrom(params)}
+          projectionFrom={source?.collected_at ?? crons[0]?.collectedAt}
           sourceStatus={sourceStatus}
           sourceCollectedAt={source?.collected_at ?? null}
         />

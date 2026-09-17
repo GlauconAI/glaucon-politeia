@@ -71,6 +71,7 @@ const crons: DashboardCronEntry[] = [
 ];
 
 const defaults: CronDirectoryFilters = {
+  view: "all",
   q: "",
   owner: "all",
   type: "all",
@@ -78,6 +79,44 @@ const defaults: CronDirectoryFilters = {
   health: "all",
   sort: "next",
 };
+
+const cockpitCrons: DashboardCronEntry[] = [
+  {
+    ...crons[0]!,
+    assetId: "cron:plato-nine",
+    id: "plato-nine",
+    name: "Plato nine",
+    owner: "plato",
+    scheduleValue: "0 9 * * *",
+    scheduleSummary: "Cron · 0 9 * * *",
+    collectedAt: "2026-09-17T07:00:00.000Z",
+    nextRunAt: "2026-09-17T16:00:00.000Z",
+  },
+  {
+    ...crons[0]!,
+    assetId: "cron:giskard-nine",
+    id: "giskard-nine",
+    name: "Giskard nine",
+    owner: "giskard",
+    scheduleValue: "0 9 * * *",
+    scheduleSummary: "Cron · 0 9 * * *",
+    collectedAt: "2026-09-17T07:00:00.000Z",
+    nextRunAt: "2026-09-17T16:00:00.000Z",
+  },
+  {
+    ...crons[0]!,
+    assetId: "cron:socrates-nine-ten",
+    id: "socrates-nine-ten",
+    name: "Socrates nine ten",
+    owner: "socrates",
+    scheduleValue: "10 9 * * *",
+    scheduleSummary: "Cron · 10 9 * * *",
+    collectedAt: "2026-09-17T07:00:00.000Z",
+    nextRunAt: "2026-09-17T16:10:00.000Z",
+  },
+  crons[1]!,
+  crons[2]!,
+];
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -91,6 +130,64 @@ describe("CronDirectory", () => {
     expect(css).toMatch(
       /@media\s*\(max-width:\s*720px\)[\s\S]*\.dashboard-cron-stats[\s\S]*grid-template-columns:\s*repeat\(2,/u,
     );
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)[\s\S]*\.cron-time-row[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/u,
+    );
+  });
+
+  it("defaults to recurring operations and exposes time risk metrics", () => {
+    render(
+      <CronDirectory
+        crons={cockpitCrons}
+        initialFilters={{ ...defaults, view: "time" }}
+        projectionFrom="2026-09-17T07:00:00.000Z"
+        sourceStatus="fresh"
+        sourceCollectedAt="2026-09-17T07:00:00.000Z"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /time view/i }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/3 enabled recurring jobs/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 recurring Agents/i)).toBeInTheDocument();
+    expect(screen.getByText(/hard conflicts.*7/i)).toBeInTheDocument();
+    expect(screen.getByText(/crowded windows.*7/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/hard conflict/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/crowded window/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Plato nine")).toHaveLength(7);
+    expect(screen.queryByText("Renewal reminder")).not.toBeInTheDocument();
+    expect(screen.queryByText("Quarter-hour sync")).not.toBeInTheDocument();
+  });
+
+  it("switches between Time, Agents, and the complete job directory", () => {
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    render(
+      <CronDirectory
+        crons={cockpitCrons}
+        initialFilters={{ ...defaults, view: "time" }}
+        projectionFrom="2026-09-17T07:00:00.000Z"
+        sourceStatus="fresh"
+        sourceCollectedAt="2026-09-17T07:00:00.000Z"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Agents view/i }));
+    expect(screen.getByRole("heading", { name: /Agent recurring load/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "plato" }))
+      .toBeInTheDocument();
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "/dashboard/crons?view=agents",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /All jobs view/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(5);
+    expect(screen.getByRole("heading", { name: "Renewal reminder" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Quarter-hour sync" }))
+      .toBeInTheDocument();
   });
 
   it("shows filterable total, enabled, attention, and schedule-type statistics", () => {
@@ -198,7 +295,7 @@ describe("CronDirectory", () => {
     expect(replaceState).toHaveBeenLastCalledWith(
       null,
       "",
-      "/dashboard/crons?q=reminder&owner=plato&type=at&enabled=enabled&health=failed",
+      "/dashboard/crons?view=all&q=reminder&owner=plato&type=at&enabled=enabled&health=failed",
     );
   });
 
