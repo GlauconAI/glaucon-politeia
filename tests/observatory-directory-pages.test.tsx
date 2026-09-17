@@ -239,6 +239,7 @@ describe("Dashboard directory pages", () => {
     render(
       await CronsPage({
         searchParams: Promise.resolve({
+          view: "agents",
           q: "Daily",
           owner: "plato",
           type: "cron",
@@ -254,6 +255,10 @@ describe("Dashboard directory pages", () => {
       .toHaveValue("plato");
     expect(screen.getByRole("combobox", { name: /schedule type/i }))
       .toHaveValue("cron");
+    expect(screen.getByRole("button", { name: /Agents view/i }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: /Agent recurring load/i }))
+      .toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Daily refresh" }))
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to dashboard/i }))
