@@ -1,8 +1,8 @@
 # Dashboard Cron Operations Cockpit Design
 
-**Date:** 2026-09-17  
-**Project:** `plato/dashboard`  
-**Route:** `/dashboard/crons`  
+**Date:** 2026-09-17
+**Project:** `plato/dashboard`
+**Route:** `/dashboard/crons`
 **Status:** User-approved for implementation and production release
 
 ## Problem
@@ -49,7 +49,7 @@ The URL stores `view`, `owner`, `health`, and search/filter state so an operatio
 Only enabled recurring jobs participate in load diagnostics.
 
 - **Hard conflict:** two or more distinct jobs start in the same clock minute. Render red and show the job and Agent count.
-- **Crowded window:** two or more distinct jobs start within a rolling 15-minute window, excluding pairs already represented by a hard conflict. Render amber.
+- **Crowded window:** two or more distinct jobs start across at least two different clock minutes within a rolling 15-minute window. Render amber.
 - Hard-conflict rows can also sit inside one crowded window when nearby minutes add further load. The row remains red while the containing window is summarized in amber; overlapping crowded windows are merged so the same load cluster is counted once.
 - Conflict detection compares normalized UTC instants; display uses Vancouver local time.
 - Diagnostics describe scheduling proximity, not proven resource contention. Copy must say “schedule conflict” or “crowded window,” not “failure.”
@@ -111,7 +111,7 @@ All functions accept an explicit `from` instant. Tests never depend on wall-cloc
 
 ### Server/client boundary
 
-`app/dashboard/crons/page.tsx` derives `from` from the operations source `collected_at`, falling back to the request-time instant only when the source has no valid timestamp. It passes the explicit horizon to the client component.
+`app/dashboard/crons/page.tsx` derives `from` from the operations source `collected_at`, falling back to a collected Cron record when the source has no timestamp. It passes that explicit anchor to the client component.
 
 `CronDirectory` owns view/filter interaction and renders precomputed deterministic view models. Runtime state remains read-only Snapshot data.
 
