@@ -5845,6 +5845,309 @@ body {
   font-size: 13px;
 }
 
+.cron-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.cron-view-tabs button {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 7px 15px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cron-view-tabs button:hover,
+.cron-view-tabs button:focus-visible {
+  border-color: rgba(124, 58, 237, 0.58);
+  color: var(--strong);
+}
+
+.cron-view-tabs button[aria-pressed="true"] {
+  border-color: rgba(67, 211, 139, 0.55);
+  background: rgba(67, 211, 139, 0.1);
+  color: var(--success);
+}
+
+.cron-cockpit-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.cron-cockpit-stats > div {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  padding: 12px;
+}
+
+.cron-cockpit-stats strong {
+  color: var(--strong);
+  font-size: 22px;
+}
+
+.cron-cockpit-stats span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cron-cockpit-stats [data-risk="hard"] {
+  border-color: rgba(248, 113, 113, 0.52);
+  background: rgba(248, 113, 113, 0.09);
+}
+
+.cron-cockpit-stats [data-risk="crowded"] {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.cron-view-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+  margin-bottom: 13px;
+}
+
+.cron-view-heading h3 {
+  margin: 4px 0 0;
+  color: var(--strong);
+}
+
+.cron-view-heading > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cron-time-view,
+.cron-agent-view {
+  margin-top: 18px;
+}
+
+.cron-day-list,
+.cron-agent-list {
+  display: grid;
+  gap: 14px;
+}
+
+.cron-day,
+.cron-agent-list > section {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-muted);
+}
+
+.cron-day > header,
+.cron-agent-list > section > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 13px 15px;
+}
+
+.cron-day > header h4,
+.cron-agent-list h3 {
+  margin: 0;
+  color: var(--strong);
+}
+
+.cron-day > header span,
+.cron-agent-list header p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cron-day > ol,
+.cron-agent-list ol,
+.cron-time-jobs ul,
+.cron-crowded-summary ul,
+.cron-projection-issues ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cron-time-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  border-left: 3px solid rgba(100, 116, 139, 0.7);
+  border-bottom: 1px solid var(--border);
+  padding: 13px 15px;
+}
+
+.cron-time-row:last-child {
+  border-bottom: 0;
+}
+
+.cron-time-row[data-risk="hard"] {
+  border-left-color: #f87171;
+  background: rgba(248, 113, 113, 0.07);
+}
+
+.cron-time-row[data-risk="crowded"] {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.cron-time-row > time {
+  color: var(--strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.cron-time-jobs {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+.cron-risk-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cron-time-row[data-risk="hard"] .cron-risk-label {
+  color: #fca5a5;
+}
+
+.cron-time-row[data-risk="crowded"] .cron-risk-label {
+  color: #fbbf24;
+}
+
+.cron-time-jobs ul {
+  display: grid;
+  gap: 7px;
+}
+
+.cron-time-jobs li {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.3fr) minmax(160px, 0.8fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.cron-time-jobs li span,
+.cron-time-jobs li small,
+.cron-agent-list li span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.cron-time-jobs li strong,
+.cron-agent-list li h4 {
+  color: var(--strong);
+  overflow-wrap: anywhere;
+}
+
+.cron-agent-list li h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.cron-crowded-summary,
+.cron-projection-issues {
+  margin-top: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: 9px;
+  background: rgba(245, 158, 11, 0.05);
+  padding: 14px;
+}
+
+.cron-projection-issues {
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.cron-crowded-summary h4,
+.cron-projection-issues h4 {
+  margin: 0 0 10px;
+  color: var(--strong);
+}
+
+.cron-crowded-summary ul,
+.cron-projection-issues ul {
+  display: grid;
+  gap: 7px;
+}
+
+.cron-crowded-summary li,
+.cron-projection-issues li {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 1fr) minmax(150px, 0.6fr);
+  gap: 10px;
+  color: var(--muted);
+}
+
+.cron-agent-list > section > header dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.cron-agent-list header dl div {
+  min-width: 0;
+}
+
+.cron-agent-list header dt {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.cron-agent-list header dd {
+  margin: 2px 0 0;
+  color: var(--strong);
+  font-weight: 800;
+}
+
+.cron-agent-list ol > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 11px 15px;
+}
+
+.cron-agent-list ol > li:last-child {
+  border-bottom: 0;
+}
+
+.cron-agent-list ol > li > div {
+  display: grid;
+  gap: 3px;
+}
+
+.cron-agent-list time {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .dashboard-skill-category {
   display: grid;
   min-width: 0;
@@ -6091,6 +6394,37 @@ body {
   .dashboard-cron-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .cron-cockpit-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cron-view-heading,
+  .cron-day > header,
+  .cron-agent-list > section > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cron-time-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cron-time-jobs li,
+  .cron-crowded-summary li,
+  .cron-projection-issues li,
+  .cron-agent-list ol > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cron-agent-list > section > header dl {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cron-agent-list time {
+    text-align: left;
+  }
 }
 
 @media (max-width: 520px) {
@@ -6103,6 +6437,11 @@ body {
   }
 
   .dashboard-cron-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cron-cockpit-stats,
+  .cron-agent-list > section > header dl {
     grid-template-columns: minmax(0, 1fr);
   }
 }

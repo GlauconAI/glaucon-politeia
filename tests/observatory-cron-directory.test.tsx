@@ -154,7 +154,7 @@ describe("CronDirectory", () => {
     expect(screen.getByText(/crowded windows.*7/i)).toBeInTheDocument();
     expect(screen.getAllByText(/hard conflict/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/crowded window/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("Plato nine")).toBeInTheDocument();
+    expect(screen.getAllByText("Plato nine")).toHaveLength(7);
     expect(screen.queryByText("Renewal reminder")).not.toBeInTheDocument();
     expect(screen.queryByText("Quarter-hour sync")).not.toBeInTheDocument();
   });
