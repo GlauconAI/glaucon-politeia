@@ -121,6 +121,39 @@ describe("Cron operations model", () => {
     });
   });
 
+  it("keeps every crowded window bounded to fifteen minutes across continuous load", () => {
+    const model = buildCronOperations(
+      [
+        entry("at-zero", "plato", {}),
+        entry("at-ten", "giskard", {
+          scheduleValue: "10 9 * * *",
+          scheduleSummary: "Cron · 10 9 * * *",
+          nextRunAt: "2026-09-17T16:10:00.000Z",
+        }),
+        entry("at-twenty", "socrates", {
+          scheduleValue: "20 9 * * *",
+          scheduleSummary: "Cron · 20 9 * * *",
+          nextRunAt: "2026-09-17T16:20:00.000Z",
+        }),
+      ],
+      { from: FROM, horizonDays: 1 },
+    );
+
+    expect(model.crowdedWindows).toHaveLength(2);
+    expect(
+      model.crowdedWindows.every(
+        (group) =>
+          new Date(group.endsAt).getTime() - new Date(group.startsAt).getTime() <=
+          15 * 60 * 1000,
+      ),
+    ).toBe(true);
+    expect(model.crowdedWindows.map((group) => [group.startsAt, group.endsAt]))
+      .toEqual([
+        ["2026-09-17T16:00:00.000Z", "2026-09-17T16:10:00.000Z"],
+        ["2026-09-17T16:10:00.000Z", "2026-09-17T16:20:00.000Z"],
+      ]);
+  });
+
   it("groups recurring load by Agent and orders jobs by their next occurrence", () => {
     const model = buildCronOperations(
       [
