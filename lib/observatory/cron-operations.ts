@@ -276,42 +276,28 @@ function crowdedWindows(occurrences: CronOccurrence[]): CronRiskGroup[] {
     }))
     .sort((left, right) => left.timestamp - right.timestamp);
 
-  const raw: CronOccurrence[][] = [];
-  for (let start = 0; start < buckets.length; start += 1) {
+  const windows: CronOccurrence[][] = [];
+  let start = 0;
+  while (start < buckets.length) {
     const values: CronOccurrence[] = [];
-    let distinctMinutes = 0;
-    for (let end = start; end < buckets.length; end += 1) {
+    let end = start;
+    for (; end < buckets.length; end += 1) {
       if (buckets[end]!.timestamp - buckets[start]!.timestamp > CROWDED_WINDOW_MS) {
         break;
       }
-      distinctMinutes += 1;
       values.push(...buckets[end]!.occurrences);
     }
     if (
-      distinctMinutes >= 2 &&
+      end - start >= 2 &&
       new Set(values.map((candidate) => candidate.job.assetId)).size >= 2
     ) {
-      raw.push(values);
+      windows.push(values);
     }
+    const lastIncluded = end - 1;
+    start = lastIncluded > start ? lastIncluded : start + 1;
   }
 
-  const merged: CronOccurrence[][] = [];
-  for (const values of raw) {
-    const currentIds = new Set(values.map((candidate) => candidate.occurrenceId));
-    const existing = merged.find((candidate) =>
-      candidate.some((occurrenceValue) => currentIds.has(occurrenceValue.occurrenceId)),
-    );
-    if (!existing) {
-      merged.push([...values]);
-      continue;
-    }
-    const existingIds = new Set(existing.map((candidate) => candidate.occurrenceId));
-    for (const value of values) {
-      if (!existingIds.has(value.occurrenceId)) existing.push(value);
-    }
-  }
-
-  return merged
+  return windows
     .map((values) => riskGroup("crowded", values))
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt));
 }
