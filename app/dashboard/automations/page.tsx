@@ -95,6 +95,10 @@ export default async function AutomationsPage({
           <p className="eyebrow shell-path">402v /dashboard/automations</p>
           <h1>Automations Directory</h1>
           <p>&gt; inspect every collected Automation without changing Runtime state</p>
+          <p>
+            openclaw cron and openclaw automations address the same Gateway
+            scheduler records; Cron remains one schedule kind.
+          </p>
         </div>
         <Link className="operator-link" href="/dashboard">
           ← Back to Dashboard

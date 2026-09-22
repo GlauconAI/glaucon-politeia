@@ -253,6 +253,8 @@ describe("Dashboard directory pages", () => {
 
     expect(screen.getByRole("heading", { name: /Automations Directory/i }))
       .toBeInTheDocument();
+    expect(screen.getByText(/openclaw cron.*openclaw automations.*same Gateway scheduler records/i))
+      .toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: /search Automations/i }))
       .toHaveValue("Daily");
     expect(screen.getByRole("combobox", { name: /Automation owner/i }))

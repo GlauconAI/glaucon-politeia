@@ -210,6 +210,10 @@ describe("system asset command projections", () => {
               command: ["git", "status", "--porcelain"],
               match: "private-pattern",
             },
+            state: {
+              lastStatus: "success",
+              nextRunAtMs: Date.parse("2026-09-22T19:00:00.000Z"),
+            },
             payload: { message: "private prompt" },
             delivery: { to: "telegram:private-user" },
           },

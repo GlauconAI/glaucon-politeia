@@ -337,7 +337,9 @@ export function projectCronAssets(
           : []),
         { key: "last_status", value: lastStatus },
         ...(lastRunAt ? [{ key: "last_run_at", value: lastRunAt }] : []),
-        ...(nextRunAt ? [{ key: "next_run_at", value: nextRunAt }] : []),
+        ...(schedule.kind !== "stream" && nextRunAt
+          ? [{ key: "next_run_at", value: nextRunAt }]
+          : []),
         ...(consecutiveErrors !== undefined
           ? [{ key: "consecutive_errors", value: String(consecutiveErrors) }]
           : []),

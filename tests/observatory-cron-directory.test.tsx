@@ -399,6 +399,27 @@ describe("CronDirectory", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/source.*failed/i);
   });
 
+  it("fails closed when a reported timezone is invalid", () => {
+    render(
+      <CronDirectory
+        crons={[
+          {
+            ...crons[0]!,
+            timezone: "Not/A-Timezone",
+          },
+        ]}
+        initialFilters={defaults}
+        sourceStatus="fresh"
+        sourceCollectedAt={null}
+      />,
+    );
+
+    expect(screen.getByText("Last run").parentElement)
+      .toHaveTextContent("Not reported");
+    expect(screen.getByText("Next run", { selector: "dt" }).parentElement)
+      .toHaveTextContent("Not reported");
+  });
+
   it("renders an empty state separately", () => {
     render(
       <CronDirectory

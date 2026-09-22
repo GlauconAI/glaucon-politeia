@@ -80,7 +80,7 @@ function displayTimestamp(value: string | null, timezone?: string | null): strin
       timeZone: timezone ?? "UTC",
     }).format(date);
   } catch {
-    return date.toISOString();
+    return "Not reported";
   }
 }
 

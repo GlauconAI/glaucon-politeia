@@ -381,7 +381,7 @@ describe("ObservatoryOverview", () => {
           freshness: "fresh",
           health: "healthy",
           summary: "Cron schedule",
-          labels: [],
+          labels: [{ key: "enabled", value: "enabled" }],
         },
         {
           id: "cron:reminder",
@@ -392,9 +392,9 @@ describe("ObservatoryOverview", () => {
           source: "openclaw/cron-list",
           collected_at: "2026-08-31T18:00:00.000Z",
           freshness: "fresh",
-          health: "healthy",
+          health: "failed",
           summary: "One-time schedule",
-          labels: [],
+          labels: [{ key: "enabled", value: "disabled" }],
         },
       ],
       core_endpoint_ids: [],
@@ -406,7 +406,7 @@ describe("ObservatoryOverview", () => {
 
     const summary = screen.getByRole("region", { name: /system summary/i });
     expect(within(summary).getByText("Automations").parentElement)
-      .toHaveTextContent("2");
+      .toHaveTextContent("2 total · 1 enabled · 1 needs attention");
     expect(
       within(summary).getByRole("link", { name: /view Automations/i }),
     ).toHaveAttribute("href", "/dashboard/automations");
