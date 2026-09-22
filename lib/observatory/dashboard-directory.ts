@@ -380,7 +380,12 @@ export function buildSkillDirectory(
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export type DashboardCronScheduleType = "cron" | "every" | "at" | "unknown";
+export type DashboardCronScheduleType =
+  | "cron"
+  | "every"
+  | "at"
+  | "stream"
+  | "unknown";
 export type DashboardCronRuntimeTarget =
   | "isolated"
   | "main"
@@ -408,7 +413,10 @@ export type DashboardCronEntry = {
 };
 
 function cronScheduleType(value: string | undefined): DashboardCronScheduleType {
-  return value === "cron" || value === "every" || value === "at"
+  return value === "cron" ||
+    value === "every" ||
+    value === "at" ||
+    value === "stream"
     ? value
     : "unknown";
 }

@@ -194,6 +194,19 @@ export function ObservatoryOverview({
       : items;
   const summary = state.snapshot.summary;
   const gatewayOnline = summary.gateway_running && summary.gateway_reachable;
+  const automations =
+    "assets" in state.snapshot
+      ? buildCronDirectory(state.snapshot.assets)
+      : [];
+  const enabledAutomationCount = automations.filter(
+    (automation) => automation.enabled === true,
+  ).length;
+  const automationAttentionCount = automations.filter(
+    (automation) =>
+      automation.health === "failed" ||
+      automation.health === "degraded" ||
+      (automation.consecutiveErrors ?? 0) > 0,
+  ).length;
   const summaryItems: ReadonlyArray<{
     label: string;
     value: string | number;
@@ -210,9 +223,9 @@ export function ObservatoryOverview({
           value: buildSkillDirectory(state.snapshot.assets).length,
           href: "/dashboard/skills",
         }, {
-          label: "Cron Jobs",
-          value: buildCronDirectory(state.snapshot.assets).length,
-          href: "/dashboard/crons",
+          label: "Automations",
+          value: `${automations.length} total · ${enabledAutomationCount} enabled · ${automationAttentionCount} needs attention`,
+          href: "/dashboard/automations",
         }]
       : []),
     {

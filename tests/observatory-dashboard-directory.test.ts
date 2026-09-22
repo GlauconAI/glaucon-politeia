@@ -205,6 +205,38 @@ describe("Dashboard directory view models", () => {
     ]);
   });
 
+  it("preserves stream as a safe event-driven Automation type", () => {
+    const assets: ObservatoryAsset[] = [
+      {
+        id: "cron:stream-job",
+        kind: "cron",
+        name: "Repository watcher",
+        owner: "plato",
+        authority: "observed",
+        source: "openclaw/cron-list",
+        collected_at: "2026-09-22T17:00:00.000Z",
+        freshness: "fresh",
+        health: "healthy",
+        summary: "Event-driven stream",
+        labels: [
+          { key: "schedule_type", value: "stream" },
+          { key: "enabled", value: "enabled" },
+          { key: "runtime_target", value: "isolated" },
+        ],
+      },
+    ];
+
+    expect(buildCronDirectory(assets)).toEqual([
+      expect.objectContaining({
+        id: "stream-job",
+        scheduleType: "stream",
+        scheduleValue: null,
+        scheduleSummary: "Event-driven stream",
+        nextRunAt: null,
+      }),
+    ]);
+  });
+
   it("flattens projects and attaches exact repository matches with latest activity", () => {
     expect(buildProjectDirectory(registry, repositories)).toEqual([
       {

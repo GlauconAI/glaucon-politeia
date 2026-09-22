@@ -364,7 +364,7 @@ describe("ObservatoryOverview", () => {
     ).toHaveAttribute("href", "/dashboard/skills");
   });
 
-  it("adds a Cron Jobs index card with the full collected job count", () => {
+  it("adds an Automations index card with the full collected job count", () => {
     const v2 = {
       ...snapshot,
       schema_version: "2.0.0",
@@ -381,7 +381,7 @@ describe("ObservatoryOverview", () => {
           freshness: "fresh",
           health: "healthy",
           summary: "Cron schedule",
-          labels: [],
+          labels: [{ key: "enabled", value: "enabled" }],
         },
         {
           id: "cron:reminder",
@@ -392,9 +392,9 @@ describe("ObservatoryOverview", () => {
           source: "openclaw/cron-list",
           collected_at: "2026-08-31T18:00:00.000Z",
           freshness: "fresh",
-          health: "healthy",
+          health: "failed",
           summary: "One-time schedule",
-          labels: [],
+          labels: [{ key: "enabled", value: "disabled" }],
         },
       ],
       core_endpoint_ids: [],
@@ -405,11 +405,11 @@ describe("ObservatoryOverview", () => {
     render(<ObservatoryOverview state={readyState(v2)} />);
 
     const summary = screen.getByRole("region", { name: /system summary/i });
-    expect(within(summary).getByText("Cron Jobs").parentElement)
-      .toHaveTextContent("2");
+    expect(within(summary).getByText("Automations").parentElement)
+      .toHaveTextContent("2 total · 1 enabled · 1 needs attention");
     expect(
-      within(summary).getByRole("link", { name: /view Cron Jobs/i }),
-    ).toHaveAttribute("href", "/dashboard/crons");
+      within(summary).getByRole("link", { name: /view Automations/i }),
+    ).toHaveAttribute("href", "/dashboard/automations");
   });
 
   it("exposes stable anchors for the homepage section index", () => {
