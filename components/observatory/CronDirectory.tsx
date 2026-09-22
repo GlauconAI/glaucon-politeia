@@ -26,6 +26,7 @@ const scheduleLabels: Record<DashboardCronScheduleType, string> = {
   cron: "Calendar expression",
   every: "Fixed interval",
   at: "One-time task",
+  stream: "Event-driven",
   unknown: "Not reported",
 };
 
@@ -50,7 +51,7 @@ function updateUrl(filters: CronDirectoryFilters) {
   window.history.replaceState(
     null,
     "",
-    `/dashboard/crons${query ? `?${query}` : ""}`,
+    `/dashboard/automations${query ? `?${query}` : ""}`,
   );
 }
 
@@ -162,10 +163,10 @@ function sortCrons(
 
 function FullCronDirectory({ crons }: { crons: DashboardCronEntry[] }) {
   if (!crons.length) {
-    return <p className="empty-text">No Cron Jobs match the current filters.</p>;
+    return <p className="empty-text">No Automations match the current filters.</p>;
   }
   return (
-    <ul className="dashboard-directory-list dashboard-cron-list" aria-label="Cron Job directory results">
+    <ul className="dashboard-directory-list dashboard-cron-list" aria-label="Automation directory results">
       {crons.map((cron) => (
         <li key={cron.assetId} data-health={cron.health}>
           <article>
@@ -248,21 +249,21 @@ export function CronDirectory({
   const attentionCount = crons.filter(needsAttention).length;
   const recurringAttentionCount = model.recurringJobs.filter(needsAttention).length;
   const scheduleCounts = Object.fromEntries(
-    (["cron", "every", "at"] as const).map((type) => [
+    (["cron", "every", "at", "stream"] as const).map((type) => [
       type,
       crons.filter((cron) => cron.scheduleType === type).length,
     ]),
-  ) as Record<"cron" | "every" | "at", number>;
+  ) as Record<"cron" | "every" | "at" | "stream", number>;
 
   return (
     <section className="dashboard-directory" aria-labelledby="cron-directory-heading">
       <div className="dashboard-directory-heading">
         <div>
           <p className="eyebrow">Read-only runtime schedule inventory</p>
-          <h2 id="cron-directory-heading">Cron Operations Cockpit</h2>
+          <h2 id="cron-directory-heading">Automations Operations Cockpit</h2>
         </div>
-        <div className="dashboard-directory-counts" aria-label="Cron Job counts">
-          <span>{crons.length} Cron Jobs</span>
+        <div className="dashboard-directory-counts" aria-label="Automation counts">
+          <span>{crons.length} Automations</span>
           <span>{enabledCount} enabled</span>
           <span>{attentionCount} needs attention</span>
           <span>{filtered.length} matched</span>
@@ -271,23 +272,23 @@ export function CronDirectory({
 
       {sourceStatus !== "fresh" ? (
         <p className="dashboard-cron-source" role="status" data-status={sourceStatus}>
-          Cron source status: {sourceStatus}. The directory is showing the latest
+          Automation source status: {sourceStatus}. The directory is showing the latest
           validated Snapshot
           {sourceCollectedAt ? ` from ${displayTimestamp(sourceCollectedAt)}` : ""}.
         </p>
       ) : null}
 
-      <div className="cron-view-tabs" aria-label="Cron directory view">
+      <div className="cron-view-tabs" aria-label="Automation directory view">
         <button type="button" aria-label="Time view" aria-pressed={filters.view === "time"} onClick={() => setFilter("view", "time")}>Time</button>
         <button type="button" aria-label="Agents view" aria-pressed={filters.view === "agents"} onClick={() => setFilter("view", "agents")}>Agents</button>
-        <button type="button" aria-label="All jobs view" aria-pressed={filters.view === "all"} onClick={() => setFilter("view", "all")}>All jobs</button>
+        <button type="button" aria-label="All Automations view" aria-pressed={filters.view === "all"} onClick={() => setFilter("view", "all")}>All Automations</button>
       </div>
 
       {filters.view === "all" ? (
-        <div className="dashboard-cron-stats" aria-label="Cron directory statistics">
+        <div className="dashboard-cron-stats" aria-label="Automation directory statistics">
           <button
             type="button"
-            aria-label={`All Cron Jobs, ${crons.length}`}
+            aria-label={`All Automations, ${crons.length}`}
             aria-pressed={
               filters.q === "" && filters.owner === "all" && filters.type === "all" &&
               filters.enabled === "all" && filters.health === "all"
@@ -304,15 +305,15 @@ export function CronDirectory({
               }))
             }
           >
-            <strong>All Cron Jobs</strong><span>{crons.length} total</span>
+            <strong>All Automations</strong><span>{crons.length} total</span>
           </button>
-          <button type="button" aria-label={`Enabled Cron Jobs, ${enabledCount}`} aria-pressed={filters.enabled === "enabled"} onClick={() => setFilter("enabled", filters.enabled === "enabled" ? "all" : "enabled")}>
-            <strong>Enabled Cron Jobs</strong><span>{enabledCount} enabled</span>
+          <button type="button" aria-label={`Enabled Automations, ${enabledCount}`} aria-pressed={filters.enabled === "enabled"} onClick={() => setFilter("enabled", filters.enabled === "enabled" ? "all" : "enabled")}>
+            <strong>Enabled Automations</strong><span>{enabledCount} enabled</span>
           </button>
           <button type="button" aria-label={`Needs attention, ${attentionCount}`} aria-pressed={filters.health === "attention"} onClick={() => setFilter("health", filters.health === "attention" ? "all" : "attention")}>
             <strong>Needs attention</strong><span>{attentionCount} Job{attentionCount === 1 ? "" : "s"}</span>
           </button>
-          {(["cron", "every", "at"] as const).map((type) => (
+          {(["cron", "every", "at", "stream"] as const).map((type) => (
             <button key={type} type="button" aria-pressed={filters.type === type} onClick={() => setFilter("type", filters.type === type ? "all" : type)}>
               <strong>{scheduleLabels[type]}</strong>
               <span>{scheduleCounts[type]} Job{scheduleCounts[type] === 1 ? "" : "s"}</span>
@@ -332,11 +333,11 @@ export function CronDirectory({
 
       <div className="dashboard-directory-controls">
         <label className="dashboard-directory-search">
-          <span>Search Cron Jobs</span>
+          <span>Search Automations</span>
           <input type="search" value={filters.q} onChange={(event) => setFilter("q", event.target.value)} placeholder="Name, Job ID, Owner, schedule, status…" />
         </label>
         <label>
-          <span>Cron owner</span>
+          <span>Automation owner</span>
           <select value={filters.owner} onChange={(event) => setFilter("owner", event.target.value)}>
             <option value="all">All owners</option>
             {options.owners.map((owner) => <option key={owner}>{owner}</option>)}
@@ -349,6 +350,7 @@ export function CronDirectory({
             <option value="cron">Calendar expression</option>
             <option value="every">Fixed interval</option>
             {filters.view === "all" ? <option value="at">One-time task</option> : null}
+            {filters.view === "all" ? <option value="stream">Event-driven</option> : null}
             {filters.view === "all" ? <option value="unknown">Not reported</option> : null}
           </select>
         </label>
@@ -369,7 +371,7 @@ export function CronDirectory({
         </label>
         {filters.view === "all" ? (
           <label>
-            <span>Sort Cron Jobs</span>
+            <span>Sort Automations</span>
             <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value as CronDirectoryFilters["sort"])}>
               <option value="next">Next run</option><option value="name">Name</option><option value="owner">Owner</option><option value="health">Health</option>
             </select>

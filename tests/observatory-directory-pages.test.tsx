@@ -48,6 +48,9 @@ import SkillsPage, {
 import CronsPage, {
   dynamic as cronsDynamic,
 } from "@/app/dashboard/crons/page";
+import AutomationsPage, {
+  dynamic as automationsDynamic,
+} from "@/app/dashboard/automations/page";
 
 const snapshot = {
   registry: {
@@ -138,6 +141,7 @@ describe("Dashboard directory pages", () => {
     expect(projectsDynamic).toBe("force-dynamic");
     expect(skillsDynamic).toBe("force-dynamic");
     expect(cronsDynamic).toBe("force-dynamic");
+    expect(automationsDynamic).toBe("force-dynamic");
   });
 
   it.each([
@@ -152,9 +156,9 @@ describe("Dashboard directory pages", () => {
       "/auth?redirectTo=/dashboard/skills",
     ],
     [
-      "Cron Jobs",
-      () => CronsPage({ searchParams: Promise.resolve({}) }),
-      "/auth?redirectTo=/dashboard/crons",
+      "Automations",
+      () => AutomationsPage({ searchParams: Promise.resolve({}) }),
+      "/auth?redirectTo=/dashboard/automations",
     ],
   ])("redirects anonymous visitors before loading %s", async (_, renderPage, target) => {
     mocks.getCurrentAdmin.mockResolvedValue(null);
@@ -235,9 +239,9 @@ describe("Dashboard directory pages", () => {
       .toBeInTheDocument();
   });
 
-  it("renders Cron Jobs with URL-derived filters and source status", async () => {
+  it("renders Automations with URL-derived filters and source status", async () => {
     render(
-      await CronsPage({
+      await AutomationsPage({
         searchParams: Promise.resolve({
           view: "agents",
           q: "Daily",
@@ -247,11 +251,11 @@ describe("Dashboard directory pages", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: /Cron Jobs Directory/i }))
+    expect(screen.getByRole("heading", { name: /Automations Directory/i }))
       .toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: /search Cron Jobs/i }))
+    expect(screen.getByRole("searchbox", { name: /search Automations/i }))
       .toHaveValue("Daily");
-    expect(screen.getByRole("combobox", { name: /Cron owner/i }))
+    expect(screen.getByRole("combobox", { name: /Automation owner/i }))
       .toHaveValue("plato");
     expect(screen.getByRole("combobox", { name: /schedule type/i }))
       .toHaveValue("cron");
@@ -263,6 +267,20 @@ describe("Dashboard directory pages", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to dashboard/i }))
       .toHaveAttribute("href", "/dashboard");
+  });
+
+  it("redirects the legacy Cron route with query parameters intact", async () => {
+    await expect(
+      CronsPage({
+        searchParams: Promise.resolve({
+          view: "agents",
+          owner: "plato",
+          type: ["cron", "every"],
+        }),
+      }),
+    ).rejects.toThrow(
+      "redirect:/dashboard/automations?view=agents&owner=plato&type=cron&type=every",
+    );
   });
 
   it("renders safe snapshot failure states instead of directory data", async () => {

@@ -68,6 +68,25 @@ const crons: DashboardCronEntry[] = [
     consecutiveErrors: 2,
     runtimeTarget: "session-bound",
   },
+  {
+    assetId: "cron:stream-job",
+    id: "stream-job",
+    name: "Repository watcher",
+    owner: "plato",
+    enabled: true,
+    health: "healthy",
+    freshness: "fresh",
+    collectedAt: "2026-08-31T18:10:00.000Z",
+    scheduleType: "stream",
+    scheduleValue: null,
+    scheduleSummary: "Event-driven stream",
+    timezone: null,
+    lastStatus: "success",
+    lastRunAt: "2026-08-31T18:00:00.000Z",
+    nextRunAt: null,
+    consecutiveErrors: 0,
+    runtimeTarget: "isolated",
+  },
 ];
 
 const defaults: CronDirectoryFilters = {
@@ -116,6 +135,7 @@ const cockpitCrons: DashboardCronEntry[] = [
   },
   crons[1]!,
   crons[2]!,
+  crons[3]!,
 ];
 
 afterEach(() => {
@@ -179,11 +199,11 @@ describe("CronDirectory", () => {
     expect(replaceState).toHaveBeenLastCalledWith(
       null,
       "",
-      "/dashboard/crons?view=agents",
+      "/dashboard/automations?view=agents",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /All jobs view/i }));
-    expect(screen.getAllByRole("article")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: /All Automations view/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(6);
     expect(screen.getByRole("heading", { name: "Renewal reminder" }))
       .toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Quarter-hour sync" }))
@@ -200,9 +220,9 @@ describe("CronDirectory", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /all Cron Jobs.*3/i }))
+    expect(screen.getByRole("button", { name: /all Automations.*4/i }))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /enabled Cron Jobs.*2/i }))
+    expect(screen.getByRole("button", { name: /enabled Automations.*3/i }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /needs attention.*1/i }))
       .toBeInTheDocument();
@@ -211,6 +231,8 @@ describe("CronDirectory", () => {
     expect(screen.getByRole("button", { name: /fixed interval.*1/i }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /one-time task.*1/i }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /event-driven.*1/i }))
       .toBeInTheDocument();
   });
 
@@ -224,8 +246,8 @@ describe("CronDirectory", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /enabled Cron Jobs.*2/i }));
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: /enabled Automations.*3/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.queryByRole("heading", { name: "Quarter-hour sync" }))
       .not.toBeInTheDocument();
 
@@ -234,11 +256,11 @@ describe("CronDirectory", () => {
     expect(screen.getByRole("heading", { name: "Renewal reminder" }))
       .toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /all Cron Jobs.*3/i }));
-    expect(screen.getAllByRole("article")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: /all Automations.*4/i }));
+    expect(screen.getAllByRole("article")).toHaveLength(4);
   });
 
-  it("clears search and Owner filters when resetting to all Cron Jobs", () => {
+  it("clears search and Owner filters when resetting to all Automations", () => {
     render(
       <CronDirectory
         crons={crons}
@@ -248,16 +270,16 @@ describe("CronDirectory", () => {
       />,
     );
 
-    const reset = screen.getByRole("button", { name: /all Cron Jobs.*3/i });
+    const reset = screen.getByRole("button", { name: /all Automations.*4/i });
     expect(reset).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText(/No Cron Jobs match/i)).toBeInTheDocument();
+    expect(screen.getByText(/No Automations match/i)).toBeInTheDocument();
 
     fireEvent.click(reset);
 
-    expect(screen.getAllByRole("article")).toHaveLength(3);
-    expect(screen.getByRole("searchbox", { name: /search Cron Jobs/i }))
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getByRole("searchbox", { name: /search Automations/i }))
       .toHaveValue("");
-    expect(screen.getByRole("combobox", { name: /Cron owner/i }))
+    expect(screen.getByRole("combobox", { name: /Automation owner/i }))
       .toHaveValue("all");
   });
 
@@ -272,10 +294,10 @@ describe("CronDirectory", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("searchbox", { name: /search Cron Jobs/i }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: /search Automations/i }), {
       target: { value: "reminder" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: /Cron owner/i }), {
+    fireEvent.change(screen.getByRole("combobox", { name: /Automation owner/i }), {
       target: { value: "plato" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: /schedule type/i }), {
@@ -295,7 +317,7 @@ describe("CronDirectory", () => {
     expect(replaceState).toHaveBeenLastCalledWith(
       null,
       "",
-      "/dashboard/crons?view=all&q=reminder&owner=plato&type=at&enabled=enabled&health=failed",
+      "/dashboard/automations?view=all&q=reminder&owner=plato&type=at&enabled=enabled&health=failed",
     );
   });
 
@@ -319,10 +341,10 @@ describe("CronDirectory", () => {
   });
 
   it.each([
-    ["next", ["Daily refresh", "Renewal reminder", "Quarter-hour sync"]],
-    ["name", ["Daily refresh", "Quarter-hour sync", "Renewal reminder"]],
-    ["owner", ["Daily refresh", "Renewal reminder", "Quarter-hour sync"]],
-    ["health", ["Renewal reminder", "Quarter-hour sync", "Daily refresh"]],
+    ["next", ["Daily refresh", "Renewal reminder", "Quarter-hour sync", "Repository watcher"]],
+    ["name", ["Daily refresh", "Quarter-hour sync", "Renewal reminder", "Repository watcher"]],
+    ["owner", ["Daily refresh", "Renewal reminder", "Repository watcher", "Quarter-hour sync"]],
+    ["health", ["Renewal reminder", "Quarter-hour sync", "Daily refresh", "Repository watcher"]],
   ] as const)("sorts by %s", (sort, expected) => {
     render(
       <CronDirectory
@@ -387,6 +409,6 @@ describe("CronDirectory", () => {
       />,
     );
 
-    expect(screen.getByText(/No Cron Jobs match/i)).toBeInTheDocument();
+    expect(screen.getByText(/No Automations match/i)).toBeInTheDocument();
   });
 });

@@ -364,7 +364,7 @@ describe("ObservatoryOverview", () => {
     ).toHaveAttribute("href", "/dashboard/skills");
   });
 
-  it("adds a Cron Jobs index card with the full collected job count", () => {
+  it("adds an Automations index card with the full collected job count", () => {
     const v2 = {
       ...snapshot,
       schema_version: "2.0.0",
@@ -405,11 +405,11 @@ describe("ObservatoryOverview", () => {
     render(<ObservatoryOverview state={readyState(v2)} />);
 
     const summary = screen.getByRole("region", { name: /system summary/i });
-    expect(within(summary).getByText("Cron Jobs").parentElement)
+    expect(within(summary).getByText("Automations").parentElement)
       .toHaveTextContent("2");
     expect(
-      within(summary).getByRole("link", { name: /view Cron Jobs/i }),
-    ).toHaveAttribute("href", "/dashboard/crons");
+      within(summary).getByRole("link", { name: /view Automations/i }),
+    ).toHaveAttribute("href", "/dashboard/automations");
   });
 
   it("exposes stable anchors for the homepage section index", () => {

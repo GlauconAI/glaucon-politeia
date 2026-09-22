@@ -49,12 +49,12 @@ afterEach(() => {
 });
 
 describe("DashboardSectionNav", () => {
-  it("links the dedicated Cron Jobs directory from the Dashboard route bar", () => {
+  it("links the Automations directory from the Dashboard route bar", () => {
     render(<DashboardRouteNav />);
 
-    expect(screen.getByRole("link", { name: "Cron Jobs" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Automations" })).toHaveAttribute(
       "href",
-      "/dashboard/crons",
+      "/dashboard/automations",
     );
   });
 

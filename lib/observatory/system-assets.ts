@@ -267,6 +267,9 @@ function cronScheduleSummary(schedule: UnknownRecord | undefined): {
       ...(at ? { value: { key: "schedule_at", value: at } } : {}),
     };
   }
+  if (kind === "stream") {
+    return { kind, summary: "Event-driven stream" };
+  }
   return { kind: "unknown", summary: "Schedule unknown" };
 }
 

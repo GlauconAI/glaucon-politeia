@@ -210,9 +210,9 @@ export function ObservatoryOverview({
           value: buildSkillDirectory(state.snapshot.assets).length,
           href: "/dashboard/skills",
         }, {
-          label: "Cron Jobs",
+          label: "Automations",
           value: buildCronDirectory(state.snapshot.assets).length,
-          href: "/dashboard/crons",
+          href: "/dashboard/automations",
         }]
       : []),
     {

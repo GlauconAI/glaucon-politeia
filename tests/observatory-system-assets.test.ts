@@ -196,6 +196,46 @@ describe("system asset command projections", () => {
       });
   });
 
+  it("projects stream Automations as event-driven without leaking command data", () => {
+    const result = projectCronAssets(
+      {
+        jobs: [
+          {
+            id: "stream-job",
+            name: "Repository watcher",
+            agentId: "plato",
+            enabled: true,
+            schedule: {
+              kind: "stream",
+              command: ["git", "status", "--porcelain"],
+              match: "private-pattern",
+            },
+            payload: { message: "private prompt" },
+            delivery: { to: "telegram:private-user" },
+          },
+        ],
+      },
+      collectedAt,
+    );
+
+    expect(result.assets[0]).toMatchObject({
+      id: "cron:stream-job",
+      summary: "Event-driven stream",
+      labels: expect.arrayContaining([
+        { key: "schedule_type", value: "stream" },
+        { key: "enabled", value: "enabled" },
+      ]),
+    });
+    expect(result.assets[0]?.labels).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "next_run_at" }),
+      ]),
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /git|porcelain|private-pattern|private prompt|telegram:private-user|command|match|payload|delivery/u,
+    );
+  });
+
   it("keeps malformed Cron state unknown and drops invalid schedule and timestamp values", () => {
     const result = projectCronAssets(
       {
