@@ -139,4 +139,3 @@ smoke checks on the canonical route before production release.
 This is a read-only Dashboard presentation and compatibility change. It does
 not edit, enable, disable, run, reschedule, or delete any OpenClaw Automation.
 It does not change the Gateway scheduler or the P7 Usage Guardian Work.
-
