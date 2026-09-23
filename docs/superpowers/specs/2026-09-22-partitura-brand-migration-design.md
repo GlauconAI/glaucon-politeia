@@ -30,8 +30,10 @@ Do not introduce a logo, new color system, splash page, route migration, data mi
 
 The canonical visible lockup is:
 
-> **PARTITURA**  
-> System Dashboard  
+> **PARTITURA**
+>
+> System Dashboard
+>
 > *The score for a society of minds.*
 
 The main `/dashboard` hero should render this hierarchy in the existing terminal-inspired visual language:
