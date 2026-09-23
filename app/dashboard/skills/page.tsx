@@ -79,7 +79,7 @@ export default async function SkillsPage({
           <p>&gt; browse unique Skills and their Agent-visible instances</p>
         </div>
         <Link className="operator-link" href="/dashboard">
-          ← Back to Dashboard
+          ← Back to Partitura
         </Link>
       </header>
       {state.status === "ready" ? (

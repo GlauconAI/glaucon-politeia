@@ -32,7 +32,7 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
           {canPublish ? (
             <>
               <Link href="/dashboard" className="operator-link">
-                Dashboard
+                Partitura
               </Link>
               <Link href="/orchestrator" className="operator-link">
                 Orchestrator

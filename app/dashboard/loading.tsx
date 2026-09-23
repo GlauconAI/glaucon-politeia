@@ -7,7 +7,7 @@ export default function DashboardLoading() {
       aria-live="polite"
     >
       <p className="eyebrow shell-path">402v /dashboard</p>
-      <h1>Loading dashboard data…</h1>
+      <h1>Loading Partitura data…</h1>
       <div className="dashboard-loading-grid" aria-hidden="true">
         <span />
         <span />

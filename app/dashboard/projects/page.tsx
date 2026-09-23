@@ -114,7 +114,7 @@ export default async function ProjectsPage({
           <p>&gt; scan the canonical Project registry without the long page</p>
         </div>
         <Link className="operator-link" href="/dashboard">
-          ← Back to Dashboard
+          ← Back to Partitura
         </Link>
       </header>
       {state.status === "ready" ? (
