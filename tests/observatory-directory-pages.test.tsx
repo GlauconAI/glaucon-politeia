@@ -185,7 +185,7 @@ describe("Dashboard directory pages", () => {
       .toBeInTheDocument();
     expect(screen.getByText(/project execution data unavailable/i))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to dashboard/i }))
+    expect(screen.getByRole("link", { name: /back to partitura/i }))
       .toHaveAttribute("href", "/dashboard");
   });
 
@@ -237,6 +237,8 @@ describe("Dashboard directory pages", () => {
       .toHaveValue("shared-custom");
     expect(screen.getByRole("heading", { name: "weather" }))
       .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to partitura/i }))
+      .toHaveAttribute("href", "/dashboard");
   });
 
   it("renders Automations with URL-derived filters and source status", async () => {
@@ -267,7 +269,7 @@ describe("Dashboard directory pages", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Daily refresh" }))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to dashboard/i }))
+    expect(screen.getByRole("link", { name: /back to partitura/i }))
       .toHaveAttribute("href", "/dashboard");
   });
 

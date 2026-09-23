@@ -19,7 +19,7 @@ vi.mock("@/lib/observatory/admin-auth", () => ({
   getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
 }));
 
-import DashboardLayout from "@/app/dashboard/layout";
+import DashboardLayout, { metadata } from "@/app/dashboard/layout";
 import DashboardLoading from "@/app/dashboard/loading";
 
 describe("Dashboard shared layout", () => {
@@ -32,13 +32,16 @@ describe("Dashboard shared layout", () => {
     render(await DashboardLayout({ children: <p>private content</p> }));
 
     const navigation = screen.getByRole("navigation", {
-      name: /dashboard routes/i,
+      name: /partitura routes/i,
     });
     expect(navigation).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Partitura" })).toHaveAttribute(
       "href",
       "/dashboard",
     );
+    expect(
+      screen.queryByRole("link", { name: "Dashboard" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
       "/dashboard/projects",
@@ -55,6 +58,11 @@ describe("Dashboard shared layout", () => {
     render(<DashboardLoading />);
 
     expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByText(/loading dashboard data/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading partitura data/i)).toBeInTheDocument();
+  });
+
+  it("publishes the Partitura browser metadata", () => {
+    expect(metadata.title).toBe("Partitura — System Dashboard");
+    expect(metadata.description).toBe("The score for a society of minds.");
   });
 });
