@@ -123,7 +123,7 @@ docs/project/snapshots/2026-05-16-production-snapshot.md
   absolute paths, raw remotes, commit messages, authors, email addresses,
   diffs, or status filenames. Archive state remains `unknown` until a trusted
   enrichment source is separately approved.
-- Concerto — Work & Collaboration System is Production Accepted: Quick Capture feeds an
+- Concerto — Work Tracker is Production Accepted: Quick Capture feeds an
   admin-only nine-state Board and item detail surface. Server-authoritative
   RPCs enforce allowed transitions, the Ready Gate, optimistic versions,
   evidence lifecycle, and append-only history. The production migration,

@@ -1,6 +1,6 @@
 # Concerto Release Channel
 
-Concerto — Work & Collaboration System retains the `/work-tracker` route and
+Concerto — Work Tracker retains the `/work-tracker` route and
 the existing `work-tracker-*` technical release identifiers for compatibility.
 
 ## Local development gate

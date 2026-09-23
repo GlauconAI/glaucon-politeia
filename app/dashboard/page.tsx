@@ -62,7 +62,7 @@ export default async function DashboardPage() {
         <div>
           <p className="eyebrow shell-path">402v /dashboard</p>
           <h1>Partitura</h1>
-          <p className="partitura-product-subtitle">System Dashboard</p>
+          <p className="partitura-product-subtitle">AI System Handbook</p>
           <p className="partitura-product-slogan">
             The score for a society of minds.
           </p>
