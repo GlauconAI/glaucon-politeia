@@ -20,6 +20,8 @@ describe("ProjectControlPortfolio", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "last-known-good Project Control facts",
     );
+    expect(screen.getByText("Maestro authority")).toBeInTheDocument();
+    expect(screen.queryByText("Orchestrator authority")).not.toBeInTheDocument();
     expect(screen.getByText("stale")).toBeInTheDocument();
     expect(screen.getByText("Registry match unavailable")).toBeInTheDocument();
     expect(screen.getByText("Unmatched Project")).toBeInTheDocument();

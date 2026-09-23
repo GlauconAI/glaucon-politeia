@@ -65,7 +65,7 @@ export function OrchestratorArtifactFrame() {
       ref={frameRef}
       className="orchestrator-artifact-frame"
       src="/orchestrator/artifact"
-      title="Orchestrator control surface"
+      title="Maestro control surface"
       scrolling={synchronized ? "no" : "auto"}
       data-height-synchronized={String(synchronized)}
       style={synchronized ? { height: frameHeight } : undefined}

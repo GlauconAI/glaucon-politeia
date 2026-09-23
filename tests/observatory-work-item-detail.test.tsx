@@ -136,7 +136,7 @@ describe("WorkItemDetail", () => {
     expect(screen.getByLabelText(/project control binding/i)).toHaveTextContent(
       "Coordinate interaction slice",
     );
-    expect(screen.getByText(/parent Stage and Gate remain Orchestrator-owned/i)).toBeInTheDocument();
+    expect(screen.getByText(/parent Stage and Gate remain Maestro-owned/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^project$/i)).toHaveValue("plato/dashboard");
     expect(screen.queryByLabelText(/project reference/i)).not.toBeInTheDocument();
 

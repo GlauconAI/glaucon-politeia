@@ -475,7 +475,7 @@ export function WorkItemDetail({
             </select>
             <small id="project-control-binding-help">
               {projectControls
-                ? "A Work Item may update only its Work Package workflow; parent Stage and Gate remain Orchestrator-owned."
+                ? "A Work Item may update only its Work Package workflow; parent Stage and Gate remain Maestro-owned."
                 : "Project Control source unavailable. Existing binding is preserved unless explicitly cleared."}
               {bindingStatus ? ` Current status: ${bindingStatus.status.replaceAll("_", " ")}.` : ""}
             </small>

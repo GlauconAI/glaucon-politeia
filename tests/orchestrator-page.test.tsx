@@ -14,7 +14,7 @@ vi.mock("@/lib/observatory/admin-auth", () => ({
   getCurrentObservatoryAdmin: mocks.getCurrentAdmin,
 }));
 
-import OrchestratorPage, { dynamic } from "@/app/orchestrator/page";
+import OrchestratorPage, { dynamic, metadata } from "@/app/orchestrator/page";
 
 describe("OrchestratorPage", () => {
   beforeEach(() => {
@@ -43,24 +43,26 @@ describe("OrchestratorPage", () => {
   it("renders the shared operator hero around the isolated artifact", async () => {
     render(await OrchestratorPage());
 
+    expect(metadata.title).toBe("Maestro — Multi-Agent Orchestrator");
     expect(
       screen.getByRole("heading", {
-        name: "Openclaw Orchestrator｜Multi-Agent 编排系统设计",
+        name: "Maestro — Multi-Agent Orchestrator",
         level: 1,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: /^orchestrator$/i, level: 1 }),
+      screen.queryByText(/Openclaw Orchestrator｜Multi-Agent 编排系统设计/i),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/orchestrator access/i)).toHaveTextContent(
+    expect(screen.getByText("从请求到可信交付")).toBeInTheDocument();
+    expect(screen.getByLabelText(/maestro access/i)).toHaveTextContent(
       /mode: admin/i,
     );
-    expect(screen.getByTitle("Orchestrator control surface")).toHaveAttribute(
+    expect(screen.getByTitle("Maestro control surface")).toHaveAttribute(
       "src",
       "/orchestrator/artifact",
     );
     expect(
-      screen.getByRole("link", { name: /open orchestrator directly/i }),
+      screen.getByRole("link", { name: /open maestro directly/i }),
     ).toHaveAttribute("href", "/orchestrator/artifact");
   });
 });

@@ -38,7 +38,7 @@ function DecisionList({ title, decisions }: { title: string; decisions: Decision
                     <div className="decision-center-suggested-actions">
                       <strong>Suggested actions</strong>
                       <ul>
-                        <li><span>Accept</span> — record the selected option through the Orchestrator command boundary.</li>
+                        <li><span>Accept</span> — record the selected option through the Maestro command boundary.</li>
                         <li><span>Request evidence</span> — keep the Gate closed and request the missing proof.</li>
                         <li><span>Return minimal work package</span> — return only the affected scope for correction.</li>
                       </ul>
@@ -100,7 +100,7 @@ export function DecisionCenter({
         <label className="decision-center-filter"><span>Gate</span><select aria-label="Gate" value={gate} onChange={(event) => setGate(event.target.value)}><option value="all">All Gates</option>{gates.map((value) => <option key={value} value={value}>{decisions.find((decision) => decision.gate_id === value)?.gateTitle ?? value}</option>)}</select></label>
         <label className="decision-center-filter"><span>Owner</span><select aria-label="Owner" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="all">All owners</option>{owners.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       </div>
-      <p className="project-control-notice">This view is read-only. Decisions become authoritative only through the Orchestrator command boundary.</p>
+      <p className="project-control-notice">This view is read-only. Decisions become authoritative only through the Maestro command boundary.</p>
       <DecisionList title="Needs evidence" decisions={filtered.filter((decision) => decision.status === "evidence_blocked")} />
       <DecisionList title="Pending decisions" decisions={filtered.filter((decision) => decision.status === "pending")} />
       <DecisionList title="Ready decision packages" decisions={filtered.filter((decision) => decision.status === "ready")} />

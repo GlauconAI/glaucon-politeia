@@ -56,6 +56,8 @@ describe("DecisionCenter", () => {
     expect(within(readySection).getByText("Approve interaction contract")).toBeInTheDocument();
     expect(within(readySection).queryByText("Confirm operating envelope")).not.toBeInTheDocument();
     expect(within(pendingSection).getByText("Suggested actions")).toBeInTheDocument();
+    expect(within(pendingSection).getByText(/Maestro command boundary/)).toBeInTheDocument();
+    expect(screen.queryByText(/Orchestrator command boundary/)).not.toBeInTheDocument();
     expect(within(pendingSection).getByText("Request evidence")).toBeInTheDocument();
     expect(within(pendingSection).getByText("Return minimal work package")).toBeInTheDocument();
 

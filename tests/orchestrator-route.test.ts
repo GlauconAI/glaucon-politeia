@@ -54,7 +54,7 @@ describe("Orchestrator route", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      error: "Orchestrator artifact is unavailable.",
+      error: "Maestro artifact is unavailable.",
     });
   });
 });
