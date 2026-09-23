@@ -73,8 +73,11 @@ describe("app shell", () => {
       screen.queryByRole("link", { name: /^dashboard$/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /^orchestrator$/i }),
+      screen.getByRole("link", { name: /^maestro$/i }),
     ).toHaveAttribute("href", "/orchestrator");
+    expect(
+      screen.queryByRole("link", { name: /^orchestrator$/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /^concerto$/i }),
     ).toHaveAttribute("href", "/work-tracker");
@@ -98,7 +101,7 @@ describe("app shell", () => {
       screen.queryByRole("link", { name: /^partitura$/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /^orchestrator$/i }),
+      screen.queryByRole("link", { name: /^maestro$/i }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /^concerto$/i }),

@@ -27,7 +27,7 @@ export function ProjectControlPortfolio({
     <section className="project-control-portfolio" aria-labelledby="project-control-portfolio-heading">
       <div className="dashboard-directory-heading">
         <div>
-          <p className="eyebrow">Orchestrator authority</p>
+          <p className="eyebrow">Maestro authority</p>
           <h2 id="project-control-portfolio-heading">Project Control</h2>
         </div>
         <Link className="operator-link" href="/dashboard/decisions">Decision Center →</Link>

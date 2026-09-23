@@ -70,7 +70,7 @@ export function ProjectControlView({
           <p>{project.project.objective}</p>
         </div>
         <dl className="project-control-meta">
-          <div><dt>Authority</dt><dd>OpenClaw Orchestrator</dd></div>
+          <div><dt>Authority</dt><dd>Maestro — Multi-Agent Orchestrator</dd></div>
           <div><dt>Plan</dt><dd>Plan revision {project.project.approved_plan_revision}</dd></div>
           <div><dt>Freshness</dt><dd>{words(freshness)}</dd></div>
           <div><dt>Updated</dt><dd>{formatTime(project.project.updated_at)} UTC</dd></div>

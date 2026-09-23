@@ -53,7 +53,8 @@ describe("ProjectControlView", () => {
     expect(
       screen.getByRole("heading", { name: "Asgard Archaea Game" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("OpenClaw Orchestrator")).toBeInTheDocument();
+    expect(screen.getByText("Maestro — Multi-Agent Orchestrator")).toBeInTheDocument();
+    expect(screen.queryByText("OpenClaw Orchestrator")).not.toBeInTheDocument();
     expect(screen.getByText("Plan revision 3")).toBeInTheDocument();
     expect(screen.getAllByText("User + Owner line").length).toBeGreaterThan(0);
     expect(

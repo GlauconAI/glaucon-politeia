@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -5,6 +6,9 @@ import { OrchestratorArtifactFrame } from "@/components/orchestrator/Orchestrato
 import { getCurrentObservatoryAdmin } from "@/lib/observatory/admin-auth";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Maestro — Multi-Agent Orchestrator",
+};
 
 export default async function OrchestratorPage() {
   const currentAdmin = await getCurrentObservatoryAdmin();
@@ -18,11 +22,11 @@ export default async function OrchestratorPage() {
       <header className="observatory-hero">
         <div>
           <p className="eyebrow shell-path">402v /orchestrator</p>
-          <h1>Openclaw Orchestrator｜Multi-Agent 编排系统设计</h1>
-          <p>&gt; coordinate projects, plans, work, and delivery</p>
+          <h1>Maestro — Multi-Agent Orchestrator</h1>
+          <p>从请求到可信交付</p>
         </div>
         <div className="orchestrator-hero-actions">
-          <div className="shell-status-line" aria-label="Orchestrator access">
+          <div className="shell-status-line" aria-label="Maestro access">
             <span>mode: admin</span>
             <span>surface: operator</span>
             <span>artifact: published</span>
@@ -33,7 +37,7 @@ export default async function OrchestratorPage() {
             target="_blank"
             rel="noreferrer"
           >
-            Open Orchestrator directly
+            Open Maestro directly
           </Link>
         </div>
       </header>

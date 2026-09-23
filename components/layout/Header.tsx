@@ -35,7 +35,7 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
                 Partitura
               </Link>
               <Link href="/orchestrator" className="operator-link">
-                Orchestrator
+                Maestro
               </Link>
               <Link href="/work-tracker" className="operator-link">
                 Concerto

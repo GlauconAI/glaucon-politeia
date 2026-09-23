@@ -23,7 +23,7 @@ describe("OrchestratorArtifactFrame", () => {
   it("keeps the iframe scrollable until the child reports a valid height", () => {
     render(<OrchestratorArtifactFrame />);
 
-    const frame = screen.getByTitle("Orchestrator control surface");
+    const frame = screen.getByTitle("Maestro control surface");
     expect(frame).toHaveAttribute("src", "/orchestrator/artifact");
     expect(frame).toHaveAttribute("scrolling", "auto");
     expect(frame).toHaveAttribute("data-height-synchronized", "false");
@@ -34,7 +34,7 @@ describe("OrchestratorArtifactFrame", () => {
     render(<OrchestratorArtifactFrame />);
 
     const frame = screen.getByTitle(
-      "Orchestrator control surface",
+      "Maestro control surface",
     ) as HTMLIFrameElement;
 
     act(() => {
@@ -71,7 +71,7 @@ describe("OrchestratorArtifactFrame", () => {
     render(<OrchestratorArtifactFrame />);
 
     const frame = screen.getByTitle(
-      "Orchestrator control surface",
+      "Maestro control surface",
     ) as HTMLIFrameElement;
     vi.spyOn(frame, "getBoundingClientRect").mockReturnValue({
       bottom: 0,

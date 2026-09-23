@@ -55,7 +55,7 @@ export async function resolveOrchestratorRequest(
 
   if (!html) {
     return NextResponse.json(
-      { error: "Orchestrator artifact is unavailable." },
+      { error: "Maestro artifact is unavailable." },
       { status: 404 },
     );
   }
