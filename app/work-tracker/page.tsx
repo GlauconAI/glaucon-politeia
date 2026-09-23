@@ -129,7 +129,7 @@ export default async function WorkTrackerPage({
         <div>
           <p className="eyebrow shell-path">402v /work-tracker</p>
           <h1>Concerto</h1>
-          <p className="concerto-product-subtitle">Work &amp; Collaboration System</p>
+          <p className="concerto-product-subtitle">Work Tracker</p>
           <p className="concerto-product-slogan">Where work and minds move in concert.</p>
         </div>
         <div className="work-tracker-hero-actions">

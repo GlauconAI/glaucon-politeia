@@ -151,7 +151,7 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("heading", { name: /^partitura$/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/^system dashboard$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^ai system handbook$/i)).toBeInTheDocument();
     expect(
       screen.getByText("The score for a society of minds."),
     ).toBeInTheDocument();

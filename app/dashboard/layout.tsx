@@ -6,7 +6,7 @@ import { DashboardRouteNav } from "@/components/observatory/DashboardRouteNav";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Partitura — System Dashboard",
+  title: "Partitura — AI System Handbook",
   description: "The score for a society of minds.",
 };
 

@@ -110,7 +110,7 @@ describe("WorkTrackerPage", () => {
     expect(
       screen.getByRole("heading", { name: /^concerto$/i, level: 1 }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Work & Collaboration System")).toBeInTheDocument();
+    expect(screen.getByText("Work Tracker")).toBeInTheDocument();
     expect(screen.getByText("Where work and minds move in concert.")).toBeInTheDocument();
     expect(screen.getByText("402v /work-tracker")).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
