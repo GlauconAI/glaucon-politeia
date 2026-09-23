@@ -131,7 +131,7 @@ describe("DashboardSectionNav", () => {
     );
 
     expect(
-      screen.getByRole("navigation", { name: /dashboard sections/i }),
+      screen.getByRole("navigation", { name: /partitura sections/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Snapshot" })).toHaveAttribute(
       "href",

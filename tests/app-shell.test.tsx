@@ -67,8 +67,11 @@ describe("app shell", () => {
       "/editor",
     );
     expect(
-      screen.getByRole("link", { name: /^dashboard$/i }),
+      screen.getByRole("link", { name: /^partitura$/i }),
     ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.queryByRole("link", { name: /^dashboard$/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /^orchestrator$/i }),
     ).toHaveAttribute("href", "/orchestrator");
@@ -89,7 +92,7 @@ describe("app shell", () => {
       screen.queryByRole("link", { name: /publish/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /^dashboard$/i }),
+      screen.queryByRole("link", { name: /^partitura$/i }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /^orchestrator$/i }),

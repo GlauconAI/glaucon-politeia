@@ -986,6 +986,21 @@
   line-height: 1.45;
 }
 
+.partitura-product-subtitle {
+  margin-top: 10px !important;
+  color: var(--success) !important;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.partitura-product-slogan {
+  margin-top: 6px !important;
+  color: var(--muted) !important;
+  font-style: italic;
+}
+
 .observatory-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);

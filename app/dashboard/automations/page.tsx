@@ -101,7 +101,7 @@ export default async function AutomationsPage({
           </p>
         </div>
         <Link className="operator-link" href="/dashboard">
-          ← Back to Dashboard
+          ← Back to Partitura
         </Link>
       </header>
       {state.status === "ready" ? (

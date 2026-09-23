@@ -149,14 +149,21 @@ describe("DashboardPage", () => {
     render(await DashboardPage());
 
     expect(
-      screen.getByRole("heading", { name: /^dashboard$/i }),
+      screen.getByRole("heading", { name: /^partitura$/i }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/dashboard access/i)).toBeInTheDocument();
+    expect(screen.getByText(/^system dashboard$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("The score for a society of minds."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/partitura access/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /^dashboard$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: /system summary/i })).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
     expect(
-      screen.getByRole("navigation", { name: /dashboard sections/i }),
+      screen.getByRole("navigation", { name: /partitura sections/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Objects" })).toHaveAttribute(
       "href",

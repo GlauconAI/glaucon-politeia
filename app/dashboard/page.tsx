@@ -61,10 +61,13 @@ export default async function DashboardPage() {
       <header className="observatory-hero">
         <div>
           <p className="eyebrow shell-path">402v /dashboard</p>
-          <h1>Dashboard</h1>
-          <p>&gt; inspect the validated system map</p>
+          <h1>Partitura</h1>
+          <p className="partitura-product-subtitle">System Dashboard</p>
+          <p className="partitura-product-slogan">
+            The score for a society of minds.
+          </p>
         </div>
-        <div className="shell-status-line" aria-label="Dashboard access">
+        <div className="shell-status-line" aria-label="Partitura access">
           <span>mode: admin</span>
           <span>source: read-only</span>
           <span>authority: observatory projection</span>

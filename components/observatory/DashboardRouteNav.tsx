@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 const routes = [
-  { href: "/dashboard", label: "Dashboard", exact: true },
+  { href: "/dashboard", label: "Partitura", exact: true },
   { href: "/dashboard/projects", label: "Projects", exact: false },
   { href: "/dashboard/decisions", label: "Decisions", exact: false },
   { href: "/dashboard/skills", label: "Skills", exact: false },
@@ -48,7 +48,7 @@ export function DashboardRouteNav() {
     <nav
       ref={navRef}
       className="dashboard-route-nav"
-      aria-label="Dashboard routes"
+      aria-label="Partitura routes"
     >
       {routes.map((route) => {
         const current = route.exact

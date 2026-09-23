@@ -69,7 +69,7 @@ export function DashboardSectionNav({
     <nav
       ref={navRef}
       className="dashboard-section-nav"
-      aria-label="Dashboard sections"
+      aria-label="Partitura sections"
     >
       <div>
         {sections.map((section) => (
