@@ -36,7 +36,7 @@ export function SourceStatus(props: SourceStatusProps) {
           publication workflow when source access is available.
         </p>
         <p className="observatory-state-hint">
-          Work Tracker remains available at /work-tracker while observation
+          Concerto remains available at /work-tracker while observation
           data is missing.
         </p>
       </section>
@@ -59,7 +59,7 @@ export function SourceStatus(props: SourceStatusProps) {
         </div>
         <p role="alert">{props.message}</p>
         <p className="observatory-state-hint">
-          Work Tracker remains available at /work-tracker while observation
+          Concerto remains available at /work-tracker while observation
           data is unavailable.
         </p>
       </section>

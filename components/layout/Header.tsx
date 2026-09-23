@@ -38,7 +38,7 @@ export function Header({ canPublish = false, userEmail }: HeaderProps) {
                 Orchestrator
               </Link>
               <Link href="/work-tracker" className="operator-link">
-                Work Tracker
+                Concerto
               </Link>
               <Link href="/editor" className="write-link">
                 Publish

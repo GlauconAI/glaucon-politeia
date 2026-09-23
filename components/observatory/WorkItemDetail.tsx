@@ -289,9 +289,9 @@ export function WorkItemDetail({
       <header className="work-item-detail-header">
         <div>
           <p className="eyebrow">
-            Work Tracker / Item
+            Concerto / Item
           </p>
-          <Link className="work-item-back-link" href={backHref}>← 返回 Work Tracker</Link>
+          <Link className="work-item-back-link" href={backHref}>← 返回 Concerto</Link>
           <h1>{item.title}</h1>
           <div className="work-item-detail-badges">
             <span>{stateLabels[item.state]}</span>

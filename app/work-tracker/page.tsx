@@ -42,7 +42,7 @@ async function loadWorkTrackerState(): Promise<WorkTrackerBoardState> {
   } catch {
     return {
       status: "error",
-      message: "Work Tracker is temporarily unavailable. Try again.",
+      message: "Concerto is temporarily unavailable. Try again.",
     };
   }
 }
@@ -74,7 +74,7 @@ export default async function WorkTrackerPage({
     return (
       <section className="observatory-page work-tracker-page">
         <div className="work-tracker-error">
-          <p role="alert">Work Tracker is temporarily unavailable. Try again.</p>
+          <p role="alert">Concerto is temporarily unavailable. Try again.</p>
         </div>
       </section>
     );
@@ -112,7 +112,7 @@ export default async function WorkTrackerPage({
       } catch {
         return (
           <section className="observatory-page work-tracker-page">
-            <div className="work-tracker-error"><p role="alert">Work Tracker Project Versions are temporarily unavailable. Try again.</p></div>
+            <div className="work-tracker-error"><p role="alert">Concerto Project Versions are temporarily unavailable. Try again.</p></div>
           </section>
         );
       }
@@ -128,11 +128,12 @@ export default async function WorkTrackerPage({
       <header className="observatory-hero">
         <div>
           <p className="eyebrow shell-path">402v /work-tracker</p>
-          <h1>Work Tracker</h1>
-          <p>&gt; 管理、推进并审计真实工作事项</p>
+          <h1>Concerto</h1>
+          <p className="concerto-product-subtitle">Work &amp; Collaboration System</p>
+          <p className="concerto-product-slogan">Where work and minds move in concert.</p>
         </div>
         <div className="work-tracker-hero-actions">
-          <div className="shell-status-line" aria-label="Work Tracker access">
+          <div className="shell-status-line" aria-label="Concerto access">
             <span>mode: admin</span>
             <span>workflow: audited write</span>
             <span>agent claim: bounded</span>

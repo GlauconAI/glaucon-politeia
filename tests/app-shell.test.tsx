@@ -76,8 +76,11 @@ describe("app shell", () => {
       screen.getByRole("link", { name: /^orchestrator$/i }),
     ).toHaveAttribute("href", "/orchestrator");
     expect(
-      screen.getByRole("link", { name: /^work tracker$/i }),
+      screen.getByRole("link", { name: /^concerto$/i }),
     ).toHaveAttribute("href", "/work-tracker");
+    expect(
+      screen.queryByRole("link", { name: /^work tracker$/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show publishing access to logged-in non-admin users", () => {
@@ -98,7 +101,7 @@ describe("app shell", () => {
       screen.queryByRole("link", { name: /^orchestrator$/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /^work tracker$/i }),
+      screen.queryByRole("link", { name: /^concerto$/i }),
     ).not.toBeInTheDocument();
   });
 

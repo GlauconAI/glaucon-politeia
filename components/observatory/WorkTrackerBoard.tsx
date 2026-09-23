@@ -191,7 +191,7 @@ export function WorkTrackerBoard({
         <div className="observatory-panel-heading">
           <div>
             <p className="eyebrow">Daily write surface</p>
-            <h2>Work Tracker</h2>
+            <h2>Concerto</h2>
           </div>
         </div>
         <p role="alert">{state.message}</p>
@@ -381,11 +381,11 @@ export function WorkTrackerBoard({
   }
 
   return (
-    <section className="work-tracker-board" aria-label="Work Tracker Board">
+    <section className="work-tracker-board" aria-label="Concerto Board">
       <div
         className="work-tracker-toolbar"
         role="group"
-        aria-label="Work Tracker controls"
+        aria-label="Concerto controls"
       >
         <div
           className="work-tracker-filter-group"
@@ -442,7 +442,7 @@ export function WorkTrackerBoard({
         </span>
       </div>
 
-      <div className="work-tracker-view-tabs" aria-label="Work Tracker views">
+      <div className="work-tracker-view-tabs" aria-label="Concerto views">
         <button
           type="button"
           aria-pressed={view === "active"}
@@ -478,7 +478,7 @@ export function WorkTrackerBoard({
       ) : null}
 
       {view === "active" ? (
-        <div className="work-tracker-columns" aria-label="Work Tracker Board">
+        <div className="work-tracker-columns" aria-label="Concerto Board">
           {OBSERVATORY_WORK_ITEM_ACTIVE_GROUPS.map((group) => {
             const items = activeItems.filter((item) =>
               group.states.includes(item.state as never),

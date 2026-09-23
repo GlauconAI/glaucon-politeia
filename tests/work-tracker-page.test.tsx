@@ -108,13 +108,16 @@ describe("WorkTrackerPage", () => {
     render(await WorkTrackerPage());
 
     expect(
-      screen.getByRole("heading", { name: /^work tracker$/i, level: 1 }),
+      screen.getByRole("heading", { name: /^concerto$/i, level: 1 }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Work & Collaboration System")).toBeInTheDocument();
+    expect(screen.getByText("Where work and minds move in concert.")).toBeInTheDocument();
+    expect(screen.getByText("402v /work-tracker")).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /新建 item/i }));
     expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: /quick capture/i })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: /work tracker/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /concerto/i })).toBeInTheDocument();
     expect(
       screen.getByText(/标题、描述和验收标准默认使用中文/),
     ).toBeInTheDocument();
@@ -207,10 +210,10 @@ describe("WorkTrackerPage", () => {
     render(await WorkTrackerPage());
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      /work tracker is temporarily unavailable/i,
+      /concerto is temporarily unavailable/i,
     );
     expect(screen.queryByText(/private database detail/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^concerto$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /新建 item/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/管理版本/i)).not.toBeInTheDocument();
   });
@@ -224,9 +227,9 @@ describe("WorkTrackerPage", () => {
     render(await WorkTrackerPage());
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      /work tracker is temporarily unavailable/i,
+      /concerto is temporarily unavailable/i,
     );
     expect(screen.queryByText(/private registry detail/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /^work tracker$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^concerto$/i })).not.toBeInTheDocument();
   });
 });
