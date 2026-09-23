@@ -326,14 +326,14 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getAllByText("No work items.").length).toBeGreaterThan(0);
     expect(screen.queryByText("Daily write surface")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { level: 2, name: "Work Tracker" }),
+      screen.queryByRole("heading", { level: 2, name: "Concerto" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText(/九种审计状态收束为四个工作分组/),
     ).not.toBeInTheDocument();
     expect(
       within(
-        screen.getByRole("group", { name: "Work Tracker controls" }),
+        screen.getByRole("group", { name: "Concerto controls" }),
       ).getByText("1 of 1 items"),
     ).toBeVisible();
   });
@@ -582,6 +582,7 @@ describe("WorkTrackerBoard", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Work Tracker is unavailable.",
     );
+    expect(screen.getByRole("heading", { name: "Concerto" })).toBeInTheDocument();
     view.rerender(
       <WorkTrackerBoard state={{ status: "ready", items: [] }} />,
     );

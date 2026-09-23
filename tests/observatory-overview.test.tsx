@@ -505,7 +505,7 @@ describe("ObservatoryOverview", () => {
       dataStatus,
     );
     expect(
-      screen.getByText(/work tracker remains available at \/work-tracker/i),
+      screen.getByText(/concerto remains available at \/work-tracker/i),
     ).toBeInTheDocument();
   });
 

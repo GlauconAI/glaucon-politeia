@@ -16,7 +16,7 @@ export const ALLOWED_BRANCH_PATTERN =
 const FIXED_PR_BODY = [
   "## Summary",
   "",
-  "Prepared by the Work Tracker host-owned release channel.",
+  "Prepared by the Concerto host-owned release channel.",
   "",
   "## Verification",
   "",
@@ -55,13 +55,13 @@ function validateReleaseTarget(context) {
     throw new Error("release prepare does not accept arguments");
   }
   if (context.gitCommonDir !== EXPECTED_GIT_COMMON_DIR) {
-    throw new Error("current worktree is not the fixed Work Tracker repository");
+    throw new Error("current worktree is not the fixed Concerto repository");
   }
   if (context.remoteUrl !== EXPECTED_REMOTE_URL) {
-    throw new Error("origin does not match the fixed Work Tracker remote");
+    throw new Error("origin does not match the fixed Concerto remote");
   }
   if (context.pushRemoteUrl !== EXPECTED_REMOTE_URL) {
-    throw new Error("origin push URL does not match the fixed Work Tracker remote");
+    throw new Error("origin push URL does not match the fixed Concerto remote");
   }
   if (!isSafeBranch(context.branch) || ["main", "master"].includes(context.branch)) {
     throw new Error("current branch is not an allowed release branch");

@@ -87,7 +87,7 @@ function formError(error: unknown): string {
 function operationalError(): ObservatoryQuickCaptureActionState {
   return {
     status: "error",
-    formError: "Work Tracker is temporarily unavailable. Try again.",
+    formError: "Concerto is temporarily unavailable. Try again.",
   };
 }
 
@@ -134,7 +134,7 @@ async function authorizedRepository(): Promise<
       ok: false,
       error: {
         status: "error",
-        formError: "Work Tracker is temporarily unavailable. Try again.",
+        formError: "Concerto is temporarily unavailable. Try again.",
       } satisfies ObservatoryWorkItemMutationActionState,
     };
   }
@@ -397,13 +397,13 @@ export async function updateObservatoryWorkItemAction(
   } catch {
     return {
       status: "error",
-      formError: "Work Tracker is temporarily unavailable. Try again.",
+      formError: "Concerto is temporarily unavailable. Try again.",
     };
   }
   if (!canonicalContext) {
     return {
       status: "error",
-      formError: "Work Tracker is temporarily unavailable. Try again.",
+      formError: "Concerto is temporarily unavailable. Try again.",
     };
   }
   if (
@@ -490,7 +490,7 @@ export async function createObservatoryProjectVersionAction(
   } catch {
     return {
       status: "error",
-      formError: "Work Tracker is temporarily unavailable. Try again.",
+      formError: "Concerto is temporarily unavailable. Try again.",
     };
   }
   if (

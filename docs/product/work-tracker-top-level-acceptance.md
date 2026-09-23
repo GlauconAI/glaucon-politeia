@@ -1,19 +1,19 @@
-# Work Tracker Top-Level Surface Acceptance
+# Concerto Top-Level Surface Acceptance
 
 Date: 2026-08-24
 Status: Local implementation accepted; production release pending explicit authorization
 
 ## Approved scope
 
-- Work Tracker is an admin-only top-level product surface at `/work-tracker`, peer to Dashboard and Orchestrator.
+- Concerto — Work & Collaboration System is an admin-only top-level product surface at the compatibility route `/work-tracker`, peer to Partitura and Orchestrator.
 - Canonical Work Item details are served from `/work-tracker/items/[id]`.
-- Dashboard no longer reads or renders Quick Capture, the Work Tracker board, or Work Tracker section navigation.
+- Partitura no longer reads or renders Quick Capture, the Concerto board, or Concerto section navigation.
 - Existing `/dashboard/work-items/[id]` links permanently redirect to the canonical detail route.
 - Existing workflow, Ready Gate, evidence ledger, audit history, optimistic concurrency, Project Control bindings, and bounded Agent Claim rules are reused without database or authority changes.
 
 ## Authoring language
 
-Work Tracker titles, descriptions, and acceptance criteria default to Chinese. Common English product names, technical terms, code identifiers, paths, APIs, and commit hashes remain valid. This is guidance, not a language validation gate, so existing English and reasonable mixed-language Items remain editable.
+Concerto Work Item titles, descriptions, and acceptance criteria default to Chinese. Common English product names, technical terms, code identifiers, paths, APIs, and commit hashes remain valid. This is guidance, not a language validation gate, so existing English and reasonable mixed-language Items remain editable.
 
 The same rule is stored in Plato's workspace `AGENTS.md` and shown in Quick Capture and Work Item editing.
 
@@ -21,9 +21,9 @@ The same rule is stored in Plato's workspace `AGENTS.md` and shown in Quick Capt
 
 | Purpose | Canonical route | Compatibility behavior |
 | --- | --- | --- |
-| Work Tracker board and capture | `/work-tracker` | Dashboard contains no embedded tracker |
+| Concerto board and capture | `/work-tracker` | Partitura contains no embedded tracker |
 | Work Item detail | `/work-tracker/items/[id]` | `/dashboard/work-items/[id]` permanently redirects |
-| Capture and mutation refresh | `/work-tracker` and canonical detail | Dashboard cache is not refreshed by Work Tracker writes |
+| Capture and mutation refresh | `/work-tracker` and canonical detail | Partitura cache is not refreshed by Concerto writes |
 
 ## Security and authority boundaries
 

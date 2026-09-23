@@ -244,9 +244,9 @@ export function ProjectControlView({
       <div className="project-control-ledger-grid">
         <section aria-labelledby="bound-work-heading" className="project-control-section">
           <p className="eyebrow">Delivery ledger</p>
-          <h2 id="bound-work-heading">Bound Work Tracker cards</h2>
+          <h2 id="bound-work-heading">Bound Concerto items</h2>
           {!workTrackerAvailable ? (
-            <p className="empty-text">Work Tracker is temporarily unavailable.</p>
+            <p className="empty-text">Concerto is temporarily unavailable.</p>
           ) : boundWorkItems.length ? (
             <ul className="project-control-ledger-list">
               {boundWorkItems.map((item) => (
@@ -266,7 +266,7 @@ export function ProjectControlView({
                 </li>
               ))}
             </ul>
-          ) : <p className="empty-text">No Work Tracker card is bound to this Project revision.</p>}
+          ) : <p className="empty-text">No Concerto item is bound to this Project revision.</p>}
         </section>
 
         <section aria-labelledby="outcome-reviews-heading" className="project-control-section">

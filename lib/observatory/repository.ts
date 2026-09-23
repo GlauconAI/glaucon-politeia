@@ -439,7 +439,7 @@ export function createObservatoryRepository(
         error.code === "42501" ? "FORBIDDEN" : "WORK_ITEM_READ_FAILED",
         error.code === "42501"
           ? "Administrator access is required."
-          : "Work Tracker data could not be loaded.",
+          : "Concerto data could not be loaded.",
       );
     }
     return (data ?? []) as T[];

@@ -19,7 +19,7 @@
   color-scheme: light;
 }
 
-/* M3 Work Tracker */
+/* Concerto; technical work-tracker class names remain for compatibility. */
 
 .work-tracker-board,
 .work-item-detail {
@@ -996,6 +996,21 @@
 }
 
 .partitura-product-slogan {
+  margin-top: 6px !important;
+  color: var(--muted) !important;
+  font-style: italic;
+}
+
+.concerto-product-subtitle {
+  margin-top: 10px !important;
+  color: var(--success) !important;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.concerto-product-slogan {
   margin-top: 6px !important;
   color: var(--muted) !important;
   font-style: italic;

@@ -161,7 +161,7 @@ describe("captureObservatoryWorkItemAction", () => {
         captureObservatoryWorkItemAction(initialState, validFormData()),
       ).resolves.toEqual({
         status: "error",
-        formError: "Work Tracker is temporarily unavailable. Try again.",
+        formError: "Concerto is temporarily unavailable. Try again.",
       });
       expect(mocks.createQuickCapture).not.toHaveBeenCalled();
       expect(mocks.revalidatePath).not.toHaveBeenCalled();
@@ -289,7 +289,7 @@ describe("captureObservatoryWorkItemAction", () => {
       captureObservatoryWorkItemAction(initialState, validFormData()),
     ).resolves.toEqual({
       status: "error",
-      formError: "Work Tracker is temporarily unavailable. Try again.",
+      formError: "Concerto is temporarily unavailable. Try again.",
     });
     expect(mocks.createQuickCapture).not.toHaveBeenCalled();
   });

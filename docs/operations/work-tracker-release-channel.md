@@ -1,4 +1,7 @@
-# Work Tracker Release Channel
+# Concerto Release Channel
+
+Concerto — Work & Collaboration System retains the `/work-tracker` route and
+the existing `work-tracker-*` technical release identifiers for compatibility.
 
 ## Local development gate
 
@@ -45,6 +48,6 @@ Run:
 npm run release:approval-report -- --days 7
 ```
 
-The report emits two deliberately separate scopes. `workTracker` contains project rollout proxy counters and keeps `manualApprovalCount: null` because current runtime data cannot reliably attribute a displayed prompt to this project. `operatorApprovals` contains real user decisions for all Plato activity in the period and is labeled `plato-agent-wide`. The approval database query reads only status/decision/terminal-reason fields; output never contains command, conversation, device, credential, or presentation data.
+The report emits two deliberately separate scopes. The compatibility key `workTracker` contains Concerto rollout proxy counters and keeps `manualApprovalCount: null` because current runtime data cannot reliably attribute a displayed prompt to this project. `operatorApprovals` contains real user decisions for all Plato activity in the period and is labeled `plato-agent-wide`. The approval database query reads only status/decision/terminal-reason fields; output never contains command, conversation, device, credential, or presentation data.
 
 Review four complete weekly windows before proposing broader adoption. Success means routine development has no human prompts, production work is normally one explicit gate, denied calls do not rise, and no permission scope is widened to compensate.

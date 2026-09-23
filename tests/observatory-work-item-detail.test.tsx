@@ -180,7 +180,7 @@ describe("WorkItemDetail", () => {
     expect(
       screen.getByRole("heading", { name: item.title }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /work tracker/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /concerto/i })).toHaveAttribute(
       "href",
       "/work-tracker",
     );

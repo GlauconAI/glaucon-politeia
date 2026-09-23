@@ -172,7 +172,7 @@ describe("WorkItemPage", () => {
     expect(mocks.listWorkItemEvents).toHaveBeenCalledWith(item.id);
     expect(mocks.listWorkItemClaims).toHaveBeenCalledWith(item.id);
     expect(screen.getByLabelText(/^project$/i)).toHaveValue("plato/dashboard");
-    expect(screen.getByRole("link", { name: "← 返回 Work Tracker" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "← 返回 Concerto" })).toHaveAttribute(
       "href",
       `/work-tracker?project=plato%2Fdashboard&version=${item.project_version_id}&view=completed`,
     );

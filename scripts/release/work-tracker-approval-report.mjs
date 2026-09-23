@@ -144,7 +144,7 @@ export function buildApprovalReport(workTrackerRollout, operatorApprovalRows) {
       autoReviewApprovals: "unavailable",
       humanPromptsDisplayed: "unavailable",
       timeoutRetries: "unavailable",
-      note: "Use Work Tracker rollout counters for trend direction and Plato-wide operator decisions only as a separate control metric.",
+      note: "Use Concerto rollout counters for trend direction and Plato-wide operator decisions only as a separate control metric.",
     },
   };
 }

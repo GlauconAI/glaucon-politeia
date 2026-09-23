@@ -76,7 +76,7 @@ describe("ProjectControlView", () => {
     expect(screen.getByText("No Stage is currently admissible.")).toBeInTheDocument();
     expect(within(dag).getAllByText(/^Unlocks/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Execution lines" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Bound Work Tracker cards" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bound Concerto items" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Validate coordinate interaction" })).toHaveAttribute(
       "href",
       `/work-tracker/items/${boundWorkItem.id}`,
