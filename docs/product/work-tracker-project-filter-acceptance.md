@@ -1,4 +1,4 @@
-# Concerto Canonical Project Filter Acceptance
+# Work Tracker Canonical Project Filter Acceptance
 
 Date: 2026-08-25
 Status: Local implementation accepted; production release pending explicit authorization
@@ -25,7 +25,7 @@ Base: `96c5419d31ea6aff55f505f899230fd3d5f70949`
 
 ## Automated verification
 
-- Focused Concerto regression: 12 files / 136 tests passed.
+- Focused Work Tracker regression: 12 files / 136 tests passed.
 - Stable complete suite: 121 files / 818 tests passed, 0 failed.
 - ESLint: exit code 0.
 - TypeScript: exit code 0.

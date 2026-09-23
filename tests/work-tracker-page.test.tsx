@@ -112,6 +112,7 @@ describe("WorkTrackerPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Work & Collaboration System")).toBeInTheDocument();
     expect(screen.getByText("Where work and minds move in concert.")).toBeInTheDocument();
+    expect(screen.getByText("402v /work-tracker")).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: /quick capture/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /新建 item/i }));
     expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
