@@ -150,6 +150,67 @@ async function updateWorkItem(
   });
 }
 
+async function updateWorkItemDue(
+  userId: string,
+  input: { id: string; expectedVersion: number; dueOn: string | null },
+) {
+  return asRole("authenticated", userId, async (transaction) => {
+    const [current] = await transaction<
+      {
+        type: string;
+        title: string;
+        description: string;
+        acceptance_criteria: string;
+        priority: string | null;
+        owner_id: string | null;
+        assigned_agent_id: string;
+        project_ref: string | null;
+        milestone_ref: string | null;
+        project_key: string | null;
+        plan_revision: number | null;
+        stage_id: string | null;
+        work_package_id: string | null;
+        project_version_id: string;
+        version_binding_kind: string;
+      }[]
+    >`
+      select type, title, description, acceptance_criteria, priority, owner_id,
+        assigned_agent_id, project_ref, milestone_ref, project_key, plan_revision,
+        stage_id, work_package_id, project_version_id, version_binding_kind
+      from public.observatory_work_items
+      where id = ${input.id}
+    `;
+    assert.ok(current, "due-date update fixture exists");
+    const [item] = await transaction<
+      { id: string; version: number; due_on: string | null }[]
+    >`
+      select id, version, due_on
+      from public.update_observatory_work_item(
+        p_work_item_id => ${input.id},
+        p_expected_version => ${input.expectedVersion},
+        p_type => ${current.type},
+        p_title => ${current.title},
+        p_description => ${current.description},
+        p_acceptance_criteria => ${current.acceptance_criteria},
+        p_priority => ${current.priority},
+        p_owner_id => ${current.owner_id},
+        p_assigned_agent_id => ${current.assigned_agent_id},
+        p_project_ref => ${current.project_ref},
+        p_milestone_ref => ${current.milestone_ref},
+        p_project_key => ${current.project_key},
+        p_plan_revision => ${current.plan_revision},
+        p_stage_id => ${current.stage_id},
+        p_work_package_id => ${current.work_package_id},
+        p_project_version_id => ${current.project_version_id},
+        p_version_binding_kind => ${current.version_binding_kind},
+        p_due_on => ${input.dueOn}
+      )
+    `;
+    assert.ok(item, "due-date update returned a row");
+    return item;
+  });
+}
+
 async function transitionWorkItem(
   userId: string,
   input: { id: string; expectedVersion: number; targetState: string },
@@ -592,6 +653,49 @@ async function main(): Promise<void> {
     assert.equal(eventCount?.count, 1);
   });
   record("exact idempotent retry returns one item and one event");
+
+  const dueDateItem = await createWorkItem(adminId, {
+    type: "feature",
+    title: "Due date contract probe",
+    description: "Exercise the canonical and compatibility RPCs.",
+    idempotencyKey: `due-date-${runId}`,
+  });
+  const dueDateSet = await updateWorkItemDue(adminId, {
+    id: dueDateItem.id,
+    expectedVersion: 1,
+    dueOn: "2026-09-30",
+  });
+  assert.deepEqual(dueDateSet, {
+    id: dueDateItem.id,
+    version: 2,
+    due_on: "2026-09-30",
+  });
+  await updateWorkItem(adminId, {
+    id: dueDateItem.id,
+    expectedVersion: 2,
+    type: "feature",
+    title: "Due date compatibility probe",
+    description: "The legacy overload must retain the date.",
+  });
+  await asRole("authenticated", adminId, async (transaction) => {
+    const [state] = await transaction<
+      { due_on: string | null; audited_change: number }[]
+    >`
+      select item.due_on::text as due_on,
+        (
+          select count(*)::integer
+          from public.observatory_work_item_events event
+          where event.work_item_id = item.id
+            and event.event_type = 'updated'
+            and event.data -> 'before' ->> 'due_on' is null
+            and event.data -> 'after' ->> 'due_on' = '2026-09-30'
+        ) as audited_change
+      from public.observatory_work_items item
+      where item.id = ${dueDateItem.id}
+    `;
+    assert.deepEqual(state, { due_on: "2026-09-30", audited_change: 1 });
+  });
+  record("legacy overload preserves due_on and canonical update is audited");
 
   await expectPgError(
     "idempotency payload conflict rejected",

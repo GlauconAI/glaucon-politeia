@@ -323,6 +323,7 @@ describe("Work Tracker workflow contract", () => {
       "2026-13-01",
       "2026-9-3",
       "2026-09-30T00:00:00Z",
+      "0000-01-01",
       "",
     ]) {
       expect(

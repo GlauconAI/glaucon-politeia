@@ -44,6 +44,7 @@ export async function runDueReminder(dependencies = {}) {
     connect_timeout: 10,
     idle_timeout: 5,
     max: 1,
+    ssl: "require",
     onnotice: () => undefined,
   }));
   let sql;
@@ -65,13 +66,25 @@ export async function runDueReminder(dependencies = {}) {
         items.assigned_agent_id,
         items.state,
         items.priority,
-        items.due_on::text as due_on
+        items.due_on::text as due_on,
+        count(*) over() as total_matching_items
       from public.observatory_work_items items
       left join public.profiles profiles on profiles.user_id = items.owner_id
       where items.state <> 'done'
         and items.due_on is not null
         and items.due_on <= ${tomorrow}::date
-      order by items.due_on, items.priority nulls last, items.project_ref, items.title
+      order by
+        items.due_on,
+        case items.priority
+          when 'urgent' then 0
+          when 'high' then 1
+          when 'medium' then 2
+          when 'low' then 3
+          else 4
+        end,
+        items.project_ref,
+        items.title,
+        items.id
       limit 200
     `;
 
@@ -80,6 +93,9 @@ export async function runDueReminder(dependencies = {}) {
       baseUrl: dependencies.baseUrl ?? "https://402v.com/work-tracker",
       maxItems: dependencies.maxItems,
       maxBytes: dependencies.maxBytes,
+      totalMatchingItems: rows[0]?.total_matching_items
+        ? Number(rows[0].total_matching_items)
+        : 0,
       items: rows.map((row) => ({
         id: row.id,
         title: row.title,

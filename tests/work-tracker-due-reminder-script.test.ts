@@ -38,6 +38,7 @@ describe("model-free Work Tracker due reminder", () => {
       state: "in_progress",
       priority: "high",
       due_on: "2026-09-23",
+      total_matching_items: "250",
     }]);
 
     await expect(runDueReminder({
@@ -51,10 +52,14 @@ describe("model-free Work Tracker due reminder", () => {
 
     expect(db.connect).toHaveBeenCalledWith("postgres://secret@example.invalid/db");
     expect(db.query()).toContain("items.due_on <= ?::date");
+    expect(db.query()).toContain("count(*) over() as total_matching_items");
+    expect(db.query()).toContain("case items.priority");
+    expect(db.query()).toContain("items.id");
     expect(db.query()).toContain("limit 200");
     expect(db.query()).not.toContain("select *");
     expect(stdout.value()).toContain("Work Tracker｜到期事项 · 2026-09-23");
     expect(stdout.value()).toContain("Ship reminder");
+    expect(stdout.value()).toContain("另有 249 项未展开。");
     expect(stdout.value()).not.toContain("postgres://");
     expect(stderr.value()).toBe("");
     expect(db.end).toHaveBeenCalledOnce();
@@ -96,5 +101,6 @@ describe("model-free Work Tracker due reminder", () => {
       "utf8",
     );
     expect(source).not.toMatch(/openai|anthropic|agentturn|sessions_spawn/iu);
+    expect(source).toContain('ssl: "require"');
   });
 });

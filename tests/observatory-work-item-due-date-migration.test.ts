@@ -33,4 +33,23 @@ describe("Work Tracker due-date migration", () => {
       /grant\s+(insert|update|delete|truncate)[\s\S]*observatory_work_items/u,
     );
   });
+
+  it("makes the local verifier exercise persistence, compatibility, and audit evidence", async () => {
+    const verifier = (
+      await readFile(
+        join(process.cwd(), "scripts/observatory/verify-local-db.ts"),
+        "utf8",
+      )
+    ).toLowerCase();
+
+    for (const fragment of [
+      "p_due_on =>",
+      "due_on: string | null",
+      "legacy overload preserves due_on",
+      "event.data -> 'before' ->> 'due_on'",
+      "event.data -> 'after' ->> 'due_on'",
+    ]) {
+      expect(verifier).toContain(fragment);
+    }
+  });
 });

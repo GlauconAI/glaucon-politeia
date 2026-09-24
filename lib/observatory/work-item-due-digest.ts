@@ -61,6 +61,7 @@ export function renderWorkItemDueDigest(input: {
   baseUrl: string;
   maxItems?: number;
   maxBytes?: number;
+  totalMatchingItems?: number;
 }): string {
   const candidates = input.items
     .filter((item) => item.state !== "done")
@@ -94,7 +95,7 @@ export function renderWorkItemDueDigest(input: {
       return plainText(left.item.title, "Untitled").localeCompare(
         plainText(right.item.title, "Untitled"),
         "zh-Hans",
-      );
+      ) || left.item.id.localeCompare(right.item.id, "en");
     });
 
   if (candidates.length === 0) return "";
@@ -102,6 +103,10 @@ export function renderWorkItemDueDigest(input: {
   const maxItems = Math.max(1, input.maxItems ?? 30);
   const maxBytes = Math.max(256, input.maxBytes ?? 3_500);
   const selected = candidates.slice(0, maxItems);
+  const totalMatchingItems = Math.max(
+    candidates.length,
+    input.totalMatchingItems ?? candidates.length,
+  );
 
   function render(entries: typeof selected): string {
     const sections: string[] = [`Work Tracker｜到期事项 · ${input.today}`];
@@ -114,14 +119,14 @@ export function renderWorkItemDueDigest(input: {
             const priority = (item.priority ?? "none").toUpperCase();
             const project = plainText(item.projectRef, "No Project");
             const title = plainText(item.title, "Untitled");
-            const owner = plainText(item.owner, item.assignedAgentId);
+            const owner = plainText(item.owner, "Owner 未分配");
             const due = group === "overdue" ? `原定 ${item.dueOn}` : groupLabels[group].replace("到期", "");
             return `- [${priority}] ${project} / ${title}｜${owner}｜${stateLabel(item.state)}｜${due}`;
           })
           .join("\n")}`,
       );
     }
-    const omitted = candidates.length - entries.length;
+    const omitted = totalMatchingItems - entries.length;
     if (omitted > 0) sections.push(`另有 ${omitted} 项未展开。`);
     sections.push(`查看 Work Tracker：${input.baseUrl}`);
     return sections.join("\n\n");
@@ -134,7 +139,7 @@ export function renderWorkItemDueDigest(input: {
   }
   if (byteLength(output) <= maxBytes) return output;
 
-  const fallback = `Work Tracker｜到期事项 · ${input.today}\n\n共 ${candidates.length} 项，请查看：${input.baseUrl}`;
+  const fallback = `Work Tracker｜到期事项 · ${input.today}\n\n共 ${totalMatchingItems} 项，请查看：${input.baseUrl}`;
   if (byteLength(fallback) <= maxBytes) return fallback;
   throw new RangeError("Digest byte budget is too small for its fixed content.");
 }

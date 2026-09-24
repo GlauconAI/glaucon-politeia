@@ -70,6 +70,17 @@ describe("Work Tracker due digest", () => {
     expect(output).not.toContain("\u0000");
   });
 
+  it("keeps Owner distinct from Assigned Agent", () => {
+    const output = renderWorkItemDueDigest({
+      today: "2026-09-23",
+      baseUrl: "https://402v.com/work-tracker",
+      items: [{ ...baseItem, owner: null, assignedAgentId: "plato" }],
+    });
+
+    expect(output).toContain("Owner 未分配");
+    expect(output).not.toContain("｜plato｜");
+  });
+
   it("bounds item count and UTF-8 bytes while reporting omissions", () => {
     const output = renderWorkItemDueDigest({
       today: "2026-09-23",
@@ -85,6 +96,17 @@ describe("Work Tracker due digest", () => {
 
     expect(Buffer.byteLength(output, "utf8")).toBeLessThanOrEqual(500);
     expect(output).toMatch(/另有 \d+ 项未展开/u);
+  });
+
+  it("uses the database total when the bounded query omits matching rows", () => {
+    const output = renderWorkItemDueDigest({
+      today: "2026-09-23",
+      baseUrl: "https://402v.com/work-tracker",
+      totalMatchingItems: 250,
+      items: [{ ...baseItem, id: "1" }, { ...baseItem, id: "2" }],
+    });
+
+    expect(output).toContain("另有 248 项未展开。");
   });
 
   it("returns an empty string when no item matches", () => {
