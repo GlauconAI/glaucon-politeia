@@ -43,6 +43,20 @@ const NullablePrioritySchema = z
   .enum(OBSERVATORY_WORK_ITEM_PRIORITIES)
   .nullable();
 const NullableOwnerSchema = z.uuid().nullable();
+export const NullableDueOnSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u, "Use a date in YYYY-MM-DD format.")
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() + 1 === month &&
+      date.getUTCDate() === day
+    );
+  }, "Use a real calendar date.")
+  .nullable();
 const AssignedAgentIdSchema = QuickCaptureTextSchema.min(1)
   .max(80)
   .regex(
@@ -202,6 +216,7 @@ export const ObservatoryWorkItemUpdateInputSchema = z.strictObject({
   projectVersionId: z.uuid(),
   versionBindingKind: z.enum(OBSERVATORY_VERSION_BINDING_KINDS).default("optional"),
   milestoneRef: NullableReferenceSchema,
+  dueOn: NullableDueOnSchema,
   projectKey: NullableProjectKeySchema,
   planRevision: z.number().int().nonnegative().nullable(),
   stageId: NullableControlIdSchema,

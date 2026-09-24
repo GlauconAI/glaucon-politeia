@@ -42,6 +42,7 @@ const item: ObservatoryWorkItemRow = {
   acceptance_criteria: "The item reaches Done.",
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
+  due_on: null,
   project_key: null,
   project_version_id: "33333333-3333-4333-8333-333333333333",
   version_binding_kind: "required",

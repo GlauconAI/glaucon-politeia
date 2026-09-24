@@ -18,6 +18,7 @@ const boundWorkItem: ObservatoryWorkItemRow = {
   acceptance_criteria: "The slice is deterministic.",
   project_ref: null,
   milestone_ref: null,
+  due_on: null,
   project_key: "asgard/archaea-gacha-game",
   project_version_id: "33333333-3333-4333-8333-333333333333",
   plan_revision: 3,

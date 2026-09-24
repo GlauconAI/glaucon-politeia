@@ -279,6 +279,7 @@ describe("Work Tracker workflow contract", () => {
       projectVersionId: "33333333-3333-4333-8333-333333333333",
       versionBindingKind: "optional",
       milestoneRef: "OBS-M3",
+      dueOn: "2026-09-30",
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
       stageId: "stage-05b",
@@ -286,6 +287,49 @@ describe("Work Tracker workflow contract", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts only canonical, real ISO calendar dates or null", () => {
+    const base = {
+      workItemId: "11111111-1111-4111-8111-111111111111",
+      expectedVersion: 2,
+      type: "feature",
+      title: "Set the release deadline",
+      description: "",
+      acceptanceCriteria: "The date is visible.",
+      priority: "high",
+      ownerId: null,
+      assignedAgentId: "plato",
+      projectRef: "plato/dashboard",
+      projectVersionId: "33333333-3333-4333-8333-333333333333",
+      versionBindingKind: "optional",
+      milestoneRef: null,
+      projectKey: null,
+      planRevision: null,
+      stageId: null,
+      workPackageId: null,
+    } as const;
+
+    for (const dueOn of [null, "2026-09-30", "2028-02-29"]) {
+      expect(
+        ObservatoryWorkItemUpdateInputSchema.safeParse({ ...base, dueOn })
+          .success,
+      ).toBe(true);
+    }
+
+    for (const dueOn of [
+      undefined,
+      "2026-02-29",
+      "2026-13-01",
+      "2026-9-3",
+      "2026-09-30T00:00:00Z",
+      "",
+    ]) {
+      expect(
+        ObservatoryWorkItemUpdateInputSchema.safeParse({ ...base, dueOn })
+          .success,
+      ).toBe(false);
+    }
   });
 
   it("rejects unknown edit fields and malformed identifiers", () => {
@@ -302,6 +346,7 @@ describe("Work Tracker workflow contract", () => {
         assignedAgentId: "Not Valid",
         projectRef: "",
         milestoneRef: null,
+        dueOn: null,
         projectKey: null,
         planRevision: null,
         stageId: null,
@@ -325,6 +370,7 @@ describe("Work Tracker workflow contract", () => {
       projectRef: "asgard/archaea-gacha-game",
       projectVersionId: "33333333-3333-4333-8333-333333333333",
       milestoneRef: null,
+      dueOn: null,
       projectKey: "asgard/archaea-gacha-game",
       planRevision: 3,
       stageId: "stage-05b",
