@@ -267,6 +267,39 @@ async function main(): Promise<void> {
   });
   record("fixtures created through service-role claim boundary");
 
+  const [dueDateContract] = await sql<
+    {
+      data_type: string;
+      is_nullable: string;
+      has_index: boolean;
+      has_due_rpc: boolean;
+    }[]
+  >`
+    select
+      columns.data_type,
+      columns.is_nullable,
+      exists (
+        select 1
+        from pg_indexes
+        where schemaname = 'public'
+          and indexname = 'observatory_work_items_open_due_on_idx'
+      ) as has_index,
+      to_regprocedure(
+        'public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text,date)'
+      ) is not null as has_due_rpc
+    from information_schema.columns columns
+    where columns.table_schema = 'public'
+      and columns.table_name = 'observatory_work_items'
+      and columns.column_name = 'due_on'
+  `;
+  assert.deepEqual(dueDateContract, {
+    data_type: "date",
+    is_nullable: "YES",
+    has_index: true,
+    has_due_rpc: true,
+  });
+  record("due date column, partial index, and canonical RPC signature");
+
   const tablePrivileges = await sql<
     {
       role_name: string;
@@ -338,6 +371,7 @@ async function main(): Promise<void> {
       role_name: string;
       can_create: boolean;
       can_update: boolean;
+      can_update_due: boolean;
       can_transition: boolean;
       can_add_evidence: boolean;
       can_remove_evidence: boolean;
@@ -356,6 +390,11 @@ async function main(): Promise<void> {
         'public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text)',
         'execute'
       ) as can_update,
+      has_function_privilege(
+        role_name,
+        'public.update_observatory_work_item(uuid,integer,text,text,text,text,text,uuid,text,text,text,text,integer,text,text,uuid,text,date)',
+        'execute'
+      ) as can_update_due,
       has_function_privilege(
         role_name,
         'public.transition_observatory_work_item(uuid,integer,text)',
@@ -388,6 +427,7 @@ async function main(): Promise<void> {
     const expected = privilege.role_name === "authenticated";
     assert.equal(privilege.can_create, expected);
     assert.equal(privilege.can_update, expected);
+    assert.equal(privilege.can_update_due, expected);
     assert.equal(privilege.can_transition, expected);
     assert.equal(privilege.can_add_evidence, expected);
     assert.equal(privilege.can_remove_evidence, expected);
