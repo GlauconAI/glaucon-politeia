@@ -194,6 +194,7 @@ describe("WorkItemDetail", () => {
     );
     expect(screen.getByLabelText(/^priority$/i)).toHaveValue("high");
     expect(screen.getByLabelText(/^owner$/i)).toHaveValue(item.owner_id);
+    expect(screen.getByLabelText(/^due date$/i)).toHaveValue("");
     expect(screen.getByLabelText(/^assigned agent$/i)).toHaveValue("plato");
     expect(screen.getByRole("region", { name: /item content/i })).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: /item properties/i })).toBeInTheDocument();
@@ -210,6 +211,32 @@ describe("WorkItemDetail", () => {
     expect(
       screen.queryByRole("button", { name: /move to done/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("renders the optional due date from the Work Item", () => {
+    render(
+      <WorkItemDetail
+        item={{ ...item, due_on: "2026-09-30" }}
+        evidence={[]}
+        events={events}
+        projects={projects}
+        currentAdmin={{
+          user_id: item.created_by,
+          display_name: "Glaucon",
+          username: "glaucon",
+        }}
+        updateAction={successAction}
+        transitionAction={successAction}
+        addEvidenceAction={successAction}
+        removeEvidenceAction={successAction}
+      />,
+    );
+
+    expect(screen.getByLabelText(/^due date$/i)).toHaveAttribute(
+      "type",
+      "date",
+    );
+    expect(screen.getByLabelText(/^due date$/i)).toHaveValue("2026-09-30");
   });
 
   it("submits optional Product Version binding and defaults missing legacy kind safely", async () => {

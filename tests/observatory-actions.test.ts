@@ -556,6 +556,7 @@ describe("Work Tracker mutation actions", () => {
     formData.set("projectVersionId", versionId);
     formData.set("versionBindingKind", "required");
     formData.set("milestoneRef", "");
+    formData.set("dueOn", " 2026-09-30 ");
     formData.set("projectKey", "plato/dashboard");
     formData.set("planRevision", "3");
     formData.set("stageId", "stage-05b");
@@ -652,6 +653,7 @@ describe("Work Tracker mutation actions", () => {
     formData.set("projectVersionId", projectVersionId);
     formData.set("versionBindingKind", "required");
     formData.set("milestoneRef", "");
+    formData.set("dueOn", " 2026-09-30 ");
     formData.set("projectKey", "plato/dashboard");
     formData.set("planRevision", "3");
     formData.set("stageId", "stage-05b");
@@ -674,6 +676,7 @@ describe("Work Tracker mutation actions", () => {
       projectVersionId,
       versionBindingKind: "required",
       milestoneRef: null,
+      dueOn: "2026-09-30",
       projectKey: "plato/dashboard",
       planRevision: 3,
       stageId: "stage-05b",
@@ -683,6 +686,22 @@ describe("Work Tracker mutation actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
       `/work-tracker/items/${workItemId}`,
     );
+  });
+
+  it("returns a dueOn field error for an impossible date", async () => {
+    const formData = updateFormData();
+    formData.set("dueOn", "2026-02-29");
+
+    const result = await updateObservatoryWorkItemAction(
+      { status: "idle" },
+      formData,
+    );
+
+    expect(result).toMatchObject({
+      status: "error",
+      fieldErrors: { dueOn: ["Use a real calendar date."] },
+    });
+    expect(mocks.updateWorkItem).not.toHaveBeenCalled();
   });
 
   it("allows an unrelated edit that preserves a historical terminal binding", async () => {
