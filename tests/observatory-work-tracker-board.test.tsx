@@ -148,6 +148,37 @@ describe("WorkTrackerBoard", () => {
     window.history.replaceState(null, "", "/work-tracker");
   });
 
+  it("shows a deterministic deadline badge only when due_on exists", () => {
+    const dueItem = { ...item, due_on: "2026-09-23" };
+    render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [dueItem],
+          evaluatedAt: "2026-09-23T19:00:00.000Z",
+        }}
+        projects={projects}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId(`work-item-${item.id}`)).getByText("Due today"),
+    ).toBeInTheDocument();
+
+    const { unmount } = render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [{ ...item, id: "22222222-2222-4222-8222-222222222222" }],
+          evaluatedAt: "2026-09-23T19:00:00.000Z",
+        }}
+        projects={projects}
+      />,
+    );
+    expect(screen.getAllByText("Due today")).toHaveLength(1);
+    unmount();
+  });
+
   it("shows and filters Project Versions while preserving detail return context", () => {
     const backlogItem = {
       ...item,
