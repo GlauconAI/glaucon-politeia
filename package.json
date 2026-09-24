@@ -32,7 +32,9 @@
     "#observatory-agent-activity-schema": "./lib/observatory/agent-activity-schema.ts",
     "#observatory-agent-activity-collector": "./lib/observatory/agent-activity-collector.ts",
     "#observatory-project-catalog-audit-schema": "./lib/observatory/project-catalog-audit-schema.ts",
-    "#observatory-project-catalog-audit": "./lib/observatory/project-catalog-audit.ts"
+    "#observatory-project-catalog-audit": "./lib/observatory/project-catalog-audit.ts",
+    "#observatory-work-item-due": "./lib/observatory/work-item-due.ts",
+    "#observatory-work-item-due-digest": "./lib/observatory/work-item-due-digest.ts"
   },
   "scripts": {
     "dev": "next dev",
@@ -49,6 +51,7 @@
     "observatory:project-versions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/apply-project-version-migration.ts",
     "observatory:project-version-contract-v1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-project-version-contract-v1.ts",
     "observatory:project-version-contract-v1:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-project-version-contract-v1.ts",
+    "observatory:work-item-due-dates:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-work-item-due-dates.ts",
     "observatory:verify-snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-snapshot.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
     "observatory:verify-local-claims": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-agent-claim-db.ts",
@@ -65,6 +68,7 @@
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
     "supabase:readiness": "node scripts/supabase-ops.mjs readiness",
     "supabase:status": "node scripts/supabase-ops.mjs status",
+    "work-tracker:due-reminder": "node scripts/work-tracker/due-reminder.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

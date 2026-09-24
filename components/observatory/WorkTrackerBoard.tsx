@@ -10,6 +10,7 @@ import {
 import { CanonicalProjectPicker } from "@/components/observatory/CanonicalProjectPicker";
 import { ProjectVersionPicker } from "@/components/observatory/ProjectVersionPicker";
 import { getAgentClaimEligibility } from "@/lib/observatory/agent-claims";
+import { formatDueLabel, vancouverDateAt } from "@/lib/observatory/work-item-due";
 import type {
   ObservatoryWorkItemClaimRow,
   ObservatoryWorkItemRow,
@@ -199,7 +200,9 @@ export function WorkTrackerBoard({
     );
   }
 
-  const evaluatedAt = new Date(state.evaluatedAt ?? "1970-01-01").getTime();
+  const evaluatedAtInstant = state.evaluatedAt ?? "1970-01-01T00:00:00.000Z";
+  const evaluatedAt = new Date(evaluatedAtInstant).getTime();
+  const today = vancouverDateAt(evaluatedAtInstant);
   const activeClaims = new Map(
     (state.activeClaims ?? [])
       .filter(
@@ -242,6 +245,7 @@ export function WorkTrackerBoard({
       : eligibility.eligible
         ? "Agent eligible"
         : "Manual";
+    const dueLabel = formatDueLabel(item.due_on, today);
 
     return (
       <li
@@ -358,6 +362,9 @@ export function WorkTrackerBoard({
           <span className="work-tracker-assignee-badge">
             Assigned · {item.assigned_agent_id}
           </span>
+          {dueLabel ? (
+            <span className="work-tracker-due-badge">{dueLabel}</span>
+          ) : null}
           {projectVersion ? (
             <span
               className={`work-tracker-version-badge work-tracker-version-${projectVersion.status}`}

@@ -49,6 +49,7 @@ export interface ObservatoryWorkItemRow {
   acceptance_criteria: string;
   project_ref: string | null;
   milestone_ref: string | null;
+  due_on: string | null;
   project_key: string | null;
   project_version_id: string | null;
   version_binding_kind?: ObservatoryVersionBindingKind;
@@ -479,7 +480,7 @@ export function createObservatoryRepository(
         client
           .from("observatory_work_items")
           .select(
-            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+            "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,due_on,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
           )
           .order("updated_at", { ascending: false }),
       );
@@ -489,7 +490,7 @@ export function createObservatoryRepository(
       const { data, error } = await client
         .from("observatory_work_items")
         .select(
-          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
+          "id,type,title,description,state,priority,owner_id,assigned_agent_id,acceptance_criteria,project_ref,milestone_ref,due_on,project_key,project_version_id,version_binding_kind,plan_revision,stage_id,work_package_id,idempotency_key,version,created_by,created_at,updated_at,risk_level,agent_claim_enabled,authorized_paths,allowed_action_classes,claim_approved_by,claim_approved_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -625,6 +626,7 @@ export function createObservatoryRepository(
           p_assigned_agent_id: input.assignedAgentId,
           p_project_ref: input.projectRef,
           p_milestone_ref: input.milestoneRef,
+          p_due_on: input.dueOn,
           p_project_key: input.projectKey,
           p_plan_revision: input.planRevision,
           p_stage_id: input.stageId,

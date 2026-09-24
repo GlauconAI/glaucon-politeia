@@ -380,6 +380,7 @@ export async function updateObservatoryWorkItemAction(
     projectVersionId: formData.get("projectVersionId"),
     versionBindingKind: formValue(formData, "versionBindingKind"),
     milestoneRef: nullableText(formData, "milestoneRef"),
+    dueOn: nullableText(formData, "dueOn"),
     projectKey: nullableText(formData, "projectKey"),
     planRevision: nullableText(formData, "planRevision") === null
       ? null

@@ -42,6 +42,7 @@ const item: ObservatoryWorkItemRow = {
   acceptance_criteria: "The item reaches Done.",
   project_ref: "Dashboard",
   milestone_ref: "OBS-M3",
+  due_on: null,
   project_key: null,
   project_version_id: "33333333-3333-4333-8333-333333333333",
   version_binding_kind: "required",
@@ -145,6 +146,37 @@ describe("WorkTrackerBoard", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.history.replaceState(null, "", "/work-tracker");
+  });
+
+  it("shows a deterministic deadline badge only when due_on exists", () => {
+    const dueItem = { ...item, due_on: "2026-09-23" };
+    render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [dueItem],
+          evaluatedAt: "2026-09-23T19:00:00.000Z",
+        }}
+        projects={projects}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId(`work-item-${item.id}`)).getByText("Due today"),
+    ).toBeInTheDocument();
+
+    const { unmount } = render(
+      <WorkTrackerBoard
+        state={{
+          status: "ready",
+          items: [{ ...item, id: "22222222-2222-4222-8222-222222222222" }],
+          evaluatedAt: "2026-09-23T19:00:00.000Z",
+        }}
+        projects={projects}
+      />,
+    );
+    expect(screen.getAllByText("Due today")).toHaveLength(1);
+    unmount();
   });
 
   it("shows and filters Project Versions while preserving detail return context", () => {

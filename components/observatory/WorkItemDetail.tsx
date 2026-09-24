@@ -462,6 +462,14 @@ export function WorkItemDetail({
             />
           </label>
           <label>
+            <span>Due date</span>
+            <input
+              type="date"
+              name="dueOn"
+              defaultValue={item.due_on ?? ""}
+            />
+          </label>
+          <label>
             <span>Project Control binding</span>
             <select
               aria-describedby="project-control-binding-help"
