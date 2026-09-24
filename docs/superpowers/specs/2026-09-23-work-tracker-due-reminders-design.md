@@ -5,7 +5,7 @@
 - Owner: Plato
 - Decision owner: Glaucon
 - Date: 2026-09-23
-- Status: approved design, awaiting written-spec review
+- Status: approved for implementation
 - Product: Concerto — Work Tracker
 
 ## Objective
