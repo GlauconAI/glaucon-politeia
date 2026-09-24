@@ -32,7 +32,9 @@
     "#observatory-agent-activity-schema": "./lib/observatory/agent-activity-schema.ts",
     "#observatory-agent-activity-collector": "./lib/observatory/agent-activity-collector.ts",
     "#observatory-project-catalog-audit-schema": "./lib/observatory/project-catalog-audit-schema.ts",
-    "#observatory-project-catalog-audit": "./lib/observatory/project-catalog-audit.ts"
+    "#observatory-project-catalog-audit": "./lib/observatory/project-catalog-audit.ts",
+    "#observatory-work-item-due": "./lib/observatory/work-item-due.ts",
+    "#observatory-work-item-due-digest": "./lib/observatory/work-item-due-digest.ts"
   },
   "scripts": {
     "dev": "next dev",
@@ -65,6 +67,7 @@
     "supabase:make-admin": "node scripts/supabase-ops.mjs make-admin",
     "supabase:readiness": "node scripts/supabase-ops.mjs readiness",
     "supabase:status": "node scripts/supabase-ops.mjs status",
+    "work-tracker:due-reminder": "node scripts/work-tracker/due-reminder.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

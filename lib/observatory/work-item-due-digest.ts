@@ -1,4 +1,4 @@
-import { classifyDueOn, type WorkItemDueClass } from "@/lib/observatory/work-item-due";
+import { classifyDueOn, type WorkItemDueClass } from "#observatory-work-item-due";
 import type {
   ObservatoryWorkItemPriority,
   ObservatoryWorkItemState,
