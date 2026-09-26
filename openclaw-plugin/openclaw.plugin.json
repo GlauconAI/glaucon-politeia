@@ -1,0 +1,54 @@
+{
+  "id": "openclaw-concerto",
+  "name": "Concerto — Agent Work Item Tools",
+  "version": "0.1.0",
+  "description": "Typed browser-free Concerto Work Item operations for registered OpenClaw Agents.",
+  "contracts": {
+    "tools": [
+      "concerto_list_work_items",
+      "concerto_get_work_item",
+      "concerto_create_work_item",
+      "concerto_update_work_item",
+      "concerto_transition_work_item",
+      "concerto_assign_work_item",
+      "concerto_add_evidence",
+      "concerto_claim_work_item",
+      "concerto_complete_claim"
+    ]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Concerto base URL"
+    },
+    "tokenEnv": {
+      "label": "Protected per-Agent token map environment variable",
+      "advanced": true
+    },
+    "timeoutMs": {
+      "label": "Request timeout in milliseconds",
+      "advanced": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "pattern": "^https://"
+      },
+      "tokenEnv": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 30000
+      }
+    }
+  }
+}

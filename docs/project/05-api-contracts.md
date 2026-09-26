@@ -202,3 +202,40 @@ Errors:
 - Admin checks must read `profiles.is_admin` for the current user.
 - Production non-admin access to admin pages and APIs should not reveal admin resource existence.
 - Service-role client must never be imported by client components.
+
+## Concerto Agent Work Items
+
+### `GET /api/concerto/work-items`
+
+Returns Work Items assigned to the authenticated Agent plus items in Projects
+owned by that Agent. Optional query fields are `state`, `projectRef`, and
+`limit` (`1..100`).
+
+### `POST /api/concerto/work-items`
+
+Creates an Inbox Work Item assigned to the authenticated Agent. The request
+contains `type`, `title`, optional `description`, `projectRef`,
+`projectVersionId`, `versionBindingKind`, and `idempotencyKey`.
+
+### `GET /api/concerto/work-items/:id`
+
+Returns one visible Work Item with `version`, `allowedActions`, and
+`allowedTransitions`. An unrelated item is reported as `NOT_FOUND`.
+
+### `PATCH /api/concerto/work-items/:id`
+
+Executes exactly one strict command:
+
+- `update`: mutable title, description, acceptance criteria, or priority;
+- `transition`: an allowed lifecycle transition;
+- `assign`: Project Owner only, to a registered Agent;
+- `add_evidence`: add a bounded HTTP(S) evidence link.
+
+Every command requires `expectedVersion` and `idempotencyKey`. The server
+derives the actor from the bearer token; `agentId`, owner authority, and audit
+identity cannot be supplied in the body. Ordinary Agents cannot transition to
+`done` or `reopened`. Final acceptance belongs to the Project Owner.
+
+Stable errors are `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`,
+`VERSION_CONFLICT`, `INVALID_TRANSITION`, `READY_GATE_FAILED`,
+`IDEMPOTENCY_CONFLICT`, `INVALID_REQUEST`, and `UNAVAILABLE`.

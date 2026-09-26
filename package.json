@@ -51,6 +51,7 @@
     "observatory:project-versions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/apply-project-version-migration.ts",
     "observatory:project-version-contract-v1": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-project-version-contract-v1.ts",
     "observatory:project-version-contract-v1:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-project-version-contract-v1.ts",
+    "observatory:concerto-agent-api:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-concerto-agent-work-item-api.ts",
     "observatory:work-item-due-dates:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-work-item-due-dates.ts",
     "observatory:verify-snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-snapshot.ts",
     "observatory:verify-local-db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/verify-local-db.ts",
