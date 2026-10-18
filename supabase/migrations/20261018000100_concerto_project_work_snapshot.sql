@@ -32,7 +32,7 @@ as $$
     from items
   )
   select case
-    when auth.role() <> 'service_role'
+    when auth.role() is distinct from 'service_role'
       or p_project_key is null
       or p_project_key !~ '^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$'
     then null
