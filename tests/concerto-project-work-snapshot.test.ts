@@ -2,9 +2,14 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createProjectWorkSnapshotHandler } from "@/app/api/concerto/project-work-snapshot/route";
+import { createProjectWorkSnapshotHandler, defaultSnapshotRouteDependencies } from "@/app/api/concerto/project-work-snapshot/route";
 import { validateProjectWorkSnapshot } from "@/lib/observatory/project-work-snapshot";
 import { createProjectWorkSnapshotRepository } from "@/lib/observatory/project-work-snapshot-repository";
+
+const { readOverview } = vi.hoisted(() => ({ readOverview: vi.fn() }));
+vi.mock("@/lib/observatory/dashboard-state", () => ({
+  loadObservatoryOverviewState: readOverview,
+}));
 
 const projectKey = "shared/asgard-archaea";
 const token = "snapshot-owner-token";
@@ -39,6 +44,32 @@ const snapshot = {
 };
 
 describe("Concerto Project Work snapshot", () => {
+  it("uses explicit runtime Project Owner rather than Shared grouping or persona alias", async () => {
+    readOverview.mockResolvedValue({ status: "ready", snapshot: {
+      registry: { project_groups: [{ owner: "Shared", projects: [{
+        project_key: projectKey, name: "asgard-archaea", title: "Asgard",
+        project_owner: "main", project_owner_source: "explicit", status: "active",
+      }] }] }, agents: [],
+    } });
+    const principals = ["main", "shared", "socrates"];
+    const read = vi.fn().mockResolvedValue(snapshot);
+    const GET = createProjectWorkSnapshotHandler({
+      keyConfiguration: () => JSON.stringify(principals.map((agentId) => ({
+        agentId, tokenSha256: createHash("sha256").update("test-" + agentId).digest("hex"),
+      }))),
+      projects: defaultSnapshotRouteDependencies.projects,
+      repository: () => ({ read }),
+    });
+    for (const agentId of principals) {
+      const response = await GET(new Request(
+        "https://example.test/api/concerto/project-work-snapshot?projectKey=shared%2Fasgard-archaea",
+        { headers: { authorization: "Bearer test-" + agentId } },
+      ));
+      expect(response.status).toBe(agentId === "main" ? 200 : 403);
+    }
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects truncated, foreign, duplicate, or incomplete snapshot responses", () => {
     expect(validateProjectWorkSnapshot(snapshot, projectKey).items).toHaveLength(1);
     for (const invalid of [
