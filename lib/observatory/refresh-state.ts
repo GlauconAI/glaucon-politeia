@@ -21,7 +21,7 @@ export interface ObservatoryRefreshTransition {
 }
 
 const FAILURE_NOTIFICATION_THRESHOLD = 3;
-export const OBSERVATORY_STALE_THRESHOLD_MS = 45 * 60 * 1000;
+export const OBSERVATORY_STALE_THRESHOLD_MS = 30 * 60 * 60 * 1_000;
 export const OBSERVATORY_REFRESH_STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
 const SAFE_REFRESH_STEP_FAILURE_CODES = [

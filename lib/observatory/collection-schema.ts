@@ -47,11 +47,11 @@ export const ObservatoryAgentSchema = z.strictObject({
 });
 
 export const ObservatoryRuntimeTaskTotalsSchema = z.strictObject({
-  total: z.number().int().nonnegative(),
-  active: z.number().int().nonnegative(),
-  queued: z.number().int().nonnegative(),
-  completed: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative().nullable(),
+  active: z.number().int().nonnegative().nullable(),
+  queued: z.number().int().nonnegative().nullable(),
+  completed: z.number().int().nonnegative().nullable(),
+  failed: z.number().int().nonnegative().nullable(),
 });
 
 export const ObservatoryRuntimeSchema = z.strictObject({

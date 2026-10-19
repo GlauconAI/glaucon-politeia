@@ -18,6 +18,7 @@ type ReportCategory =
 interface ReportEntity {
   id: string;
   label: string;
+  fingerprint: string;
 }
 
 interface SnapshotLike {
@@ -38,6 +39,7 @@ interface SnapshotLike {
     owner?: string;
   }>;
   relationships?: unknown[];
+  source_health?: Array<{ domain: string; status: string; error_code?: string }>;
   project_catalog_audit?: ProjectCatalogAudit;
 }
 
@@ -56,8 +58,9 @@ export interface ObservatoryRefreshReport {
     assets: number;
     relationships: number;
   };
-  changes: Record<ReportCategory, { added: string[]; removed: string[] }>;
+  changes: Record<ReportCategory, { added: string[]; removed: string[]; updated: string[] }>;
   catalog_audit: ProjectCatalogAudit | null;
+  data_gaps: string[];
 }
 
 const CATEGORY_LABELS: Record<ReportCategory, string> = {
@@ -83,6 +86,17 @@ function safeLabel(value: unknown, fallback: string): string {
   return normalized.length <= 120 ? normalized : `${normalized.slice(0, 117)}…`;
 }
 
+// Observation timestamps/health change every collection; they are not asset edits.
+function fingerprint(value: unknown): string {
+  const volatile = new Set(["collected_at", "observed_at", "generated_at", "last_seen_at", "last_success_at", "freshness", "health", "source_digest", "last_run_at", "next_run_at", "updated_at"]);
+  function stable(input: unknown): unknown {
+    if (Array.isArray(input)) return input.filter(item => !(item && typeof item === "object" && "key" in item && volatile.has(String(item.key)))).map(stable);
+    if (input && typeof input === "object") return Object.fromEntries(Object.entries(input).filter(([key]) => !volatile.has(key)).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, stable(val)]));
+    return input;
+  }
+  return JSON.stringify(stable(value));
+}
+
 function snapshotEntities(
   input: unknown,
 ): Record<ReportCategory, ReportEntity[]> {
@@ -91,12 +105,12 @@ function snapshotEntities(
     (group.projects ?? []).flatMap((project) => {
       if (typeof project.project_key !== "string") return [];
       const name = safeLabel(project.title ?? project.name, project.project_key);
-      return [{ id: project.project_key, label: `${name} (${project.project_key})` }];
+      return [{ id: project.project_key, label: `${name} (${project.project_key})`, fingerprint: fingerprint(project) }];
     }),
   );
   const agents = (snapshot.agents ?? []).flatMap((agent) => {
     if (typeof agent.id !== "string") return [];
-    return [{ id: agent.id, label: safeLabel(agent.display_name, agent.id) }];
+    return [{ id: agent.id, label: safeLabel(agent.display_name, agent.id), fingerprint: fingerprint(agent) }];
   });
   const assets = snapshot.assets ?? [];
   const assetsByKind = (kind: string): ReportEntity[] =>
@@ -105,7 +119,7 @@ function snapshotEntities(
       const name = safeLabel(asset.name, asset.id);
       const owner = safeLabel(asset.owner, "");
       const label = kind === "repository" || !owner ? name : `${owner}/${name}`;
-      return [{ id: asset.id, label }];
+      return [{ id: asset.id, label, fingerprint: fingerprint(asset) }];
     });
   return {
     projects,
@@ -127,10 +141,11 @@ function snapshotEntities(
 function diffEntities(
   previous: ReportEntity[],
   current: ReportEntity[],
-): { added: string[]; removed: string[] } {
+): { added: string[]; removed: string[]; updated: string[] } {
   const before = new Map(previous.map((entity) => [entity.id, entity.label]));
   const after = new Map(current.map((entity) => [entity.id, entity.label]));
   return {
+    updated: current.filter(entity => previous.some(old => old.id === entity.id && old.fingerprint !== entity.fingerprint)).map(entity => entity.label).sort(),
     added: [...after]
       .filter(([id]) => !before.has(id))
       .map(([, label]) => label)
@@ -166,7 +181,7 @@ export function createObservatoryRefreshReport(
     (Object.keys(CATEGORY_LABELS) as ReportCategory[]).map((category) => [
       category,
       previousSnapshot === null
-        ? { added: [], removed: [] }
+        ? { added: [], removed: [], updated: [] }
         : diffEntities(previous[category], current[category]),
     ]),
   ) as ObservatoryRefreshReport["changes"];
@@ -187,6 +202,7 @@ export function createObservatoryRefreshReport(
     },
     changes,
     catalog_audit: snapshot.project_catalog_audit ?? null,
+    data_gaps: (snapshot.source_health ?? []).filter(source => source.status !== "fresh" || source.error_code).map(source => `${source.domain}: ${source.error_code ?? source.status}`),
   };
 }
 
@@ -255,9 +271,10 @@ export function formatObservatoryRefreshSuccessMessage(
   const changeLines = (Object.keys(CATEGORY_LABELS) as ReportCategory[]).flatMap(
     (category) => {
       const change = report.changes[category];
-      if (change.added.length === 0 && change.removed.length === 0) return [];
+      if (change.added.length === 0 && change.removed.length === 0 && change.updated.length === 0) return [];
       const details = [
         change.added.length > 0 ? `新增 ${itemSummary(change.added)}` : "",
+        change.updated.length > 0 ? `修改 ${itemSummary(change.updated)}` : "",
         change.removed.length > 0 ? `删除 ${itemSummary(change.removed)}` : "",
       ].filter(Boolean);
       return [`• ${CATEGORY_LABELS[category]}：${details.join("；")}`];
@@ -267,7 +284,7 @@ export function formatObservatoryRefreshSuccessMessage(
     ? "首次建立对比基线，本次不报告新增和删除"
     : changeLines.length > 0
       ? changeLines.join("\n")
-      : "本次未发现受监控资产的新增和删除";
+      : "本次无新增、修改或移除";
   const status = options.recovered
     ? "已恢复，Dashboard 已使用最新信息"
     : "更新成功，Dashboard 已使用最新信息";
@@ -277,15 +294,16 @@ export function formatObservatoryRefreshSuccessMessage(
     `状态：${status}`,
     `耗时：${durationLabel(report.duration_ms)}`,
     "",
-    "本次变化",
+    `本次变化：新增 ${Object.values(report.changes).reduce((n, c) => n + c.added.length, 0)} · 修改 ${Object.values(report.changes).reduce((n, c) => n + c.updated.length, 0)} · 移除 ${Object.values(report.changes).reduce((n, c) => n + c.removed.length, 0)}`,
     changes,
     "",
     "当前规模",
     `• Project ${report.totals.projects} · Skill ${report.totals.skills} · Agent ${report.totals.agents} · Tool ${report.totals.tools} · Repository ${report.totals.repositories}`,
     `• 资产 ${report.totals.assets} · 关系 ${report.totals.relationships}`,
     "",
+    ...(report.data_gaps.length ? ["数据覆盖提示（发布成功不代表所有来源完整）：", ...report.data_gaps.map(gap => `• ${gap}`)] : []),
     ...catalogAuditSummary(report.catalog_audit),
-    `历史 Snapshot 保留：${options.retentionOk ? "正常" : "异常"}`,
+    "此更新未执行历史快照清理",
   ].join("\n");
 }
 

@@ -4,7 +4,8 @@ import type {
 } from "#observatory-asset-schema";
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1_000;
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1_000;
+export const DAILY_SNAPSHOT_MAX_AGE_MS = 30 * 60 * 60 * 1_000;
+const TWENTY_FOUR_HOURS_MS = DAILY_SNAPSHOT_MAX_AGE_MS;
 
 const thresholdByDomain: Record<ObservatorySourceDomain, number> = {
   core: TWENTY_FOUR_HOURS_MS,
@@ -12,7 +13,7 @@ const thresholdByDomain: Record<ObservatorySourceDomain, number> = {
   tools_profiles: TWENTY_FOUR_HOURS_MS,
   rules_config: TWENTY_FOUR_HOURS_MS,
   knowledge_agenda: TWENTY_FOUR_HOURS_MS,
-  operations: FIFTEEN_MINUTES_MS,
+  operations: DAILY_SNAPSHOT_MAX_AGE_MS,
   source_repositories: TWENTY_FOUR_HOURS_MS,
   project_executions: FIFTEEN_MINUTES_MS,
   project_controls: FIFTEEN_MINUTES_MS,

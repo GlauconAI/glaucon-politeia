@@ -13,6 +13,7 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
   usePathname: () => mocks.dashboardPath.split("?")[0],
   redirect: vi.fn(),
 }));

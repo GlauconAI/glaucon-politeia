@@ -92,6 +92,7 @@ export function SourceStatus(props: SourceStatusProps) {
       </div>
 
       <p role={status === "fresh" ? "status" : "alert"}>{announcement}</p>
+      <p>Daily snapshot · scheduled 09:30 America/Vancouver. Stale after 30 hours. This page does not provide live telemetry.</p>
 
       <dl className="observatory-provenance">
         <div>

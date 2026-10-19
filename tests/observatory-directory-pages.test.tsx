@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock("@/components/observatory/ProjectWorkPortfolio", () => ({ ProjectWorkPortfolio: () => <div>Live Project Work — test boundary</div> }));
+
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 vi.mock("@/lib/observatory/admin-auth", () => ({
@@ -53,7 +55,11 @@ import AutomationsPage, {
 } from "@/app/dashboard/automations/page";
 
 const snapshot = {
+  generated_at: "2026-10-19T16:30:00Z",
+  source_digest: "b".repeat(64),
   registry: {
+    registry_version: "test",
+    source: { freshness: "fresh", collected_at: "2026-10-19T16:30:00Z", owner: "Socrates", authority: "canonical", logical_reference: "shared/registry", digest: "a".repeat(64) },
     project_groups: [
       {
         owner: "Plato",

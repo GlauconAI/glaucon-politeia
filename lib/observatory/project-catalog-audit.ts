@@ -38,11 +38,13 @@ export const PROJECT_CATALOG_PROJECTION_FILES = [
 interface CanonicalProjectAuditRecord {
   name: string;
   mapping_incomplete?: boolean;
+  status?: string;
 }
 
 interface CanonicalProjectGroupAuditRecord {
   owner: string;
   root: string;
+  audit_excludes?: string[];
   projects: CanonicalProjectAuditRecord[];
 }
 
@@ -179,12 +181,12 @@ export async function collectProjectCatalogAudit(
     for (const { group, actual } of groupDirectories) {
       const registered = new Set(group.projects.map((project) => project.name));
       for (const name of actual) {
-        if (!registered.has(name)) {
+        if (!registered.has(name) && !(group.audit_excludes ?? []).includes(name)) {
           unregisteredSurfaces.push(`${group.owner}/${name}`);
         }
       }
       for (const project of group.projects) {
-        if (!actual.includes(project.name)) {
+        if (project.status !== "retired" && !actual.includes(project.name)) {
           registeredPathsMissing.push(`${group.owner}/${project.name}`);
         }
         if (project.mapping_incomplete === true) {

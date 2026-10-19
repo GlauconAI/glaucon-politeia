@@ -158,6 +158,7 @@ export function ProjectExecutionPortfolio({
         </p>
       ) : (
         <>
+          <p role="note">Execution export coverage: {projects.filter(project => project.match !== "catalog_only").length} of {projects.length} listed Projects. Counts describe exported lines only; missing coverage does not mean no work exists.</p>
           <dl className="project-execution-summary" aria-label="Project execution portfolio summary">
             <div><dt>Active Projects</dt><dd>{countLabel(summary.activeProjects, "active Project")}</dd></div>
             <div><dt>Active Agent Lines</dt><dd>{countLabel(summary.activeLines, "active Agent line")}</dd></div>

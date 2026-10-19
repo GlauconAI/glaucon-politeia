@@ -88,25 +88,25 @@ describe("Observatory refresh state", () => {
     expect(healthy.notification).toBeNull();
   });
 
-  it("escalates once after 45 minutes without a successful refresh", () => {
+  it("escalates once after 30 hours without a successful refresh", () => {
     const state = createObservatoryRefreshState(startedAt);
     expect(
       evaluateObservatoryRefreshStaleness(
         state,
-        "2026-07-22T20:44:59.999Z",
+        "2026-07-24T01:59:59.999Z",
       ).notification,
     ).toBeNull();
 
     const stale = evaluateObservatoryRefreshStaleness(
       state,
-      "2026-07-22T20:45:00.000Z",
+      "2026-07-24T02:00:00.000Z",
     );
     expect(stale.notification).toBe("stale");
-    expect(stale.state.stale_notified_at).toBe("2026-07-22T20:45:00.000Z");
+    expect(stale.state.stale_notified_at).toBe("2026-07-24T02:00:00.000Z");
     expect(
       evaluateObservatoryRefreshStaleness(
         stale.state,
-        "2026-07-22T21:45:00.000Z",
+        "2026-07-24T03:00:00.000Z",
       ).notification,
     ).toBeNull();
   });
@@ -120,13 +120,13 @@ describe("Observatory refresh state", () => {
     expect(
       evaluateObservatoryRefreshStaleness(
         healthy,
-        "2026-07-22T21:14:59.999Z",
+        "2026-07-24T02:29:59.999Z",
       ).notification,
     ).toBeNull();
     expect(
       evaluateObservatoryRefreshStaleness(
         healthy,
-        "2026-07-22T21:15:00.000Z",
+        "2026-07-24T02:30:00.000Z",
       ).notification,
     ).toBe("stale");
   });

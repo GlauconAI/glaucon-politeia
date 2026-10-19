@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, rename } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { ObservatoryCollectionEnvelopeSchema } from "#observatory-collection-schema";
@@ -162,8 +162,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const observatoryDirectory = resolve(".observatory");
-  const snapshotPath = resolve(observatoryDirectory, "observatory-snapshot.json");
+  const observatoryDirectory = resolve(process.env.OBSERVATORY_STATE_DIR ?? ".observatory");
+  const snapshotPath = resolve(observatoryDirectory, "candidate-snapshot.json");
+  const baselinePath = resolve(observatoryDirectory, "observatory-snapshot.json");
   const statePath = resolve(observatoryDirectory, "refresh-state.json");
   const reportPath = resolve(observatoryDirectory, "latest-refresh-report.txt");
   const diagnosticDirectory = resolve(observatoryDirectory, "refresh-errors");
@@ -177,7 +178,7 @@ async function main(): Promise<void> {
 
   try {
     const startedAtMs = Date.now();
-    const previousSnapshot = await readSnapshotIfPresent(snapshotPath);
+    const previousSnapshot = await readSnapshotIfPresent(baselinePath);
     let state = await readObservatoryRefreshState(statePath, () => new Date());
     const collectArgs = [
       resolve(registryPath),
@@ -272,6 +273,7 @@ async function main(): Promise<void> {
         retentionOk: true,
       })}\n`,
     );
+    await rename(snapshotPath, baselinePath);
     process.stdout.write("OBSERVATORY_REFRESH_OK\n");
   } finally {
     await lock.release?.();
@@ -280,7 +282,7 @@ async function main(): Promise<void> {
 
 main().catch(async (error: unknown) => {
   const failedAt = new Date().toISOString();
-  const observatoryDirectory = resolve(".observatory");
+  const observatoryDirectory = resolve(process.env.OBSERVATORY_STATE_DIR ?? ".observatory");
   const failureCode = sanitizeObservatoryRefreshStepFailure(
     error instanceof Error ? error.message : String(error),
   );

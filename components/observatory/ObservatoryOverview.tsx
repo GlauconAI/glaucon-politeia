@@ -255,12 +255,12 @@ export function ObservatoryOverview({
     },
     {
       label: "Active tasks",
-      value: summary.task_totals.active,
+      value: summary.task_totals.active ?? "Unavailable",
       href: "#dashboard-snapshot",
     },
     {
       label: "Failed tasks",
-      value: summary.task_totals.failed,
+      value: summary.task_totals.failed ?? "Unavailable",
       href: "#dashboard-snapshot",
     },
     ...("source_repositories" in state.snapshot
@@ -426,6 +426,7 @@ export function ObservatoryOverview({
             className="dashboard-section-anchor"
             data-dashboard-section
           >
+            <p role="note">Dashboard development history only. These Roadmap, Analytics and Review records do not represent current progress across all Projects.</p>
             <ProjectCockpit governance={state.snapshot.delivery_governance} />
           </div>
           <div

@@ -98,20 +98,20 @@ describe("Observatory refresh report", () => {
 
     expect(report.changes.projects).toEqual({
       added: ["New Project (plato/new-project)"],
-      removed: ["old-project (plato/old-project)"],
+      removed: ["old-project (plato/old-project)"], updated: [],
     });
     expect(report.changes.skills).toEqual({
       added: ["plato/new-skill"],
-      removed: ["plato/old-skill"],
+      removed: ["plato/old-skill"], updated: [],
     });
     expect(report.changes.agents).toEqual({
       added: ["New Agent"],
-      removed: ["Old Agent"],
+      removed: ["Old Agent"], updated: [],
     });
-    expect(report.changes.tools).toEqual({ added: [], removed: [] });
+    expect(report.changes.tools).toEqual({ added: [], removed: [], updated: [] });
     expect(report.changes.repositories).toEqual({
       added: ["new-repository"],
-      removed: [],
+      removed: [], updated: [],
     });
     expect(report.totals).toEqual({
       projects: 1,
@@ -178,9 +178,9 @@ describe("Observatory refresh report", () => {
     expect(message).toContain("Dashboard 每日更新完成");
     expect(message).toContain("状态：更新成功，Dashboard 已使用最新信息");
     expect(message).toContain("耗时：4 分 26 秒");
-    expect(message).toContain("本次未发现受监控资产的新增和删除");
+    expect(message).toContain("本次无新增、修改或移除");
     expect(message).toContain("Project 1 · Skill 1 · Agent 1 · Tool 0 · Repository 0");
-    expect(message).toContain("历史 Snapshot 保留：正常");
+    expect(message).toContain("此更新未执行历史快照清理");
   });
 
   it("reports Project Catalog drift even when the asset inventory is unchanged", () => {

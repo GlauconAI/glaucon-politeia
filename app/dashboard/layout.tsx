@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { SnapshotAutoRefresh } from "@/components/observatory/SnapshotAutoRefresh";
 import { DashboardRouteNav } from "@/components/observatory/DashboardRouteNav";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function DashboardLayout({
 }) {
   return (
     <div className="dashboard-route-shell">
+      <SnapshotAutoRefresh />
       <DashboardRouteNav />
       {children}
     </div>
