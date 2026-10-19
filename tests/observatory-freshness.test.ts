@@ -8,12 +8,12 @@ import {
 describe("deriveFreshness", () => {
   const now = new Date("2026-07-22T22:30:00.000Z");
 
-  it("uses short thresholds for operations and day thresholds for metadata", () => {
+  it("uses the daily window for observations and short windows for execution exports", () => {
     expect(
       deriveFreshness("operations", "2026-07-22T22:16:00.000Z", now),
     ).toBe("fresh");
     expect(
-      deriveFreshness("operations", "2026-07-22T22:14:59.000Z", now),
+      deriveFreshness("operations", "2026-07-21T16:29:59.000Z", now),
     ).toBe("stale");
     expect(
       deriveFreshness(
@@ -33,7 +33,7 @@ describe("deriveFreshness", () => {
       deriveFreshness("skills", "2026-07-21T22:30:01.000Z", now),
     ).toBe("fresh");
     expect(
-      deriveFreshness("skills", "2026-07-21T22:29:59.000Z", now),
+      deriveFreshness("skills", "2026-07-21T16:29:59.000Z", now),
     ).toBe("stale");
   });
 

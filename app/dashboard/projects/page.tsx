@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProjectWorkPortfolio } from "@/components/observatory/ProjectWorkPortfolio";
 import { redirect } from "next/navigation";
 
 import {
@@ -119,6 +120,8 @@ export default async function ProjectsPage({
       </header>
       {state.status === "ready" ? (
         <>
+          <SourceStatus status="ready" snapshot={state.snapshot} />
+          <ProjectWorkPortfolio />
           <ProjectCatalogAuditPanel
             audit={
               "project_catalog_audit" in state.snapshot

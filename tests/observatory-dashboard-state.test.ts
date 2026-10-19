@@ -127,7 +127,7 @@ describe("Observatory Dashboard state", () => {
       getLatestSuccessfulSnapshot: async () => row(),
     });
 
-    expect(state).toEqual({ status: "ready", snapshot: payload });
+    expect(state).toEqual({ status: "ready", snapshot: { ...payload, registry: { ...payload.registry, source: { ...payload.registry.source, freshness: "stale" } }, summary: { ...payload.summary, freshness: "stale" } } });
   });
 
   it("keeps empty, invalid, and failed reads safe", async () => {

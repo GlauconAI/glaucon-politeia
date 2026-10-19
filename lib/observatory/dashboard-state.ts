@@ -1,4 +1,5 @@
 import "server-only";
+import { ageObservatorySnapshot } from "./read-freshness";
 
 import { unstable_cache } from "next/cache";
 
@@ -36,7 +37,7 @@ export async function readObservatoryOverviewState(
       };
     }
 
-    return { status: "ready", snapshot: parsed.data };
+    return { status: "ready", snapshot: ageObservatorySnapshot(parsed.data) };
   } catch {
     return {
       status: "error",

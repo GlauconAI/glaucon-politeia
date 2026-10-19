@@ -31,7 +31,7 @@ export function FreshnessSummary({
           <li key={source.domain} data-health={source.health}>
             <div>
               <strong>{label(source.domain)}</strong>
-              <span>{source.asset_count} assets</span>
+              <span>{source.last_success_at === null && source.health !== "healthy" ? "Count unavailable" : `${source.asset_count} assets reported`}</span>
             </div>
             <div>
               <span>{source.status}</span>

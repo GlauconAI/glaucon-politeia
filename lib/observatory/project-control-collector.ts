@@ -6,6 +6,7 @@ import {
   computeProjectControlDigest,
   type ProjectControlSnapshot,
 } from "#observatory-project-control-schema";
+import { deriveFreshness } from "#observatory-freshness";
 import { scanObservatoryPrivacy } from "#observatory-privacy-scan";
 
 export const OBSERVATORY_PROJECT_CONTROL_MAX_BYTES = 10 * 1024 * 1024;
@@ -177,15 +178,16 @@ export async function collectProjectControlSnapshot(
       "The Project Control export digest does not match its content.",
     );
   }
-  const stale = parsed.data.projects.some(
+  const freshness = deriveFreshness("project_controls", parsed.data.collected_at, dependencies.now());
+  const stale = freshness === "stale" || parsed.data.projects.some(
     (project) => project.project.freshness === "stale",
   );
   return {
     snapshot: parsed.data,
     sourceHealth: {
       domain: "project_controls",
-      status: stale ? "stale" : "fresh",
-      health: stale ? "degraded" : "healthy",
+      status: stale ? "stale" : freshness,
+      health: stale ? "degraded" : freshness === "fresh" ? "healthy" : "unknown",
       collected_at: parsed.data.collected_at,
       last_success_at: parsed.data.collected_at,
       asset_count: parsed.data.summary.project_count,

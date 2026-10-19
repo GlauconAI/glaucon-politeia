@@ -1,4 +1,5 @@
 import { dirname, isAbsolute, relative } from "node:path";
+import { deriveFreshness } from "#observatory-freshness";
 
 import type { ObservatorySourceHealth } from "#observatory-asset-schema";
 import {
@@ -146,15 +147,16 @@ export async function collectProjectExecutionSnapshot(
     );
   }
 
-  const stale = parsed.data.projects.some(
+  const freshness = deriveFreshness("project_executions", parsed.data.collected_at, dependencies.now());
+  const stale = freshness === "stale" || parsed.data.projects.some(
     (project) => project.project.freshness === "stale",
   );
   return {
     snapshot: parsed.data,
     sourceHealth: {
       domain: "project_executions",
-      status: stale ? "stale" : "fresh",
-      health: stale ? "degraded" : "healthy",
+      status: stale ? "stale" : freshness,
+      health: stale ? "degraded" : freshness === "fresh" ? "healthy" : "unknown",
       collected_at: parsed.data.collected_at,
       last_success_at: parsed.data.collected_at,
       asset_count: parsed.data.summary.project_count,

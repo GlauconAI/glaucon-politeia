@@ -8,7 +8,7 @@ import {
   computeCanonicalRegistrySourceHash,
   PROJECT_CATALOG_PROJECTION_FILES,
 } from "@/lib/observatory/project-catalog-audit";
-import { parseOrchestrationRegistryHtml } from "@/lib/observatory/registry";
+import { extractOrchestrationRegistryPayload, parseOrchestrationRegistryHtml } from "@/lib/observatory/registry";
 
 const fixtureHtml = readFileSync(
   join(process.cwd(), "tests/fixtures/observatory-registry.html"),
@@ -63,6 +63,22 @@ describe("collectProjectCatalogAudit", () => {
       error_code: null,
     });
     expect(JSON.stringify(audit)).not.toContain(privateRoot);
+  });
+
+  it("respects canonical audit exclusions and retired missing directories", async () => {
+    const payload = JSON.parse(extractOrchestrationRegistryPayload(fixtureHtml));
+    const group = payload.project_groups.find((group: { owner: string }) => group.owner === "Owner Team");
+    group.audit_excludes = ["scratch"];
+    group.projects.find((project: { name: string }) => project.name === "beta").status = "retired";
+    const html = fixtureHtml.replace(extractOrchestrationRegistryPayload(fixtureHtml), JSON.stringify(payload));
+    const audit = await collectProjectCatalogAudit({ registryHtml: html, registrySnapshot: snapshot, projectionDirectory, mirrorPath }, {
+      now: () => new Date(collectedAt),
+      listDirectories: async path => path.endsWith("socrates-agora/projects") ? ["governance"] : ["alpha", "scratch"],
+      listFiles: async () => PROJECT_CATALOG_PROJECTION_FILES,
+      readTextFile: async path => path === mirrorPath ? html : `source_hash: ${computeCanonicalRegistrySourceHash(html)}\n`,
+    });
+    expect(audit.unregistered_surfaces).toEqual([]);
+    expect(audit.registered_paths_missing).toEqual([]);
   });
 
   it("returns clean when every read-only projection matches", async () => {

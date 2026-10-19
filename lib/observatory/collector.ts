@@ -359,7 +359,7 @@ function mapRuntime(
       safeCount(agents?.count) ??
       (Array.isArray(agents?.agents) ? agents.agents.length : undefined) ??
       observedAgentCount,
-    task_totals: {
+    task_totals: !tasks ? { total: null, active: null, queued: null, completed: null, failed: null } : {
       total:
         safeCount(tasks?.total) ?? active + queued + completed + failed,
       active,
