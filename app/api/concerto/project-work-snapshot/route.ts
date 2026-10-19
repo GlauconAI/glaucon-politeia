@@ -9,6 +9,7 @@ import {
   type ProjectWorkSnapshotClient,
 } from "@/lib/observatory/project-work-snapshot-repository";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadObservatoryOverviewState } from "@/lib/observatory/dashboard-state";
 
 const PROJECT_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -20,7 +21,21 @@ export interface SnapshotRouteDependencies {
 
 export const defaultSnapshotRouteDependencies: SnapshotRouteDependencies = {
   keyConfiguration: defaultAgentWorkItemApiDependencies.keyConfiguration,
-  projects: defaultAgentWorkItemApiDependencies.projects,
+  projects: async () => {
+    const state = await loadObservatoryOverviewState();
+    if (state.status !== "ready") throw new Error("Registry unavailable");
+    return {
+      projects: state.snapshot.registry.project_groups.flatMap((group) =>
+        group.projects.map((project) => ({
+          projectKey: project.project_key,
+          title: project.title ?? project.name,
+          owner: project.project_owner ?? group.owner,
+          status: project.status,
+        })),
+      ),
+      agentIds: state.snapshot.agents?.map((agent) => agent.id) ?? [],
+    };
+  },
   repository: () => createProjectWorkSnapshotRepository(
     createSupabaseAdminClient() as unknown as ProjectWorkSnapshotClient,
   ),
