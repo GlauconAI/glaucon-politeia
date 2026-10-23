@@ -33,4 +33,14 @@ Supabase 官方通知：[public 新表不再自动暴露给 Data API](https://gi
 
 本地没有运行中的 Docker/Supabase，未完成全量 `db reset`。上线前继续按 `work-tracker-release` 的数据库迁移分支做生产目标锁定、真实 PostgreSQL 回滚演练、独立审查、部署验证。生产授权变更与默认分支合并需要各自的明确授权。不能直接用旧 `supabase:apply-missing`：它只列举较早的固定迁移集，不会发现此文件。
 
+### 受限部署入口
+
+使用 `scripts/observatory/deploy-data-api-grants.ts check|apply|status`；默认 `check`，拒绝额外参数，复用现有生产 Supabase target pinning。通过 `GLAUCON_POLITEIA_ENV_FILE` 指向本机已有环境文件，不在命令或回执中输出凭据。
+
+- `check`：在事务中执行严格限定的七条 GRANT、写入迁移版本、逐项校验 26 项所需权限和 56 项私有表拒绝权限。嵌套回滚探测验证登录管理员 INSERT RETURNING、匿名隔离、后台查询和统计 RPC；校验受保护时间戳、审计数、RLS 策略和非目标 ACL 不变后，回滚整个事务并确认版本记录未留下。
+- `apply`：执行同一验证；探测数据始终通过 savepoint 回滚，只提交授权和迁移版本。
+- `status`：只读回读迁移版本及 ACL/RLS 合同。
+
+匿名 INSERT RETURNING 的既有 RLS 拒绝属于预期边界，部署探测不得将它误报为已修复的匿名提交链路。现有生产默认授权不收紧，本次也不改变 Supabase 的 future-object defaults。
+
 现有生产表不受 10 月 30 日默认权限变更影响，因此无需为此紧急改线上权限、轮换密钥或升级订阅。
