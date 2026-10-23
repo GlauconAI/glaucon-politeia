@@ -6,6 +6,12 @@ import { validateGrantMigration } from "../scripts/observatory/deploy-data-api-g
 const source = readFileSync("supabase/migrations/20261023000100_explicit_data_api_grants.sql", "utf8");
 
 describe("bounded Data API grant deployment", () => {
+  it("isolates expected SQL errors in a native driver savepoint scope", () => {
+    const runner = readFileSync("scripts/observatory/deploy-data-api-grants.ts", "utf8");
+    expect(runner).toContain("await tx.savepoint(async (probeTx)");
+    expect(runner).toContain("await probeTx`insert into public.prompts");
+    expect(runner).not.toContain('savepoint anonymous_returning');
+  });
   it("accepts only the reviewed seven grants", () => {
     expect(() => validateGrantMigration(source)).not.toThrow();
     const executable = validateGrantMigration(source);

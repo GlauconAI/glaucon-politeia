@@ -111,19 +111,20 @@ async function probes(tx: TransactionSql) {
     const visible = await tx`select id from public.prompts where id=${row.id}`;
     if (visible.length !== 0) throw new Error("Anonymous role can see private probe row.");
     await tx.unsafe("reset role");
-    await tx.unsafe("savepoint anonymous_returning");
     let anonymousReturningDenied = false;
     try {
-      await tx.unsafe("set local role anon");
-      const anonymousNonce = randomUUID();
-      await tx`insert into public.prompts(client_session_id,source_url,content,idempotency_key)
-        values(${anonymousNonce},'https://402v.com','Rollback-only anonymous boundary probe',${anonymousNonce}) returning id,created_at`;
+      // Expected SQL errors must belong to a postgres.js child scope. A raw
+      // SQL SAVEPOINT restores PG state but leaves the parent driver's error
+      // flag set, preventing COMMIT even when the error was caught.
+      await tx.savepoint(async (probeTx) => {
+        await probeTx.unsafe("set local role anon");
+        const anonymousNonce = randomUUID();
+        await probeTx`insert into public.prompts(client_session_id,source_url,content,idempotency_key)
+          values(${anonymousNonce},'https://402v.com','Rollback-only anonymous boundary probe',${anonymousNonce}) returning id,created_at`;
+      });
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "42501") anonymousReturningDenied = true;
       else throw error;
-    } finally {
-      await tx.unsafe("rollback to savepoint anonymous_returning");
-      await tx.unsafe("release savepoint anonymous_returning");
     }
     if (!anonymousReturningDenied) throw new Error("Anonymous RETURNING RLS boundary changed.");
     await tx`select set_config('request.jwt.claim.role','service_role',true)`;

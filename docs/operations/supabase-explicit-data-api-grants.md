@@ -43,4 +43,6 @@ Supabase 官方通知：[public 新表不再自动暴露给 Data API](https://gi
 
 匿名 INSERT RETURNING 的既有 RLS 拒绝属于预期边界，部署探测不得将它误报为已修复的匿名提交链路。现有生产默认授权不收紧，本次也不改变 Supabase 的 future-object defaults。
 
+预期失败的 SQL 必须通过 `tx.savepoint` 提供的子事务客户端执行；手工 SQL SAVEPOINT 只能恢复服务器状态，不能清除 postgres.js 父 scope 的错误标记，会导致 check 能回滚而 apply 无法提交。此边界已用真实数据库 READ ONLY 事务验证：手工 scope 恢复后仍阻止提交，原生子 scope 隔离后可正常提交只读事务；没有提交探测业务记录。
+
 现有生产表不受 10 月 30 日默认权限变更影响，因此无需为此紧急改线上权限、轮换密钥或升级订阅。
