@@ -1,10 +1,13 @@
 {
   "id": "openclaw-concerto",
-  "name": "Concerto — Agent Work Item Tools",
+  "name": "Concerto \u2014 Agent Work Item Tools",
   "version": "0.1.0",
   "description": "Typed browser-free Concerto Work Item operations for registered OpenClaw Agents.",
   "contracts": {
     "tools": [
+      "concerto_get_operation",
+      "concerto_bind_work_item_execution",
+      "concerto_get_project_work_snapshot",
       "concerto_list_work_items",
       "concerto_get_work_item",
       "concerto_create_work_item",

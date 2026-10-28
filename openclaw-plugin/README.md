@@ -50,3 +50,18 @@ Building and testing this package does not activate it. Installation or config
 changes must stop at `READY_FOR_ACTIVATION`; an independent Operator activates
 it during an idle window with a complete Gateway restart. Do not hot reload the
 Orchestrator or this Plugin from an active Agent turn.
+
+## Public execution interfaces
+
+`concerto_get_operation` reads the immutable operation receipt in exact
+Project/actor/key scope. `concerto_get_project_work_snapshot` reads the existing
+complete Project snapshot (Owner only). `concerto_bind_work_item_execution`
+atomically binds an eligible Item to an exact Plan/Stage/Work Package using both
+Item `expected_version` and complete Project `expected_project_revision` (Owner
+only). Optional `intake_fingerprint` binds the original intake decision to the
+same durable result and audit event. These additions require the matching server
+migration and deployment; package tests do not establish live availability.
+
+See `docs/project/concerto-public-execution-interfaces-v1.md` in the parent
+repository for HTTP arguments, factual receipt shape, recovery, and required
+isolated deployment verification. Existing tool contracts are unchanged.

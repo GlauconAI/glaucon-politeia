@@ -109,6 +109,9 @@ describe("Concerto Agent Work Item routes", () => {
     expect(body.items[0]).toMatchObject({
       id: workItemId,
       assignedAgentId: "aristotle",
+      planRevision: null,
+      stageId: null,
+      workPackageId: null,
       allowedActions: expect.arrayContaining(["update", "transition"]),
     });
     expect(response.headers.get("cache-control")).toBe("no-store");
