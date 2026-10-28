@@ -46,10 +46,14 @@ for these operations.
 
 ## Activation boundary
 
-Building and testing this package does not activate it. Installation or config
-changes must stop at `READY_FOR_ACTIVATION`; an independent Operator activates
-it during an idle window with a complete Gateway restart. Do not hot reload the
-Orchestrator or this Plugin from an active Agent turn.
+Building and testing this package does not activate it. Follow the current host's
+official Plugin lifecycle and governance for the exact immutable candidate;
+prefer a supported authorized hot reload during the applicable activation window.
+Do not require a Gateway restart merely because this is a Plugin. If a served
+turn holds the target Plugin, use the supported handoff/drain mechanism and never
+bypass cleanup or detach a lifecycle action to evade that boundary. Verify the
+actual loaded path/hash, tool exposure and supported API behavior after activation;
+accepted commands or source tests alone do not prove availability.
 
 ## Public execution interfaces
 
