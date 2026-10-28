@@ -110,13 +110,26 @@ try {
   assert.ok(triggerStart >= 0 && exactTrigger.endsWith('();'));
   await sql.unsafe(exactTrigger);
   await applyMigration('20261018000100_concerto_project_work_snapshot.sql');
-  await applyMigration('20261027000100_concerto_public_execution_interfaces.sql');
-  record('actual predecessor functions, version trigger, snapshot and candidate migrations apply');
-
   const versionId = randomUUID(); const id = randomUUID(); const other = randomUUID(); const creator = randomUUID();
   await sql`insert into public.observatory_project_versions values (${versionId},${project},'active')`;
   async function insert(tx, itemId) { await tx`insert into public.observatory_work_items (id, project_ref, project_version_id, created_by) values (${itemId},${project},${versionId},${creator})`; }
   await insert(sql, id); await insert(sql, other);
+  await sql.unsafe('create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key, statements text[], name text)');
+  const launcher = await import('../observatory/deploy-concerto-public-execution-interfaces.ts');
+  const candidate = await migration('20261027000100_concerto_public_execution_interfaces.sql');
+  const checkResult = await launcher.runConcertoDatabaseCommand(sql, 'check', candidate);
+  assert.equal(checkResult.rolledBack, true); assert.equal(checkResult.protectedStateUnchanged, true);
+  const [absent] = await sql`select to_regprocedure('public.read_observatory_agent_work_item_operation(text,boolean,text,text,text)') is null as absent, (select count(*)::int from supabase_migrations.schema_migrations) history`;
+  assert.equal(absent.absent,true); assert.equal(absent.history,0);
+  record('launcher rollback rehearsal leaves schema/history/protected timestamps unchanged');
+  const applyResult = await launcher.runConcertoDatabaseCommand(sql, 'apply', candidate);
+  assert.equal(applyResult.committed,true); assert.equal(applyResult.status.applied,true);
+  record('launcher LOCAL apply commits only schema/history and rolls probe rows back');
+  const statusResult = await launcher.runConcertoDatabaseCommand(sql, 'status', candidate);
+  assert.equal(statusResult.applied,true); assert.equal(statusResult.verified.grantChecks,29);
+  assert.equal((await launcher.runConcertoDatabaseCommand(sql, 'check', candidate)).rolledBack,true);
+  record('launcher status read-only commit/savepoint isolation and already-applied rehearsal pass');
+  record('actual predecessor functions, version trigger, snapshot and candidate migrations apply');
   const signatures = ['read_observatory_agent_work_item_operation(text,boolean,text,text,text)', 'bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)'];
   for (const signature of signatures) {
     const rows = await sql`select rolname, has_function_privilege(rolname, ${signature}, 'EXECUTE') as allowed from pg_roles where rolname in ('anon','authenticated','service_role') order by rolname`;

@@ -131,3 +131,51 @@ verify in an isolated authorized test Project:
 5. Timeout recovery through operation lookup and complete fresh-Agent typed-tool
    calls; existing wrappers retain their contracts. No Wenya Item/Graph/schedule
    or Core fixture is a substitute for these supported-backend checks.
+
+## Bounded migration release entry
+
+Use the dedicated entry, not generic `supabase:apply-missing`:
+
+```sh
+npm run observatory:concerto-public-interfaces:deploy -- status
+npm run observatory:concerto-public-interfaces:deploy -- check
+# Separate production authorization, PR CI and Preview are required before apply:
+npm run observatory:concerto-public-interfaces:deploy -- apply
+```
+
+The launcher reads the existing `.env.local` internally (or the existing
+`GLAUCON_POLITEIA_ENV_FILE` file setting), pins the production Supabase identity,
+exact migration version/path and prints only redacted metadata. It accepts no
+URL, SQL or extra command arguments. The only permitted DB URL flags are exact
+`pgbouncer=true` and `sslmode=require`, with no duplicates; flags are stripped
+before connection and TLS is enforced independently. Endpoint, credential,
+path, protocol and other query overrides fail closed.
+
+`status` is strictly read-only. `check` uses one native postgres.js transaction
+for migration/history/catalog/grants/real RPC/audit/replay verification and
+unconditionally rolls it back. Protected Item timestamps/versions, audit IDs,
+operation IDs/fingerprints, Product Versions and migration-history digests must
+match afterward. Expected permission/idempotency failures use native child
+savepoints. A separate read-only transaction verifies denial recovery, a healthy
+subsequent query and actual COMMIT, detecting parent-driver scope poisoning.
+`apply` commits only schema/history: its real probe is rolled back through a
+native savepoint, then committed semantic status is checked separately. A
+post-commit verification failure emits the explicit
+`CONCERTO_PUBLIC_APPLY_COMMITTED_VERIFY_STATUS` marker; inspect status before any
+retry. Recovery remains forward-only; never remove audit/operation history.
+
+Verification evidence for this candidate:
+
+- Disposable PostgreSQL 18.4: 11 groups pass, including fresh rollback rehearsal,
+  LOCAL-only apply with zero surviving probe rows, already-applied rehearsal,
+  read-only status/COMMIT isolation, and the eight original SQL contract groups.
+- Production read-only status: migration remains unapplied.
+- Production rollback-only rehearsal: success; all five semantic catalog
+  invariants, 29 individually checked grants, two audit events/two operation
+  receipts, original-result replay and native expected-error isolation verified;
+  protected-state digests unchanged after rollback.
+- Migration SHA-256:
+  `249e2577db9a6f241986fcc6777d96f8a963fcd9989b3a5bca2f4a7c97325a36`.
+- Independent source review reported no Important/Critical finding. No production
+  apply, app release, Plugin activation, merge or PR was performed by this entry's
+  preparation work. Live availability remains a separate deployment gate.

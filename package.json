@@ -76,7 +76,8 @@
     "vercel:build": "npx vercel@latest build",
     "vercel:deploy": "npx vercel@latest deploy --prebuilt",
     "vercel:env:pull": "npx vercel@latest env pull .env.local",
-    "vercel:link": "npx vercel@latest link"
+    "vercel:link": "npx vercel@latest link",
+    "observatory:concerto-public-interfaces:deploy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/observatory/deploy-concerto-public-execution-interfaces.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
