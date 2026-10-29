@@ -57,8 +57,16 @@ function bearerToken(authorization: string | null) {
 export function authenticateAgentClaimRequest(
   authorization: string | null,
   rawConfiguration: string | undefined,
+  mainTokenSha256: string | undefined = process.env.CONCERTO_MAIN_API_TOKEN_SHA256,
 ): { agentId: string } {
   const keys = parseAgentClaimKeys(rawConfiguration);
+  // Additive bootstrap: a sensitive legacy deployment variable need not be read
+  // back or replaced. This second credential can identify only canonical main.
+  if (mainTokenSha256 !== undefined &&
+      (!/^[a-f0-9]{64}$/u.test(mainTokenSha256) ||
+       keys.some((key) => key.agentId !== "main" && key.tokenSha256 === mainTokenSha256))) {
+    throw new AgentClaimAuthError("UNCONFIGURED");
+  }
   const presentedHash = createHash("sha256")
     .update(bearerToken(authorization))
     .digest();
@@ -72,6 +80,10 @@ export function authenticateAgentClaimRequest(
     ) {
       matchedAgentId = entry.agentId;
     }
+  }
+  if (mainTokenSha256 !== undefined &&
+      timingSafeEqual(Buffer.from(mainTokenSha256, "hex"), presentedHash)) {
+    matchedAgentId = "main";
   }
   if (!matchedAgentId) throw new AgentClaimAuthError("UNAUTHORIZED");
   return { agentId: matchedAgentId };
