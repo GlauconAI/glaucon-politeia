@@ -1,7 +1,7 @@
 {
   "id": "openclaw-concerto",
   "name": "Concerto — Agent Work Item Tools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Typed browser-free Concerto Work Item operations for registered OpenClaw Agents.",
   "activation": {
     "onStartup": true

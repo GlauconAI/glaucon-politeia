@@ -54,9 +54,9 @@ Operator 在登记配置前核验 Maestro 的不可变原始 receipt：operation
 
 现有 `concerto_get_operation` 读取的是旧 Item 操作表，不读取本接口关联回执；本接口以相同请求 POST 恢复结果。
 
-## 原生 SecretRef（Plugin 0.2.0）
+## 原生 SecretRef（Plugin 0.2.2）
 
-插件支持 `agentTokens.<canonical-agent-id>`，只接受原生 SecretRef 对象。使用 OpenClaw 返回的精确 store SecretRef，不自行猜 provider/id；manifest 声明 capability secret input，仅在工具实际执行的 active invocation 内从当前 Agent 的宿主 prepared input 读取，每次调用重新读取且不缓存，不读取其他 Agent 路径，不冷解析凭据。
+插件支持 `agentTokens.<canonical-agent-id>`，只接受原生 SecretRef 对象。使用 OpenClaw 返回的精确 store SecretRef，不自行猜 provider/id；manifest 声明 capability secret input，仅在工具实际执行时通过公开 toolContext.getRuntimeConfig() 读取最新 runtime-resolved 配置中的本插件、当前 Agent 路径，并检查公开 capability 可用性 guard；每次调用重新读取且不缓存，不读取其他 Agent 路径，不冷解析凭据。
 
 显式配置的 SecretRef 可声明工具，但未解析时实际执行返回 UNAVAILABLE，**不回退**旧 env；未配置该 Agent ref 时兼容原 `CONCERTO_AGENT_API_TOKENS` JSON env map。禁止把整个受保护 JSON opaque sentinel 当作该 map 解析。Token 与后端 hash 必须对应同 Agent；不要在仓库、命令参数或聊天中放明文。
 

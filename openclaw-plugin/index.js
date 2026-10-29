@@ -1,6 +1,6 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { Type } from "typebox";
-import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-runtime";
+import { assertPluginCapabilitySecretAvailable } from "openclaw/plugin-sdk/secret-input-runtime";
 
 import { createConcertoRequest, resolveContextToken } from "./src/client.js";
 import {
@@ -40,7 +40,7 @@ export default defineToolPlugin({
         factory: ({ config, toolContext }) => {
           const baseUrl = config.baseUrl ?? "https://402v.com";
           const tokenForAgent = (agentId) => agentId === toolContext.agentId
-            ? resolveContextToken({agentId,config,readPrepared:getPreparedPluginSecretInput,env:process.env})
+            ? resolveContextToken({agentId,config,getRuntimeConfig:toolContext.getRuntimeConfig,assertAvailable:assertPluginCapabilitySecretAvailable,env:process.env})
             : null;
           const tools = createConcertoTools({
             baseUrl,
