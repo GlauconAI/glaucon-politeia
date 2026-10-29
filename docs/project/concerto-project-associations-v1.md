@@ -20,6 +20,10 @@ Operator 在登记配置前核验 Maestro 的不可变原始 receipt：operation
 
 不可回读的敏感旧配置无需重建或覆盖。可另外设置 `CONCERTO_MAIN_API_TOKEN_SHA256` 为一个 64 位小写 SHA-256，用于引导 main 的独立凭据；该凭据只能认证 canonical `main`，旧 main 与其他 Agent 的原凭据保持有效。旧配置仍必须有效，补充哈希格式错误或与其他 Agent 凭据冲突时 fail closed。原始 token 只进入原生 Secret Store，不进入 Vercel、源码或日志。
 
+可选 `CONCERTO_ADDITIONAL_AGENT_CLAIM_KEYS` 可为任意合法 Agent ID 追加独立凭据，格式与 `OBSERVATORY_AGENT_CLAIM_KEYS` 相同：严格数组，每项仅 `agentId` 与 `tokenSha256`，1–32 项，64 位小写 SHA-256；单来源不允许重复身份或哈希。未设置时行为不变，设置为空字符串或坏配置时 fail closed。原有配置仍必须有效；无需读取或覆盖不可回读的旧敏感配置。
+
+跨来源允许同一 Agent 的不同 token（保留旧凭据用于轮换），以及同身份同哈希；任何哈希映射不同身份（包括 main bootstrap 冲突）均 fail closed。此配置只完成身份认证，不登记 Agent、不授予 Project Owner 或管理员权限，也不代替精确 source/target 的审批。Project Registry 与关联权限检查保持不变。
+
 ## 正式 typed 入口
 
 只读：`concerto_get_project_association_snapshot`：
