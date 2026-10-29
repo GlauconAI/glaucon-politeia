@@ -58,8 +58,23 @@ export function authenticateAgentClaimRequest(
   authorization: string | null,
   rawConfiguration: string | undefined,
   mainTokenSha256: string | undefined = process.env.CONCERTO_MAIN_API_TOKEN_SHA256,
+  additionalConfiguration: string | undefined = process.env.CONCERTO_ADDITIONAL_AGENT_CLAIM_KEYS,
 ): { agentId: string } {
-  const keys = parseAgentClaimKeys(rawConfiguration);
+  // Keep the legacy source mandatory, and never rewrite it to add credentials.
+  const keys = [
+    ...parseAgentClaimKeys(rawConfiguration),
+    ...(additionalConfiguration === undefined
+      ? []
+      : parseAgentClaimKeys(additionalConfiguration)),
+  ];
+  const identitiesByHash = new Map<string, string>();
+  for (const key of keys) {
+    const existingIdentity = identitiesByHash.get(key.tokenSha256);
+    if (existingIdentity !== undefined && existingIdentity !== key.agentId) {
+      throw new AgentClaimAuthError("UNCONFIGURED");
+    }
+    identitiesByHash.set(key.tokenSha256, key.agentId);
+  }
   // Additive bootstrap: a sensitive legacy deployment variable need not be read
   // back or replaced. This second credential can identify only canonical main.
   if (mainTokenSha256 !== undefined &&
