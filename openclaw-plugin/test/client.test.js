@@ -5,7 +5,21 @@ import {
   ConcertoClientError,
   createConcertoRequest,
   parseAgentTokens,
+  resolveContextToken,
 } from "../src/client.js";
+
+test("uses only current Agent prepared SecretRef; unresolved explicit refs never fall back", () => {
+  const calls=[];
+  const config={agentTokens:{main:{source:"store",provider:"default",id:"CONCERTO_MAIN_API_TOKEN"}}};
+  const readPrepared=(plugin,path)=>{calls.push([plugin,path]);return {value:"prepared-main-secret-value",revision:1};};
+  assert.equal(resolveContextToken({agentId:"main",config,readPrepared,env:{}}),"prepared-main-secret-value");
+  assert.deepEqual(calls,[["openclaw-concerto","agentTokens.main"]]);
+  const env={CONCERTO_AGENT_API_TOKENS:JSON.stringify({main:"legacy-main-token-value",plato:"legacy-plato-token-value"})};
+  assert.equal(resolveContextToken({agentId:"main",config,readPrepared:()=>({revision:2}),env}),null);
+  assert.equal(resolveContextToken({agentId:"plato",config,readPrepared,env}),"legacy-plato-token-value");
+  assert.equal(calls.length,1);
+  assert.equal(resolveContextToken({agentId:"../main",config,readPrepared,env}),null);
+});
 
 test("accepts only bounded canonical Agent token entries", () => {
   assert.deepEqual(

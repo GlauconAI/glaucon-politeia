@@ -1,7 +1,8 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { Type } from "typebox";
+import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-runtime";
 
-import { createConcertoRequest, parseAgentTokens } from "./src/client.js";
+import { createConcertoRequest, resolveContextToken } from "./src/client.js";
 import {
   CONCERTO_TOOL_DEFINITIONS,
   CONCERTO_TOOL_NAMES,
@@ -12,6 +13,10 @@ const configSchema = Type.Object(
   {
     baseUrl: Type.Optional(Type.String({ pattern: "^https://" })),
     tokenEnv: Type.Optional(Type.String({ pattern: "^[A-Z][A-Z0-9_]*$" })),
+    agentTokens: Type.Optional(Type.Record(Type.String({pattern:"^[a-z0-9]+(?:-[a-z0-9]+)*$"}),Type.Object({
+      source:Type.Union([Type.Literal("env"),Type.Literal("file"),Type.Literal("exec"),Type.Literal("store")]),
+      provider:Type.String({minLength:1}),id:Type.String({minLength:1}),
+    },{additionalProperties:false}),{additionalProperties:false})),
     timeoutMs: Type.Optional(Type.Integer({ minimum: 1_000, maximum: 30_000 })),
   },
   { additionalProperties: false },
@@ -34,15 +39,14 @@ export default defineToolPlugin({
         parameters: Type.Unsafe(definition.parameters),
         factory: ({ config, toolContext }) => {
           const baseUrl = config.baseUrl ?? "https://402v.com";
-          const tokenEnv = config.tokenEnv ?? "CONCERTO_AGENT_API_TOKENS";
-          const tokens = parseAgentTokens(process.env[tokenEnv]);
+          const token = resolveContextToken({agentId:toolContext.agentId,config,readPrepared:getPreparedPluginSecretInput,env:process.env});
           const tools = createConcertoTools({
             baseUrl,
             request: createConcertoRequest({
               baseUrl,
               timeoutMs: config.timeoutMs ?? 10_000,
             }),
-            tokenForAgent: (agentId) => tokens[agentId] ?? null,
+            tokenForAgent: (agentId) => agentId===toolContext.agentId ? token : null,
           }).forContext(toolContext);
           return tools.find((candidate) => candidate.name === name) ?? null;
         },

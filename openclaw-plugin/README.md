@@ -69,3 +69,20 @@ migration and deployment; package tests do not establish live availability.
 See `docs/project/concerto-public-execution-interfaces-v1.md` in the parent
 repository for HTTP arguments, factual receipt shape, recovery, and required
 isolated deployment verification. Existing tool contracts are unchanged.
+
+## Project association interfaces (0.2.0)
+
+`concerto_get_project_association_snapshot` returns every Version and Item for
+an exact server-approved source/target pair, with original/effective keys and
+one revision. `concerto_associate_project` registers an idempotent association
+without rewriting frozen rows or moving Catalog/filesystem resources. Current
+published target Owner only; server approval, fresh uncached Registry, matching
+API and database migration are required. Older Item/snapshot/UI consumers retain
+their original-key semantics. See `docs/project/concerto-project-associations-v1.md`.
+
+For native protected credentials, configure `agentTokens.<agent-id>` with the
+exact OpenClaw SecretRef. The manifest declares each input and the factory reads
+only the current Agent's prepared capability credential. Unresolved explicit refs
+hide tools and never fall back to a legacy token. Unconfigured Agents retain
+legacy JSON environment-map compatibility; an opaque protected whole-map sentinel
+is not a JSON map. Never place plaintext tokens in repository files.
