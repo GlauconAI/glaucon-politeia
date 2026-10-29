@@ -11,6 +11,8 @@ const token = "owner-supplied-token";
 
 test("registers the exact Concerto V1 tool inventory", () => {
   assert.deepEqual(CONCERTO_TOOL_NAMES, [
+    "concerto_get_project_association_snapshot",
+    "concerto_associate_project",
     "concerto_get_operation",
     "concerto_bind_work_item_execution",
     "concerto_get_project_work_snapshot",
@@ -24,6 +26,20 @@ test("registers the exact Concerto V1 tool inventory", () => {
     "concerto_claim_work_item",
     "concerto_complete_claim",
   ]);
+});
+
+test("association ports bind exact pair/revision but never accept actor or catalog proof", async () => {
+  const requests = [];
+  const tools = createConcertoTools({baseUrl:"https://402v.com",tokenForAgent:(id)=>id==="main"?token:null,request:async(input)=>{requests.push(input);return {ok:true};}}).forContext({agentId:"main"});
+  const read=tools.find((tool)=>tool.name==="concerto_get_project_association_snapshot");
+  const write=tools.find((tool)=>tool.name==="concerto_associate_project");
+  assert.ok(read); assert.ok(write);
+  const params={source_project_key:"socrates/fixture",target_project_key:"shared/fixture",expected_revision:"a".repeat(32)};
+  await read.execute("read",params);
+  await write.execute("write",{...params,idempotency_key:"fixture:associate"});
+  assert.deepEqual(requests[0],{method:"GET",path:"/api/concerto/project-associations/snapshot",query:{sourceProjectKey:params.source_project_key,targetProjectKey:params.target_project_key,expectedRevision:params.expected_revision},token,agentId:"main",params:undefined});
+  assert.deepEqual(requests[1],{method:"POST",path:"/api/concerto/project-associations",body:{sourceProjectKey:params.source_project_key,targetProjectKey:params.target_project_key,expectedRevision:params.expected_revision,idempotencyKey:"fixture:associate"},token,agentId:"main",params:undefined});
+  for(const tool of [read,write])for(const forbidden of ["actor","agentId","catalog_receipt_sha256","catalog_operation_id"])assert.equal(Object.hasOwn(tool.parameters.properties,forbidden),false);
 });
 
 test("derives identity from tool context and never accepts caller identity", async () => {

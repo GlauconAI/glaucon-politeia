@@ -1,28 +1,27 @@
 {
   "id": "openclaw-concerto",
-  "name": "Concerto \u2014 Agent Work Item Tools",
-  "version": "0.1.0",
+  "name": "Concerto — Agent Work Item Tools",
+  "version": "0.2.0",
   "description": "Typed browser-free Concerto Work Item operations for registered OpenClaw Agents.",
-  "contracts": {
-    "tools": [
-      "concerto_get_operation",
-      "concerto_bind_work_item_execution",
-      "concerto_get_project_work_snapshot",
-      "concerto_list_work_items",
-      "concerto_get_work_item",
-      "concerto_create_work_item",
-      "concerto_update_work_item",
-      "concerto_transition_work_item",
-      "concerto_assign_work_item",
-      "concerto_add_evidence",
-      "concerto_claim_work_item",
-      "concerto_complete_claim"
-    ]
-  },
   "activation": {
     "onStartup": true
   },
+  "configContracts": {
+    "secretInputs": {
+      "paths": [
+        {
+          "path": "agentTokens.*",
+          "expected": "string",
+          "ownerKind": "capability"
+        }
+      ]
+    }
+  },
   "uiHints": {
+    "agentTokens.*": {
+      "label": "Per-Agent Concerto token SecretRef",
+      "sensitive": true
+    },
     "baseUrl": {
       "label": "Concerto base URL"
     },
@@ -37,7 +36,6 @@
   },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
     "properties": {
       "baseUrl": {
         "type": "string",
@@ -47,11 +45,75 @@
         "type": "string",
         "pattern": "^[A-Z][A-Z0-9_]*$"
       },
+      "agentTokens": {
+        "type": "object",
+        "patternProperties": {
+          "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+            "type": "object",
+            "required": [
+              "source",
+              "provider",
+              "id"
+            ],
+            "properties": {
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "env"
+                  },
+                  {
+                    "type": "string",
+                    "const": "file"
+                  },
+                  {
+                    "type": "string",
+                    "const": "exec"
+                  },
+                  {
+                    "type": "string",
+                    "const": "store"
+                  }
+                ]
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
       "timeoutMs": {
         "type": "integer",
         "minimum": 1000,
         "maximum": 30000
       }
-    }
+    },
+    "additionalProperties": false
+  },
+  "contracts": {
+    "tools": [
+      "concerto_get_project_association_snapshot",
+      "concerto_associate_project",
+      "concerto_get_operation",
+      "concerto_bind_work_item_execution",
+      "concerto_get_project_work_snapshot",
+      "concerto_list_work_items",
+      "concerto_get_work_item",
+      "concerto_create_work_item",
+      "concerto_update_work_item",
+      "concerto_transition_work_item",
+      "concerto_assign_work_item",
+      "concerto_add_evidence",
+      "concerto_claim_work_item",
+      "concerto_complete_claim"
+    ]
   }
 }

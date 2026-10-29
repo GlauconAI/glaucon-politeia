@@ -25,6 +25,25 @@ const agentId = {
 };
 
 export const CONCERTO_TOOL_DEFINITIONS = {
+  concerto_get_project_association_snapshot: {
+    label: "Get Complete Concerto Project Association Snapshot",
+    description: "Read all Versions and Items for an approved historical/current Project pair in one revision. Current target Owner only; preserves original and effective keys.",
+    parameters: schema(["source_project_key", "target_project_key"], {
+      source_project_key: { type: "string", minLength: 3, maxLength: 160 },
+      target_project_key: { type: "string", minLength: 3, maxLength: 160 },
+      expected_revision: { type: "string", pattern: "^[a-f0-9]{32}$" },
+    }),
+  },
+  concerto_associate_project: {
+    label: "Associate Historical Concerto Project",
+    description: "Register a pre-approved historical Project association without rewriting frozen Versions/Items or IDs. Current target Owner only; requires exact full snapshot revision and idempotency key. Not a Catalog or directory move.",
+    parameters: schema(["source_project_key", "target_project_key", "expected_revision", "idempotency_key"], {
+      source_project_key: { type: "string", minLength: 3, maxLength: 160 },
+      target_project_key: { type: "string", minLength: 3, maxLength: 160 },
+      expected_revision: { type: "string", pattern: "^[a-f0-9]{32}$" },
+      idempotency_key: idempotencyKey,
+    }),
+  },
   concerto_get_operation: {
     label: "Get Concerto Operation Receipt",
     description: "Read an immutable operation receipt in exact actor/project scope; only the current Project Owner may select another actor.",
@@ -160,6 +179,14 @@ export const CONCERTO_TOOL_NAMES = Object.freeze(
 );
 
 function requestFor(name, params) {
+  if (name === "concerto_get_project_association_snapshot") return {
+    method: "GET", path: "/api/concerto/project-associations/snapshot",
+    query: { sourceProjectKey: params.source_project_key, targetProjectKey: params.target_project_key, expectedRevision: params.expected_revision },
+  };
+  if (name === "concerto_associate_project") return {
+    method: "POST", path: "/api/concerto/project-associations",
+    body: { sourceProjectKey: params.source_project_key, targetProjectKey: params.target_project_key, expectedRevision: params.expected_revision, idempotencyKey: params.idempotency_key },
+  };
   if (name === "concerto_get_operation") return {
     method: "GET", path: "/api/concerto/operations",
     query: { projectRef: params.project_ref, operationKey: params.operation_key, operationAgentId: params.operation_agent_id },

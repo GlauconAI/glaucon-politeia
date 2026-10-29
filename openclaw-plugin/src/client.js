@@ -16,6 +16,17 @@ export class ConcertoClientError extends Error {
   }
 }
 
+// Explicit native SecretRefs take precedence. An unresolved ref never silently
+// selects a legacy credential, and only the host-context Agent path is queried.
+export function resolveContextToken({agentId,config,readPrepared,env}) {
+  if(typeof agentId!=="string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(agentId))return null;
+  if(Object.hasOwn(config.agentTokens??{},agentId)) {
+    const value=readPrepared("openclaw-concerto",`agentTokens.${agentId}`).value;
+    return typeof value==="string" && value.length>=16 ? value : null;
+  }
+  return parseAgentTokens(env[config.tokenEnv??"CONCERTO_AGENT_API_TOKENS"])[agentId]??null;
+}
+
 export function createConcertoRequest({ baseUrl, timeoutMs = 10_000, fetchImpl = fetch }) {
   const root = new URL(baseUrl);
   if (root.protocol !== "https:") throw new Error("Concerto base URL must use HTTPS");
