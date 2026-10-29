@@ -6,9 +6,9 @@ import { pathToFileURL } from 'node:url';
 import postgres, { type Sql, type TransactionSql } from 'postgres';
 import { assertConcertoProductionTarget, protectedState, verifyConcertoPublicCatalog, verifyReadOnlySavepointCommit, parseConcertoDeploymentCommand } from './deploy-concerto-public-execution-interfaces.ts';
 
-export const MIGRATION_VERSION = '20261029000100';
+export const MIGRATION_VERSION = '20261029000200';
 const SIGNATURE = 'public.bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)';
-const SOURCE = new URL('../../supabase/migrations/20261029000100_concerto_binding_terminal_conflicts.sql', import.meta.url);
+const SOURCE = new URL('../../supabase/migrations/20261029000200_concerto_binding_terminal_conflicts.sql', import.meta.url);
 const BASE = new URL('../../supabase/migrations/20261027000100_concerto_public_execution_interfaces.sql', import.meta.url);
 type Db = Sql | TransactionSql;
 class RolledBack extends Error { result: unknown; constructor(result: unknown) { super('ROLLBACK_ONLY'); this.result=result; } }

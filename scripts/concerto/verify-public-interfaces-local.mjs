@@ -131,7 +131,7 @@ try {
   record('launcher status read-only commit/savepoint isolation and already-applied rehearsal pass');
   record('actual predecessor functions, version trigger, snapshot and candidate migrations apply');
   const terminal = await import('../observatory/deploy-concerto-terminal-conflicts.ts');
-  const terminalSource = await migration('20261029000100_concerto_binding_terminal_conflicts.sql');
+  const terminalSource = await migration('20261029000200_concerto_binding_terminal_conflicts.sql');
   const terminalCheck = await terminal.runTerminalConflictCommand(sql,'check',terminalSource,candidate);
   assert.equal(terminalCheck.rolledBack,true); assert.equal(terminalCheck.protectedStateUnchanged,true);
   assert.equal((await terminal.runTerminalConflictCommand(sql,'status',terminalSource,candidate)).applied,false);
