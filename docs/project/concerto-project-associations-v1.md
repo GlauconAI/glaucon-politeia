@@ -18,6 +18,8 @@ Operator 在登记配置前核验 Maestro 的不可变原始 receipt：operation
 
 认证复用 `OBSERVATORY_AGENT_CLAIM_KEYS` 的 Agent 哈希映射；身份只来自 Bearer，不接受 caller identity。普通 Agent、persona 别名或 Shared 分组都不能代替 main。
 
+不可回读的敏感旧配置无需重建或覆盖。可另外设置 `CONCERTO_MAIN_API_TOKEN_SHA256` 为一个 64 位小写 SHA-256，用于引导 main 的独立凭据；该凭据只能认证 canonical `main`，旧 main 与其他 Agent 的原凭据保持有效。旧配置仍必须有效，补充哈希格式错误或与其他 Agent 凭据冲突时 fail closed。原始 token 只进入原生 Secret Store，不进入 Vercel、源码或日志。
+
 ## 正式 typed 入口
 
 只读：`concerto_get_project_association_snapshot`：
