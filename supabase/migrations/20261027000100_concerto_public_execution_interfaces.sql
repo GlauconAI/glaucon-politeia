@@ -149,4 +149,44 @@ revoke all on function public.bind_observatory_work_item_execution_as_agent(text
 from public, anon, authenticated, service_role;
 grant execute on function public.bind_observatory_work_item_execution_as_agent(text, boolean, text, uuid, integer, text, integer, text, text, text, text, text) to service_role;
 
+-- Exact Item read for the authenticated server API. No direct table grant.
+-- Route visibility is checked against the current Registry before JSON release.
+create function public.read_observatory_work_item_for_agent_api(p_item_id uuid)
+returns jsonb language plpgsql security definer set search_path = pg_catalog
+as $$
+declare item jsonb;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'Service role required' using errcode = '42501';
+  end if;
+  select jsonb_build_object(
+    'id', w.id,
+    'type', w.type,
+    'title', w.title,
+    'description', w.description,
+    'state', w.state,
+    'priority', w.priority,
+    'owner_id', w.owner_id,
+    'assigned_agent_id', w.assigned_agent_id,
+    'acceptance_criteria', w.acceptance_criteria,
+    'project_ref', w.project_ref,
+    'milestone_ref', w.milestone_ref,
+    'due_on', w.due_on,
+    'project_key', w.project_key,
+    'project_version_id', w.project_version_id,
+    'version_binding_kind', w.version_binding_kind,
+    'plan_revision', w.plan_revision,
+    'stage_id', w.stage_id,
+    'work_package_id', w.work_package_id,
+    'idempotency_key', w.idempotency_key,
+    'version', w.version,
+    'created_at', w.created_at,
+    'updated_at', w.updated_at) into item
+  from public.observatory_work_items w where w.id = p_item_id;
+  return item;
+end;
+$$;
+revoke all on function public.read_observatory_work_item_for_agent_api(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.read_observatory_work_item_for_agent_api(uuid) to service_role;
+
 commit;

@@ -179,3 +179,23 @@ Verification evidence for this candidate:
 - Independent source review reported no Important/Critical finding. No production
   apply, app release, Plugin activation, merge or PR was performed by this entry's
   preparation work. Live availability remains a separate deployment gate.
+
+## Integration repair candidate (unreleased)
+
+Production diagnosis confirms `service_role` has no direct SELECT on Work Items.
+Exact Item GET and execution-binding pre-read now use
+`read_observatory_work_item_for_agent_api(uuid)`, a fixed-projection service-only
+RPC. Route authentication, current Registry visibility and owner/assignee checks
+remain enforced. Shared projects honor explicit `project_owner`. No table grant
+is broadened. The collection/list read path is not repaired by this change.
+
+The still-unapplied migration `20261027000100` now includes this reader. Its
+current SHA-256 is `d2570824ca0c9c428dd0710aa0a92da9594033de3c39889a7295601701a7f90f`;
+this candidate supersedes the earlier checksum above. All 33 role/grant checks,
+Item readback and missing-Item/permission negative probes passed on actual isolated
+PostgreSQL and the production rollback-only rehearsal. Subsequent production
+status is `applied=false`. Apply/verify the database migration before deploying
+the application, or the new read path will remain unavailable.
+
+The CI audit blocker is addressed by pinning Zod 4.6.7; the production-dependency
+audit reports zero vulnerabilities. This is not a production deployment receipt.

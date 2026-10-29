@@ -17,10 +17,13 @@ function run(args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
+    timeout: 10_000,
   });
 }
 
-describe("html note kit", () => {
+// CLI integration: two cold subprocess starts can exceed the 5s unit-test default.
+// Keep each subprocess bounded; allow the complete assertion/cleanup sequence.
+describe("html note kit", { timeout: 25_000 }, () => {
   it("creates a compact Markdown starter without overwriting it", () => {
     const dir = mkdtempSync(join(tmpdir(), "html-note-init-"));
 

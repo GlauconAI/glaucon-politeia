@@ -126,11 +126,11 @@ try {
   assert.equal(applyResult.committed,true); assert.equal(applyResult.status.applied,true);
   record('launcher LOCAL apply commits only schema/history and rolls probe rows back');
   const statusResult = await launcher.runConcertoDatabaseCommand(sql, 'status', candidate);
-  assert.equal(statusResult.applied,true); assert.equal(statusResult.verified.grantChecks,29);
+  assert.equal(statusResult.applied,true); assert.equal(statusResult.verified.grantChecks,33);
   assert.equal((await launcher.runConcertoDatabaseCommand(sql, 'check', candidate)).rolledBack,true);
   record('launcher status read-only commit/savepoint isolation and already-applied rehearsal pass');
   record('actual predecessor functions, version trigger, snapshot and candidate migrations apply');
-  const signatures = ['read_observatory_agent_work_item_operation(text,boolean,text,text,text)', 'bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)'];
+  const signatures = ['read_observatory_work_item_for_agent_api(uuid)', 'read_observatory_agent_work_item_operation(text,boolean,text,text,text)', 'bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)'];
   for (const signature of signatures) {
     const rows = await sql`select rolname, has_function_privilege(rolname, ${signature}, 'EXECUTE') as allowed from pg_roles where rolname in ('anon','authenticated','service_role') order by rolname`;
     assert.deepEqual(rows.map((r) => [r.rolname,r.allowed]), [['anon',false],['authenticated',false],['service_role',true]]);

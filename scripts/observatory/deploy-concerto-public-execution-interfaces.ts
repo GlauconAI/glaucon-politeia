@@ -11,6 +11,7 @@ const MIGRATION_NAME = 'concerto_public_execution_interfaces';
 const MIGRATION_URL = new URL('../../supabase/migrations/20261027000100_concerto_public_execution_interfaces.sql', import.meta.url);
 const PROJECT_REF = 'fiicazfhjkviqaaaiksp';
 const READ_SIGNATURE = 'public.read_observatory_agent_work_item_operation(text,boolean,text,text,text)';
+const ITEM_SIGNATURE = 'public.read_observatory_work_item_for_agent_api(uuid)';
 const BIND_SIGNATURE = 'public.bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)';
 const PERMISSION_QUERY = "select public.create_observatory_work_item_as_agent('plato','feature','permission probe','','shared/probe','00000000-0000-4000-8000-000000000000'::uuid,'optional','permission:probe',repeat('a',64))";
 export type ConcertoDeploymentCommand = 'check' | 'apply' | 'status';
@@ -67,8 +68,8 @@ export async function protectedState(sql: Database) {
 }
 export async function verifyConcertoPublicCatalog(sql: Database) {
   const [metadata] = await sql<{ rpc_security: boolean; ledger_rls: boolean; unique_key: boolean; version_trigger: boolean; rows_compatible: boolean }[]>`select
-    (select count(*)=2 and bool_and(prosecdef and provolatile='v' and prorettype='jsonb'::regtype and proconfig @> array['search_path=pg_catalog'])
-      from pg_proc where oid in (to_regprocedure(${READ_SIGNATURE}),to_regprocedure(${BIND_SIGNATURE}))) rpc_security,
+    (select count(*)=3 and bool_and(prosecdef and provolatile='v' and prorettype='jsonb'::regtype and proconfig @> array['search_path=pg_catalog'])
+      from pg_proc where oid in (to_regprocedure(${READ_SIGNATURE}),to_regprocedure(${BIND_SIGNATURE}),to_regprocedure(${ITEM_SIGNATURE}))) rpc_security,
     coalesce((select relrowsecurity from pg_class where oid=to_regclass('public.observatory_agent_work_item_operations')),false) ledger_rls,
     exists(select 1 from pg_constraint c join pg_index i on i.indexrelid=c.conindid where c.conrelid='public.observatory_agent_work_item_operations'::regclass and c.contype='u' and c.convalidated and i.indisvalid and i.indisunique
       and c.conkey=array[(select attnum from pg_attribute where attrelid=c.conrelid and attname='agent_id'),(select attnum from pg_attribute where attrelid=c.conrelid and attname='idempotency_key')]::smallint[]) unique_key,
@@ -78,7 +79,7 @@ export async function verifyConcertoPublicCatalog(sql: Database) {
       or num_nonnulls(w.project_key,w.plan_revision,w.stage_id,w.work_package_id) not in (0,4)) rows_compatible`;
   assert.ok(metadata && Object.values(metadata).every((value) => value === true), 'CATALOG_CONTRACT_FAILED');
   let grantChecks = 0;
-  for (const signature of [READ_SIGNATURE,BIND_SIGNATURE]) {
+  for (const signature of [READ_SIGNATURE,BIND_SIGNATURE,ITEM_SIGNATURE]) {
     for (const role of ['anon','authenticated','service_role']) {
       const [grant] = await sql<{ allowed: boolean }[]>`select has_function_privilege(${role},${signature},'EXECUTE') allowed`;
       assert.equal(grant.allowed, role === 'service_role', 'RPC_GRANT_FAILED'); grantChecks++;
@@ -124,6 +125,12 @@ async function rpcProbe(tx: TransactionSql) {
   await expectedPgError(tx,'42501',async (child) => { await bind(child,false); });
   const result = await bind(tx);
   assert.equal(result.workItem.version,item.version+1);
+  const [readback] = await tx<{value: ProbeItem}[]>`select public.read_observatory_work_item_for_agent_api(${item.id}::uuid) value`;
+  assert.equal(readback.value.version,result.workItem.version);
+  assert.equal(readback.value.work_package_id,'release-probe');
+  const [missing] = await tx`select public.read_observatory_work_item_for_agent_api('00000000-0000-4000-8000-000000000000'::uuid) value`;
+  assert.equal(missing.value,null);
+  for (const role of ['anon','authenticated']) await expectedPgError(tx,'42501',async child=>{await child.unsafe(`set local role ${role}`);await child`select public.read_observatory_work_item_for_agent_api(${item.id}::uuid)`;});
   assert.equal(result.workItem.plan_revision,1); assert.equal(result.workItem.stage_id,'release-probe'); assert.equal(result.workItem.work_package_id,'release-probe');
   assert.equal(result.operation.result.intakeFingerprint,digest); assert.equal(result.operation.requestFingerprint,digest);
   assert.deepEqual(await bind(tx),result);

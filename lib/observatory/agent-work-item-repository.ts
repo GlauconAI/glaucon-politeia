@@ -33,7 +33,8 @@ export interface AgentWorkItemRepositoryClient {
   rpc(
     functionName:
       | "create_observatory_work_item_as_agent"
-      | "execute_observatory_agent_work_item_command",
+      | "execute_observatory_agent_work_item_command"
+      | "read_observatory_work_item_for_agent_api",
     arguments_: Record<string, unknown>,
   ): PromiseLike<{ data: unknown; error: DatabaseError | null }>;
 }
@@ -115,11 +116,12 @@ export function createAgentWorkItemRepository(
     },
 
     async get(id: string): Promise<ObservatoryWorkItemRow | null> {
-      const { data, error } = await client
-        .from("observatory_work_items")
-        .select(WORK_ITEM_COLUMNS)
-        .eq("id", id)
-        .maybeSingle();
+      // Direct table SELECT is intentionally revoked, including for service_role.
+      // This service-only reader returns the existing API projection; routes still
+      // authenticate and check current Registry visibility before releasing it.
+      const { data, error } = await client.rpc(
+        "read_observatory_work_item_for_agent_api", { p_item_id: id },
+      );
       if (error) throw mapError(error);
       return (data as ObservatoryWorkItemRow | null) ?? null;
     },

@@ -16,7 +16,7 @@ export function buildWorkTrackerProjectOptions(
       group.projects.map((project) => ({
         projectKey: project.project_key,
         title: project.title ?? project.name,
-        owner: group.owner,
+        owner: project.project_owner ?? group.owner,
         status: project.status,
       })),
     )
