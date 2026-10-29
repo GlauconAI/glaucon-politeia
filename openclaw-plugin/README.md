@@ -81,8 +81,8 @@ API and database migration are required. Older Item/snapshot/UI consumers retain
 their original-key semantics. See `docs/project/concerto-project-associations-v1.md`.
 
 For native protected credentials, configure `agentTokens.<agent-id>` with the
-exact OpenClaw SecretRef. The manifest declares each input and the factory reads
-only the current Agent's prepared capability credential. Unresolved explicit refs
-hide tools and never fall back to a legacy token. Unconfigured Agents retain
+exact OpenClaw SecretRef. The manifest declares each input and each active tool execution reads
+only the current Agent's materialized credential from the official tool context getRuntimeConfig() snapshot, guarded by capability availability and without retaining it across calls. Unresolved explicit refs
+fail execution with UNAVAILABLE and never fall back to a legacy token. Unconfigured Agents retain
 legacy JSON environment-map compatibility; an opaque protected whole-map sentinel
 is not a JSON map. Never place plaintext tokens in repository files.

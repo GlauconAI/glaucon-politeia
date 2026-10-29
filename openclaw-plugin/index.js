@@ -1,6 +1,6 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { Type } from "typebox";
-import { getPreparedPluginSecretInput } from "openclaw/plugin-sdk/secret-input-runtime";
+import { assertPluginCapabilitySecretAvailable } from "openclaw/plugin-sdk/secret-input-runtime";
 
 import { createConcertoRequest, resolveContextToken } from "./src/client.js";
 import {
@@ -39,14 +39,21 @@ export default defineToolPlugin({
         parameters: Type.Unsafe(definition.parameters),
         factory: ({ config, toolContext }) => {
           const baseUrl = config.baseUrl ?? "https://402v.com";
-          const token = resolveContextToken({agentId:toolContext.agentId,config,readPrepared:getPreparedPluginSecretInput,env:process.env});
+          const tokenForAgent = (agentId) => agentId === toolContext.agentId
+            ? resolveContextToken({agentId,config,getRuntimeConfig:toolContext.getRuntimeConfig,assertAvailable:assertPluginCapabilitySecretAvailable,env:process.env})
+            : null;
           const tools = createConcertoTools({
             baseUrl,
             request: createConcertoRequest({
               baseUrl,
               timeoutMs: config.timeoutMs ?? 10_000,
             }),
-            tokenForAgent: (agentId) => agentId===toolContext.agentId ? token : null,
+            availableForAgent: (agentId) => {
+              if (agentId !== toolContext.agentId) return false;
+              if (Object.hasOwn(config.agentTokens ?? {}, agentId)) return true;
+              return Boolean(tokenForAgent(agentId));
+            },
+            tokenForAgent,
           }).forContext(toolContext);
           return tools.find((candidate) => candidate.name === name) ?? null;
         },

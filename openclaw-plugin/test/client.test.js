@@ -8,17 +8,24 @@ import {
   resolveContextToken,
 } from "../src/client.js";
 
-test("uses only current Agent prepared SecretRef; unresolved explicit refs never fall back", () => {
-  const calls=[];
+test("reads only the current Agent from the fresh runtime-resolved config", () => {
   const config={agentTokens:{main:{source:"store",provider:"default",id:"CONCERTO_MAIN_API_TOKEN"}}};
-  const readPrepared=(plugin,path)=>{calls.push([plugin,path]);return {value:"prepared-main-secret-value",revision:1};};
-  assert.equal(resolveContextToken({agentId:"main",config,readPrepared,env:{}}),"prepared-main-secret-value");
-  assert.deepEqual(calls,[["openclaw-concerto","agentTokens.main"]]);
-  const env={CONCERTO_AGENT_API_TOKENS:JSON.stringify({main:"legacy-main-token-value",plato:"legacy-plato-token-value"})};
-  assert.equal(resolveContextToken({agentId:"main",config,readPrepared:()=>({revision:2}),env}),null);
-  assert.equal(resolveContextToken({agentId:"plato",config,readPrepared,env}),"legacy-plato-token-value");
-  assert.equal(calls.length,1);
-  assert.equal(resolveContextToken({agentId:"../main",config,readPrepared,env}),null);
+  let current="fresh-main-token-value";const calls=[];
+  const getRuntimeConfig=()=>({plugins:{entries:{"openclaw-concerto":{enabled:true,config:{agentTokens:{main:current,plato:"other-agent-secret-value"}}}}}});
+  const assertAvailable=(path)=>calls.push(path);
+  const args={agentId:"main",config,getRuntimeConfig,assertAvailable,env:{CONCERTO_AGENT_API_TOKENS:JSON.stringify({main:"legacy-main-token-value"})}};
+  assert.equal(resolveContextToken(args),"fresh-main-token-value");
+  current="refreshed-main-token-value";assert.equal(resolveContextToken(args),current);
+  current={source:"store",provider:"default",id:"CONCERTO_MAIN_API_TOKEN"};assert.equal(resolveContextToken(args),null);
+  current=undefined;assert.equal(resolveContextToken(args),null);
+  assert.equal(resolveContextToken({...args,getRuntimeConfig:undefined}),null);
+  assert.equal(resolveContextToken({...args,assertAvailable:()=>{throw new Error("unavailable");}}),null);
+  assert.equal(resolveContextToken({...args,agentId:"../main"}),null);
+  assert.equal(resolveContextToken({...args,getRuntimeConfig:()=>({plugins:{enabled:false}})}),null);
+  assert.ok(calls.every(path=>path==="plugins.entries.openclaw-concerto.config.agentTokens.main"));
+  const env={CONCERTO_AGENT_API_TOKENS:JSON.stringify({plato:"legacy-plato-token-value"})};
+  assert.equal(resolveContextToken({agentId:"plato",config,env}),"legacy-plato-token-value");
+  assert.equal(resolveContextToken({...args,getRuntimeConfig:()=>({plugins:{entries:{"openclaw-concerto":{enabled:false}}}})}),null);
 });
 
 test("accepts only bounded canonical Agent token entries", () => {

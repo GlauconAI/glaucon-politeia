@@ -140,3 +140,23 @@ test('plugin activation manifest advertises the implemented tool inventory', asy
   const manifest = JSON.parse(await readFile(new URL('../openclaw.plugin.json', import.meta.url), 'utf8'));
   assert.deepEqual(manifest.contracts.tools, CONCERTO_TOOL_NAMES);
 });
+
+
+test("native credential is read only during execution and refreshed for every call", async () => {
+  let active = false; let current = "main-current-token-value"; let reads = 0; const calls = [];
+  const tools = createConcertoTools({
+    availableForAgent: (id) => id === "main",
+    tokenForAgent: () => { reads++; assert.equal(active, true); return current; },
+    request: async (call) => { calls.push(call); return {ok:true}; },
+  }).forContext({agentId:"main"});
+  assert.equal(reads, 0);
+  const tool = tools.find((entry) => entry.name === "concerto_get_project_association_snapshot");
+  assert.ok(tool);
+  const args = {source_project_key:"socrates/project",target_project_key:"shared/project"};
+  active = true; await tool.execute("first", args);
+  current = "main-refreshed-token-value"; await tool.execute("second", args);
+  current = null; await assert.rejects(tool.execute("revoked", args), /UNAVAILABLE/);
+  assert.equal(reads, 3); assert.equal(calls.length, 2);
+  assert.equal(calls[0].token, "main-current-token-value");
+  assert.equal(calls[1].token, "main-refreshed-token-value");
+});

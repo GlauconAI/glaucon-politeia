@@ -18,11 +18,22 @@ export class ConcertoClientError extends Error {
 
 // Explicit native SecretRefs take precedence. An unresolved ref never silently
 // selects a legacy credential, and only the host-context Agent path is queried.
-export function resolveContextToken({agentId,config,readPrepared,env}) {
+export function resolveContextToken({agentId,config,getRuntimeConfig,assertAvailable,env}) {
   if(typeof agentId!=="string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(agentId))return null;
-  if(Object.hasOwn(config.agentTokens??{},agentId)) {
-    const value=readPrepared("openclaw-concerto",`agentTokens.${agentId}`).value;
-    return typeof value==="string" && value.length>=16 ? value : null;
+  let current;
+  try {
+    const runtime=getRuntimeConfig?.();
+    if(runtime?.plugins?.enabled===false)return null;
+    current=runtime?.plugins?.entries?.["openclaw-concerto"];
+  }
+  catch { return null; }
+  if(current?.enabled===false)return null;
+  if(Object.hasOwn(config.agentTokens??{},agentId) || Object.hasOwn(current?.config?.agentTokens??{},agentId)) {
+    if(typeof getRuntimeConfig!=="function" || typeof assertAvailable!=="function")return null;
+    try { assertAvailable(`plugins.entries.openclaw-concerto.config.agentTokens.${agentId}`); }
+    catch { return null; }
+    const value=current?.config?.agentTokens?.[agentId];
+    return typeof value==="string" && value.trim().length>=16 ? value.trim() : null;
   }
   return parseAgentTokens(env[config.tokenEnv??"CONCERTO_AGENT_API_TOKENS"])[agentId]??null;
 }
