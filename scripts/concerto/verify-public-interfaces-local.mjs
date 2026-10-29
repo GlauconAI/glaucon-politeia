@@ -130,6 +130,18 @@ try {
   assert.equal((await launcher.runConcertoDatabaseCommand(sql, 'check', candidate)).rolledBack,true);
   record('launcher status read-only commit/savepoint isolation and already-applied rehearsal pass');
   record('actual predecessor functions, version trigger, snapshot and candidate migrations apply');
+  const terminal = await import('../observatory/deploy-concerto-terminal-conflicts.ts');
+  const terminalSource = await migration('20261029000100_concerto_binding_terminal_conflicts.sql');
+  const terminalCheck = await terminal.runTerminalConflictCommand(sql,'check',terminalSource,candidate);
+  assert.equal(terminalCheck.rolledBack,true); assert.equal(terminalCheck.protectedStateUnchanged,true);
+  assert.equal((await terminal.runTerminalConflictCommand(sql,'status',terminalSource,candidate)).applied,false);
+  record('terminal conflicts rollback rehearsal rejects both domains without business writes');
+  const terminalApply = await terminal.runTerminalConflictCommand(sql,'apply',terminalSource,candidate);
+  assert.equal(terminalApply.committed,true); assert.equal(terminalApply.result.probe.rejectedConflicts,2);
+  assert.equal((await terminal.runTerminalConflictCommand(sql,'status',terminalSource,candidate)).applied,true);
+  assert.equal((await terminal.runTerminalConflictCommand(sql,'check',terminalSource,candidate)).result.alreadyApplied,true);
+  record('terminal conflicts local apply and status preserve body and 33 grants');
+
   const signatures = ['read_observatory_work_item_for_agent_api(uuid)', 'read_observatory_agent_work_item_operation(text,boolean,text,text,text)', 'bind_observatory_work_item_execution_as_agent(text,boolean,text,uuid,integer,text,integer,text,text,text,text,text)'];
   for (const signature of signatures) {
     const rows = await sql`select rolname, has_function_privilege(rolname, ${signature}, 'EXECUTE') as allowed from pg_roles where rolname in ('anon','authenticated','service_role') order by rolname`;
