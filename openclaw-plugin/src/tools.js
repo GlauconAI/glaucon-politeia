@@ -292,17 +292,20 @@ function requestFor(name, params) {
   return { method: "PATCH", path: itemPath, body: bodies[name] };
 }
 
-export function createConcertoTools({ baseUrl, tokenForAgent, request }) {
+export function createConcertoTools({ baseUrl, tokenForAgent, availableForAgent, request }) {
   void baseUrl;
   return {
     forContext(context = {}) {
       const agent = context.agentId;
-      const token = typeof agent === "string" ? tokenForAgent(agent) : null;
-      if (!agent || !token) return [];
+      if (typeof agent !== "string" || !(availableForAgent ? availableForAgent(agent) : tokenForAgent(agent))) return [];
       return CONCERTO_TOOL_NAMES.map((name) => ({
         name,
         ...CONCERTO_TOOL_DEFINITIONS[name],
         execute: async (_callId, params) => {
+          // Prepared credentials are readable only inside the active invocation.
+          // Never retain a credential across calls or secret/runtime generations.
+          const token = tokenForAgent(agent);
+          if (!token) throw new Error("UNAVAILABLE");
           const spec = requestFor(name, params);
           const details = await request({
             ...spec,
