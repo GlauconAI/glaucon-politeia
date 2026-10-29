@@ -102,6 +102,18 @@ function governance(): DeliveryGovernance {
 }
 
 describe("DeliveryGovernanceSchema", () => {
+  it.each(["2026-07-21T20:43-07:00", "2026-07-21T20:43Z", "2026-07-21T20:43:00-07:00", "2026-07-21T20:43:00.123Z"])("preserves historical date fact %s", (timestamp) => {
+    const model = governance();
+    model.tasks[0].forecast_finish = timestamp;
+    expect(DeliveryGovernanceSchema.parse(model).tasks[0].forecast_finish).toBe(timestamp);
+  });
+
+  it.each(["2026-02-30T20:43-07:00", "2026-07-21T24:43-07:00", "2026-07-21T20:63-07:00", "2026-07-21T20:43", "tomorrow"])("rejects malformed or timezone-free date fact %s", (timestamp) => {
+    const model = governance();
+    model.tasks[0].forecast_finish = timestamp;
+    expect(DeliveryGovernanceSchema.safeParse(model).success).toBe(false);
+  });
+
   it("accepts a strict, internally consistent governance model", () => {
     expect(DeliveryGovernanceSchema.parse(governance())).toEqual(governance());
   });

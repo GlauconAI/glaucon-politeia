@@ -18,6 +18,8 @@ const IsoTimestamp = z.iso.datetime({ offset: true });
 const DateFact = z.union([
   z.iso.date(),
   z.iso.datetime({ offset: true }),
+  // Historical source facts record minute precision; preserve their original value.
+  z.iso.datetime({ offset: true, precision: -1 }),
   z.literal("not_recorded"),
 ]);
 const ContractType = z.enum(["GOV-DOC", "IMPLEMENT", "VERIFY", "UX", "OPS"]);
