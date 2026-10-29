@@ -11,6 +11,9 @@ const token = "owner-supplied-token";
 
 test("registers the exact Concerto V1 tool inventory", () => {
   assert.deepEqual(CONCERTO_TOOL_NAMES, [
+    "concerto_get_operation",
+    "concerto_bind_work_item_execution",
+    "concerto_get_project_work_snapshot",
     "concerto_list_work_items",
     "concerto_get_work_item",
     "concerto_create_work_item",
@@ -93,4 +96,31 @@ test("maps assignment to the item command endpoint without exposing secrets", as
     },
   });
   assert.doesNotMatch(JSON.stringify(output), /owner-supplied-token/u);
+});
+
+test('public ports expose exact typed binding, operation receipt and complete snapshot requests', async () => {
+  const calls = [];
+  const tools = createConcertoTools({ tokenForAgent: () => token, request: async (call) => { calls.push(call); return {}; } }).forContext({ agentId });
+  for (const name of ['concerto_get_operation', 'concerto_bind_work_item_execution', 'concerto_get_project_work_snapshot']) {
+    const tool = tools.find((entry) => entry.name === name);
+    assert.ok(tool, name);
+    assert.equal(tool.parameters.additionalProperties, false);
+    assert.equal(Object.hasOwn(tool.parameters.properties, 'is_project_owner'), false);
+  }
+  await tools.find((entry) => entry.name === 'concerto_get_operation').execute('op', { project_ref: 'shared/test', operation_key: 'key', operation_agent_id: 'aristotle' });
+  assert.equal(calls[0].path, '/api/concerto/operations');
+  assert.deepEqual(calls[0].query, { projectRef: 'shared/test', operationKey: 'key', operationAgentId: 'aristotle' });
+  await tools.find((entry) => entry.name === 'concerto_bind_work_item_execution').execute('bind', { work_item_id: 'id', expected_version: 1, expected_project_revision: 'a'.repeat(32), plan_revision: 2, stage_id: 's', work_package_id: 'wp', idempotency_key: 'key', intake_fingerprint: 'b'.repeat(64) });
+  assert.equal(calls[1].path, '/api/concerto/work-items/id/execution-binding');
+  assert.equal(calls[1].method, 'POST');
+  assert.deepEqual(calls[1].body, { expectedVersion: 1, expectedProjectRevision: 'a'.repeat(32), planRevision: 2, stageId: 's', workPackageId: 'wp', idempotencyKey: 'key', intakeFingerprint: 'b'.repeat(64) });
+  await tools.find((entry) => entry.name === 'concerto_get_project_work_snapshot').execute('snapshot', { project_key: 'shared/test', expected_revision: 'c'.repeat(32) });
+  assert.equal(calls[2].path, '/api/concerto/project-work-snapshot');
+  assert.deepEqual(calls[2].query, { projectKey: 'shared/test', expectedRevision: 'c'.repeat(32) });
+});
+
+test('plugin activation manifest advertises the implemented tool inventory', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const manifest = JSON.parse(await readFile(new URL('../openclaw.plugin.json', import.meta.url), 'utf8'));
+  assert.deepEqual(manifest.contracts.tools, CONCERTO_TOOL_NAMES);
 });

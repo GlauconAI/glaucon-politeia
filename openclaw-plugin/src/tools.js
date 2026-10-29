@@ -25,6 +25,37 @@ const agentId = {
 };
 
 export const CONCERTO_TOOL_DEFINITIONS = {
+  concerto_get_operation: {
+    label: "Get Concerto Operation Receipt",
+    description: "Read an immutable operation receipt in exact actor/project scope; only the current Project Owner may select another actor.",
+    parameters: schema(["project_ref", "operation_key"], {
+      project_ref: { type: "string", minLength: 3, maxLength: 160 },
+      operation_key: idempotencyKey,
+      operation_agent_id: agentId,
+    }),
+  },
+  concerto_bind_work_item_execution: {
+    label: "Bind Concerto Work Item Execution",
+    description: "Bind an eligible Work Item to an exact Plan/Stage/Work Package. Current Project Owner only, atomically checks the complete Project snapshot revision.",
+    parameters: schema(["work_item_id", "expected_version", "expected_project_revision", "plan_revision", "stage_id", "work_package_id", "idempotency_key"], {
+      work_item_id: uuid,
+      expected_version: { ...version, maximum: 2147483647 },
+      expected_project_revision: { type: "string", pattern: "^[a-f0-9]{32}$" },
+      plan_revision: { type: "integer", minimum: 0, maximum: 2147483647 },
+      stage_id: { type: "string", minLength: 1, maxLength: 128 },
+      work_package_id: { type: "string", minLength: 1, maxLength: 128 },
+      idempotency_key: idempotencyKey,
+      intake_fingerprint: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    }),
+  },
+  concerto_get_project_work_snapshot: {
+    label: "Get Complete Concerto Project Work Snapshot",
+    description: "Read a complete Project Work snapshot with its authoritative revision; current Project Owner only.",
+    parameters: schema(["project_key"], {
+      project_key: { type: "string", minLength: 3, maxLength: 160 },
+      expected_revision: { type: "string", pattern: "^[a-f0-9]{32}$" },
+    }),
+  },
   concerto_list_work_items: {
     label: "List Concerto Work Items",
     description: "List Concerto Work Items visible to the current Agent.",
@@ -129,6 +160,22 @@ export const CONCERTO_TOOL_NAMES = Object.freeze(
 );
 
 function requestFor(name, params) {
+  if (name === "concerto_get_operation") return {
+    method: "GET", path: "/api/concerto/operations",
+    query: { projectRef: params.project_ref, operationKey: params.operation_key, operationAgentId: params.operation_agent_id },
+  };
+  if (name === "concerto_get_project_work_snapshot") return {
+    method: "GET", path: "/api/concerto/project-work-snapshot",
+    query: { projectKey: params.project_key, expectedRevision: params.expected_revision },
+  };
+  if (name === "concerto_bind_work_item_execution") return {
+    method: "POST", path: `/api/concerto/work-items/${params.work_item_id}/execution-binding`,
+    body: { expectedVersion: params.expected_version, expectedProjectRevision: params.expected_project_revision,
+      planRevision: params.plan_revision, stageId: params.stage_id, workPackageId: params.work_package_id,
+      idempotencyKey: params.idempotency_key,
+      ...(params.intake_fingerprint === undefined ? {} : { intakeFingerprint: params.intake_fingerprint }),
+    },
+  };
   const itemPath = params.work_item_id
     ? `/api/concerto/work-items/${params.work_item_id}`
     : null;
